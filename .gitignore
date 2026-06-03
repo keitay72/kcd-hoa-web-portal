@@ -1,0 +1,30 @@
+# Flutter/Dart
+**/.dart_tool/
+**/.packages
+**/build/
+**/pubspec.lock
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+
+# iOS/Android
+**/ios/Pods/
+**/ios/.symlinks/
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/android/.gradle/
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# Supabase local
+backend/supabase/.temp/

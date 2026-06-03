@@ -1,0 +1,16 @@
+name: kc_disposal_phase1
+
+packages:
+  - apps/**
+  - packages/**
+
+scripts:
+  bootstrap:
+    run: melos bootstrap
+    description: Bootstrap all Dart/Flutter packages.
+  analyze:
+    run: melos exec -- flutter analyze
+    description: Run static analysis across workspace.
+  test:
+    run: melos exec -- flutter test
+    description: Run tests across workspace.
