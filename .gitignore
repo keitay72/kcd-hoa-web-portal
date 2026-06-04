@@ -28,3 +28,5 @@
 
 # Supabase local
 backend/supabase/.temp/
+
+.DS_Store
