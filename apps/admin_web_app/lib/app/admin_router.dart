@@ -10,6 +10,8 @@ import '../features/activation_codes/presentation/activation_code_list_page.dart
 import '../features/auth_admin/presentation/sign_in_page.dart';
 import '../features/hoa_management/presentation/hoa_detail_page.dart';
 import '../features/hoa_management/presentation/hoa_list_page.dart';
+import '../features/verification_admin/presentation/resident_verification_detail_page.dart';
+import '../features/verification_admin/presentation/resident_verification_list_page.dart';
 
 final currentAdminRoleProvider = FutureProvider.autoDispose<String>((ref) async {
   final user = ref.watch(currentUserProvider);
@@ -112,10 +114,14 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/admin/resident-verification',
-            name: 'residentVerification',
-            builder: (context, state) => const AdminComingSoonPage(
-              title: 'Resident Verification',
-              description: 'Resident verification management will be implemented next.',
+            name: 'residentVerificationList',
+            builder: (context, state) => const ResidentVerificationListPage(),
+          ),
+          GoRoute(
+            path: '/admin/resident-verification/:verificationId',
+            name: 'residentVerificationDetail',
+            builder: (context, state) => ResidentVerificationDetailPage(
+              verificationId: state.pathParameters['verificationId']!,
             ),
           ),
           GoRoute(
