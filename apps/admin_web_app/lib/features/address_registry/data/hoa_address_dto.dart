@@ -15,6 +15,11 @@ class HoaAddressDto {
     required this.updatedAt,
     this.hoaName,
     this.hoaCode,
+    this.activationCodeId,
+    this.activationCodeStatus,
+    this.activationCodeExpiresAt,
+    this.activationCodeConsumedAt,
+    this.activationCodeResetCount,
   });
 
   final String id;
@@ -30,9 +35,15 @@ class HoaAddressDto {
   final DateTime updatedAt;
   final String? hoaName;
   final String? hoaCode;
+  final String? activationCodeId;
+  final String? activationCodeStatus;
+  final DateTime? activationCodeExpiresAt;
+  final DateTime? activationCodeConsumedAt;
+  final int? activationCodeResetCount;
 
   factory HoaAddressDto.fromJson(Map<String, dynamic> json) {
     final hoa = json['hoa_communities'] as Map<String, dynamic>?;
+    final activationCode = _selectedActivationCode(json['activation_codes']);
 
     return HoaAddressDto(
       id: json['id'] as String,
@@ -48,6 +59,15 @@ class HoaAddressDto {
       updatedAt: DateTime.parse(json['updated_at'] as String),
       hoaName: hoa?['name'] as String?,
       hoaCode: hoa?['code'] as String?,
+      activationCodeId: activationCode?['id'] as String?,
+      activationCodeStatus: activationCode?['status'] as String?,
+      activationCodeExpiresAt: activationCode?['expires_at'] == null
+          ? null
+          : DateTime.parse(activationCode!['expires_at'] as String),
+      activationCodeConsumedAt: activationCode?['consumed_at'] == null
+          ? null
+          : DateTime.parse(activationCode!['consumed_at'] as String),
+      activationCodeResetCount: activationCode?['reset_count'] as int?,
     );
   }
 
@@ -66,6 +86,32 @@ class HoaAddressDto {
       updatedAt: updatedAt,
       hoaName: hoaName,
       hoaCode: hoaCode,
+      activationCodeId: activationCodeId,
+      activationCodeStatus: activationCodeStatus,
+      activationCodeExpiresAt: activationCodeExpiresAt,
+      activationCodeConsumedAt: activationCodeConsumedAt,
+      activationCodeResetCount: activationCodeResetCount,
     );
+  }
+
+  static Map<String, dynamic>? _selectedActivationCode(Object? value) {
+    if (value is! List || value.isEmpty) {
+      return null;
+    }
+
+    final codes = value.cast<Map<String, dynamic>>().toList()
+      ..sort((left, right) {
+        final leftActive = left['status'] == 'active' ? 0 : 1;
+        final rightActive = right['status'] == 'active' ? 0 : 1;
+        if (leftActive != rightActive) {
+          return leftActive.compareTo(rightActive);
+        }
+
+        final leftCreated = DateTime.parse(left['created_at'] as String);
+        final rightCreated = DateTime.parse(right['created_at'] as String);
+        return rightCreated.compareTo(leftCreated);
+      });
+
+    return codes.first;
   }
 }

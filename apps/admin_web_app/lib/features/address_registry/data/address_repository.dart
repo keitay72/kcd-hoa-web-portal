@@ -48,7 +48,8 @@ class SupabaseAddressRepository implements AddressRepository {
     is_active,
     created_at,
     updated_at,
-    hoa_communities(name, code)
+    hoa_communities(name, code),
+    activation_codes(id, status, expires_at, consumed_at, reset_count, created_at)
   ''';
 
   @override

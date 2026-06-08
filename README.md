@@ -32,13 +32,13 @@ Implemented in `apps/admin_web_app`:
 - Address Registry Management
 - Bulk address CSV import
 - Activation Code Management
+- Resident Verification Management
+- Document Management with Supabase Storage uploads and signed downloads
+- Announcement Management with draft/published/archived workflows
+- Service Schedule Management with HOA-wide defaults and optional address overrides
 
 Planned Phase 1 admin areas with routes reserved in the navigation shell:
 
-- Resident Verification
-- Announcements
-- Documents
-- Service Schedules
 - Tickets
 - Audit Logs
 
@@ -62,6 +62,10 @@ The Admin Web App uses feature-first organization:
 - `lib/features/hoa_management`: HOA list/detail/create/edit workflows
 - `lib/features/address_registry`: Address list/detail/create/edit/import workflows
 - `lib/features/activation_codes`: Activation code list/detail/generate/reset/revoke/history workflows
+- `lib/features/verification_admin`: Resident verification list/detail/status workflows
+- `lib/features/documents_cms`: Document list/detail/upload/edit/archive/download workflows
+- `lib/features/announcements_cms`: Announcement list/detail/create/edit/archive/publish workflows
+- `lib/features/schedules_admin`: HOA-wide service schedule and optional address override workflows
 
 Each implemented feature follows a lightweight clean architecture shape:
 
@@ -83,8 +87,23 @@ Phase 1 migrations are located in `backend/supabase/migrations` and include:
 - Storage policies
 - Role/permission seed data
 - Development seed data
+- HOA-wide service schedule schema migration in `0014_service_schedule_hoa_wide_model.sql`
 
 The deployed schema is treated as the source of truth for Admin Web App queries.
+
+## Service Schedule Model
+
+Service schedules are modeled as HOA-wide defaults first:
+
+- `hoa_id`: HOA community receiving service
+- `service_type`: `trash`, `recycling`, `yard_waste`, or `bulk`
+- `schedule_rule`: human-readable rule such as `Tuesday`, `Thursday`, or `First Saturday`
+- `route_name`: optional KC Disposal route label
+- `effective_date`: first date the schedule applies
+- `end_date`: optional historical end date
+- `status`: `active` or `archived`
+
+Address-specific schedules are optional overrides only. Override rows use the same `service_schedules` table with `address_id` populated. HOA-wide default rows keep `address_id` as `null`.
 
 ## Environment Setup
 
@@ -113,7 +132,7 @@ Run static analysis when the local Flutter/Dart toolchain supports it:
 flutter analyze
 ```
 
-Note: on this machine, `flutter analyze` is currently blocked because the installed Dart VM requires macOS 14 while the machine reports macOS 13.
+Note: this development machine is limited to macOS 13. If the installed Flutter/Dart SDK requires macOS 14, use the running Flutter Web compiler/hot restart output for local compile feedback or pin a compatible Flutter SDK for this hardware.
 
 ## Activation Code Security Note
 

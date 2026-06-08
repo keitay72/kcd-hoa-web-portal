@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../domain/activation_code_address_option.dart';
 import '../domain/activation_code_inputs.dart';
 import 'activation_code_providers.dart';
 import 'generated_code_result.dart';
 
 class GenerateActivationCodeDialog extends ConsumerStatefulWidget {
-  const GenerateActivationCodeDialog({super.key});
+  const GenerateActivationCodeDialog({
+    this.initialAddressId,
+    super.key,
+  });
+
+  final String? initialAddressId;
 
   @override
   ConsumerState<GenerateActivationCodeDialog> createState() =>
@@ -20,9 +26,12 @@ class _GenerateActivationCodeDialogState
   final _reasonController = TextEditingController();
   String? _addressId;
 
+  bool get _isAddressLocked => widget.initialAddressId != null;
+
   @override
   void initState() {
     super.initState();
+    _addressId = widget.initialAddressId;
     Future.microtask(() {
       ref.read(activationCodeCommandProvider.notifier).clearGeneratedCode();
     });
@@ -45,64 +54,78 @@ class _GenerateActivationCodeDialogState
       content: SizedBox(
         width: 680,
         child: addresses.when(
-          data: (items) => Form(
-            key: _formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  DropdownButtonFormField<String>(
-                    value: _addressId,
-                    decoration: const InputDecoration(
-                      labelText: 'Address',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: items
-                        .map(
-                          (item) => DropdownMenuItem(
-                            value: item.id,
-                            child: Text(item.label),
-                          ),
-                        )
-                        .toList(),
-                    validator: (value) => value == null ? 'Required' : null,
-                    onChanged: (value) => setState(() => _addressId = value),
-                  ),
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: _daysController,
-                    decoration: const InputDecoration(
-                      labelText: 'Expires In Days',
-                      border: OutlineInputBorder(),
-                    ),
-                    keyboardType: TextInputType.number,
-                    validator: _validateDays,
-                  ),
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: _reasonController,
-                    decoration: const InputDecoration(
-                      labelText: 'Reason / Notes',
-                      border: OutlineInputBorder(),
-                    ),
-                    minLines: 2,
-                    maxLines: 4,
-                  ),
-                  if (commandState.hasError) ...[
+          data: (items) {
+            final selectedAddress = _selectedAddressLabel(items);
+
+            return Form(
+              key: _formKey,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_isAddressLocked)
+                      TextFormField(
+                        initialValue: selectedAddress ?? _addressId,
+                        readOnly: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Address',
+                          border: OutlineInputBorder(),
+                        ),
+                      )
+                    else
+                      DropdownButtonFormField<String>(
+                        value: _addressId,
+                        decoration: const InputDecoration(
+                          labelText: 'Address',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: items
+                            .map(
+                              (item) => DropdownMenuItem(
+                                value: item.id,
+                                child: Text(item.label),
+                              ),
+                            )
+                            .toList(),
+                        validator: (value) => value == null ? 'Required' : null,
+                        onChanged: (value) => setState(() => _addressId = value),
+                      ),
                     const SizedBox(height: 14),
-                    Text(
-                      commandState.error.toString(),
-                      style: TextStyle(color: Theme.of(context).colorScheme.error),
+                    TextFormField(
+                      controller: _daysController,
+                      decoration: const InputDecoration(
+                        labelText: 'Expires In Days',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: _validateDays,
                     ),
-                  ],
-                  if (commandState.valueOrNull != null) ...[
                     const SizedBox(height: 14),
-                    GeneratedCodeResult(result: commandState.valueOrNull!),
+                    TextFormField(
+                      controller: _reasonController,
+                      decoration: const InputDecoration(
+                        labelText: 'Reason / Notes',
+                        border: OutlineInputBorder(),
+                      ),
+                      minLines: 2,
+                      maxLines: 4,
+                    ),
+                    if (commandState.hasError) ...[
+                      const SizedBox(height: 14),
+                      Text(
+                        commandState.error.toString(),
+                        style: TextStyle(color: Theme.of(context).colorScheme.error),
+                      ),
+                    ],
+                    if (commandState.valueOrNull != null) ...[
+                      const SizedBox(height: 14),
+                      GeneratedCodeResult(result: commandState.valueOrNull!),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
-          ),
+            );
+          },
           loading: () => const Padding(
             padding: EdgeInsets.all(24),
             child: Center(child: CircularProgressIndicator()),
@@ -129,6 +152,21 @@ class _GenerateActivationCodeDialogState
         ),
       ],
     );
+  }
+
+  String? _selectedAddressLabel(List<ActivationCodeAddressOption> items) {
+    final addressId = _addressId;
+    if (addressId == null) {
+      return null;
+    }
+
+    for (final item in items) {
+      if (item.id == addressId) {
+        return item.label;
+      }
+    }
+
+    return addressId;
   }
 
   String? _validateDays(String? value) {

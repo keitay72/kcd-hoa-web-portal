@@ -114,7 +114,14 @@ class _AddressListPageState extends ConsumerState<AddressListPage> {
                         subtitle: Text(
                           '${address.hoaName ?? 'HOA'} · ${address.statusLabel}',
                         ),
-                        trailing: const Icon(Icons.chevron_right),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _StatusPill(label: address.activationCodeStatusLabel),
+                            const SizedBox(width: 8),
+                            const Icon(Icons.chevron_right),
+                          ],
+                        ),
                         onTap: () => context.go('/admin/addresses/${address.id}'),
                       );
                     },
@@ -151,5 +158,28 @@ class _AddressListPageState extends ConsumerState<AddressListPage> {
       builder: (_) => const AddressCsvImportDialog(),
     );
     ref.invalidate(addressListProvider(_selectedHoaId));
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        child: Text(
+          label,
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+      ),
+    );
   }
 }

@@ -7,9 +7,15 @@ import '../features/address_registry/presentation/address_detail_page.dart';
 import '../features/address_registry/presentation/address_list_page.dart';
 import '../features/activation_codes/presentation/activation_code_detail_page.dart';
 import '../features/activation_codes/presentation/activation_code_list_page.dart';
+import '../features/announcements_cms/presentation/announcement_detail_page.dart';
+import '../features/announcements_cms/presentation/announcement_list_page.dart';
 import '../features/auth_admin/presentation/sign_in_page.dart';
+import '../features/documents_cms/presentation/document_detail_page.dart';
+import '../features/documents_cms/presentation/document_list_page.dart';
 import '../features/hoa_management/presentation/hoa_detail_page.dart';
 import '../features/hoa_management/presentation/hoa_list_page.dart';
+import '../features/schedules_admin/presentation/service_schedule_detail_page.dart';
+import '../features/schedules_admin/presentation/service_schedule_list_page.dart';
 import '../features/verification_admin/presentation/resident_verification_detail_page.dart';
 import '../features/verification_admin/presentation/resident_verification_list_page.dart';
 
@@ -126,26 +132,38 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/admin/announcements',
-            name: 'announcements',
-            builder: (context, state) => const AdminComingSoonPage(
-              title: 'Announcements',
-              description: 'Announcement CMS will be implemented next.',
+            name: 'announcementList',
+            builder: (context, state) => const AnnouncementListPage(),
+          ),
+          GoRoute(
+            path: '/admin/announcements/:announcementId',
+            name: 'announcementDetail',
+            builder: (context, state) => AnnouncementDetailPage(
+              announcementId: state.pathParameters['announcementId']!,
             ),
           ),
           GoRoute(
             path: '/admin/documents',
-            name: 'documents',
-            builder: (context, state) => const AdminComingSoonPage(
-              title: 'Documents',
-              description: 'Document CMS will be implemented next.',
+            name: 'documentList',
+            builder: (context, state) => const DocumentListPage(),
+          ),
+          GoRoute(
+            path: '/admin/documents/:documentId',
+            name: 'documentDetail',
+            builder: (context, state) => DocumentDetailPage(
+              documentId: state.pathParameters['documentId']!,
             ),
           ),
           GoRoute(
             path: '/admin/service-schedules',
-            name: 'serviceSchedules',
-            builder: (context, state) => const AdminComingSoonPage(
-              title: 'Service Schedules',
-              description: 'Service schedule management will be implemented next.',
+            name: 'serviceScheduleList',
+            builder: (context, state) => const ServiceScheduleListPage(),
+          ),
+          GoRoute(
+            path: '/admin/service-schedules/:scheduleId',
+            name: 'serviceScheduleDetail',
+            builder: (context, state) => ServiceScheduleDetailPage(
+              scheduleId: state.pathParameters['scheduleId']!,
             ),
           ),
           GoRoute(
