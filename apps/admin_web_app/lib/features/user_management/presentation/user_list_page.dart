@@ -31,6 +31,7 @@ class _UserListPageState extends ConsumerState<UserListPage> {
   @override
   Widget build(BuildContext context) {
     final users = ref.watch(userListProvider(_filter));
+    final metrics = ref.watch(inviteMetricsProvider);
 
     return Padding(
       padding: const EdgeInsets.all(24),
@@ -48,6 +49,12 @@ class _UserListPageState extends ConsumerState<UserListPage> {
                 label: const Text('Invite User'),
               ),
             ],
+          ),
+          const SizedBox(height: 16),
+          metrics.when(
+            data: (item) => _InviteMetricCards(metrics: item),
+            loading: () => const SizedBox(height: 88, child: Center(child: LinearProgressIndicator())),
+            error: (error, _) => Text('Unable to load invite counters: $error'),
           ),
           const SizedBox(height: 16),
           Card(
@@ -72,6 +79,10 @@ class _UserListPageState extends ConsumerState<UserListPage> {
                     items: const [
                       DropdownMenuItem(value: 'all', child: Text('All Statuses')),
                       DropdownMenuItem(value: 'active', child: Text('Active')),
+                      DropdownMenuItem(value: 'invite_pending', child: Text('Pending Invite')),
+                      DropdownMenuItem(value: 'invite_expired', child: Text('Invite Expired')),
+                      DropdownMenuItem(value: 'invite_failed', child: Text('Failed Invite')),
+                      DropdownMenuItem(value: 'invite_cancelled', child: Text('Cancelled Invite')),
                       DropdownMenuItem(value: 'disabled', child: Text('Disabled')),
                     ],
                     onChanged: (value) => setState(() => _status = value == 'all' ? null : value),
@@ -147,12 +158,72 @@ class _UserListPageState extends ConsumerState<UserListPage> {
 
     if (result == true) ref.invalidate(userListProvider);
   }
+
+}
+
+class _InviteMetricCards extends StatelessWidget {
+  const _InviteMetricCards({required this.metrics});
+
+  final InviteMetrics metrics;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: [
+        _MetricCard(label: 'Pending Invites', value: metrics.pending, icon: Icons.schedule_send_outlined),
+        _MetricCard(label: 'Failed Invites', value: metrics.failed, icon: Icons.error_outline),
+        _MetricCard(label: 'Accepted Invites', value: metrics.accepted, icon: Icons.mark_email_read_outlined),
+      ],
+    );
+  }
+}
+
+class _MetricCard extends StatelessWidget {
+  const _MetricCard({required this.label, required this.value, required this.icon});
+
+  final String label;
+  final int value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 220,
+      child: Card(
+        margin: EdgeInsets.zero,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Icon(icon, color: Theme.of(context).colorScheme.primary),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(value.toString(), style: Theme.of(context).textTheme.headlineSmall),
+                  Text(label),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _UserTable extends StatelessWidget {
   const _UserTable({required this.users});
 
   final List<AdminUser> users;
+
+  IconData _iconForUser(AdminUser user) {
+    if (user.isPendingInvite) return Icons.mark_email_unread_outlined;
+    if (!user.isActive) return Icons.person_off_outlined;
+    return Icons.person_outline;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -166,14 +237,14 @@ class _UserTable extends StatelessWidget {
         itemBuilder: (context, index) {
           final user = users[index];
           return ListTile(
-            leading: Icon(user.isActive ? Icons.person_outline : Icons.person_off_outlined),
+            leading: Icon(_iconForUser(user)),
             title: Text(user.displayName),
             subtitle: Text('${user.email} - ${user.roleSummary}'),
             trailing: Wrap(
               spacing: 8,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                Chip(label: Text(user.status)),
+                Chip(label: Text(user.statusLabel)),
                 const Icon(Icons.chevron_right),
               ],
             ),

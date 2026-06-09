@@ -34,6 +34,7 @@ class AdminUserDto {
   AdminUser toDomain({
     required List<UserPlatformRoleAssignment> platformRoles,
     required List<UserHoaRoleAssignment> hoaRoles,
+    AdminUserInvite? latestInvite,
   }) {
     return AdminUser(
       id: id,
@@ -45,8 +46,85 @@ class AdminUserDto {
       updatedAt: updatedAt,
       platformRoles: platformRoles,
       hoaRoles: hoaRoles,
+      latestInvite: latestInvite,
     );
   }
+}
+
+class AdminUserInviteDto {
+  const AdminUserInviteDto({
+    required this.id,
+    this.userId,
+    required this.email,
+    required this.roleCode,
+    required this.status,
+    required this.invitedAt,
+    required this.expiresAt,
+    this.acceptedAt,
+    this.resentAt,
+    required this.resendCount,
+    this.cancelledAt,
+    this.failureMessage,
+    this.failureReason,
+    this.failureTimestamp,
+  });
+
+  final String id;
+  final String? userId;
+  final String email;
+  final String roleCode;
+  final String status;
+  final DateTime invitedAt;
+  final DateTime expiresAt;
+  final DateTime? acceptedAt;
+  final DateTime? resentAt;
+  final int resendCount;
+  final DateTime? cancelledAt;
+  final String? failureMessage;
+  final String? failureReason;
+  final DateTime? failureTimestamp;
+
+  factory AdminUserInviteDto.fromJson(Map<String, dynamic> json) {
+    return AdminUserInviteDto(
+      id: json['id'] as String,
+      userId: json['user_id'] as String?,
+      email: json['email'] as String,
+      roleCode: json['role_code'] as String,
+      status: json['status'] as String? ?? 'pending',
+      invitedAt: DateTime.parse(json['invited_at'] as String),
+      expiresAt: DateTime.parse(json['expires_at'] as String),
+      acceptedAt: _optionalDate(json['accepted_at']),
+      resentAt: _optionalDate(json['resent_at']),
+      resendCount: json['resend_count'] as int? ?? 0,
+      cancelledAt: _optionalDate(json['cancelled_at']),
+      failureMessage: json['failure_message'] as String?,
+      failureReason: json['failure_reason'] as String?,
+      failureTimestamp: _optionalDate(json['failure_timestamp']),
+    );
+  }
+
+  AdminUserInvite toDomain() {
+    return AdminUserInvite(
+      id: id,
+      userId: userId,
+      email: email,
+      roleCode: roleCode,
+      status: status,
+      invitedAt: invitedAt,
+      expiresAt: expiresAt,
+      acceptedAt: acceptedAt,
+      resentAt: resentAt,
+      resendCount: resendCount,
+      cancelledAt: cancelledAt,
+      failureMessage: failureMessage,
+      failureReason: failureReason,
+      failureTimestamp: failureTimestamp,
+    );
+  }
+}
+
+DateTime? _optionalDate(Object? value) {
+  return value is String ? DateTime.parse(value) : null;
 }
 
 class UserPlatformRoleAssignmentDto {

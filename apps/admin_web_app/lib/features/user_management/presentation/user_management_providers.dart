@@ -29,6 +29,22 @@ final userDetailProvider = FutureProvider.autoDispose.family<AdminUser, String>(
   return ref.watch(userRepositoryProvider).getById(id);
 });
 
+final inviteMetricsProvider = FutureProvider.autoDispose<InviteMetrics>((ref) async {
+  final users = await ref.watch(userRepositoryProvider).list();
+  var pending = 0;
+  var failed = 0;
+  var accepted = 0;
+
+  for (final user in users) {
+    final status = user.latestInvite?.status;
+    if (status == 'pending') pending += 1;
+    if (status == 'failed') failed += 1;
+    if (status == 'accepted') accepted += 1;
+  }
+
+  return InviteMetrics(pending: pending, failed: failed, accepted: accepted);
+});
+
 final roleCatalogProvider = FutureProvider.autoDispose<List<RoleCatalogEntry>>((ref) {
   return ref.watch(roleRepositoryProvider).roles();
 });
@@ -48,6 +64,18 @@ final hoaScopeOptionsProvider = FutureProvider.autoDispose<List<HoaScopeOption>>
 final userCommandProvider = AsyncNotifierProvider.autoDispose<UserCommandController, void>(
   UserCommandController.new,
 );
+
+class InviteMetrics {
+  const InviteMetrics({
+    required this.pending,
+    required this.failed,
+    required this.accepted,
+  });
+
+  final int pending;
+  final int failed;
+  final int accepted;
+}
 
 class UserListFilter {
   const UserListFilter({this.search, this.status});
@@ -82,6 +110,28 @@ class UserCommandController extends AutoDisposeAsyncNotifier<void> {
     state = const AsyncData(null);
     _invalidateUsers();
     return true;
+  }
+
+  Future<bool> resendInvite({required String userId, required String inviteId}) async {
+    state = const AsyncLoading();
+    final result = await AsyncValue.guard(() {
+      return ref.read(userRepositoryProvider).resendInvite(
+            InviteLifecycleActionInput(action: 'resend', inviteId: inviteId),
+          );
+    });
+
+    return _finishVoidCommand(result, userId);
+  }
+
+  Future<bool> cancelInvite({required String userId, required String inviteId}) async {
+    state = const AsyncLoading();
+    final result = await AsyncValue.guard(() {
+      return ref.read(userRepositoryProvider).cancelInvite(
+            InviteLifecycleActionInput(action: 'cancel', inviteId: inviteId),
+          );
+    });
+
+    return _finishVoidCommand(result, userId);
   }
 
   Future<AdminUser?> updateUser({
@@ -165,6 +215,7 @@ class UserCommandController extends AutoDisposeAsyncNotifier<void> {
 
   void _invalidateUsers([String? userId]) {
     ref.invalidate(userListProvider);
+    ref.invalidate(inviteMetricsProvider);
     if (userId != null) ref.invalidate(userDetailProvider(userId));
   }
 }

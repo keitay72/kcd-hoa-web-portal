@@ -47,6 +47,7 @@ class _UserDetailContent extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final commandState = ref.watch(userCommandProvider);
+    final isInviteOnly = user.id.startsWith('invite:');
 
     return ListView(
       padding: const EdgeInsets.all(24),
@@ -76,22 +77,22 @@ class _UserDetailContent extends ConsumerWidget {
               runSpacing: 8,
               children: [
                 OutlinedButton.icon(
-                  onPressed: () => _openEditDialog(context, ref),
+                  onPressed: isInviteOnly ? null : () => _openEditDialog(context, ref),
                   icon: const Icon(Icons.edit_outlined),
                   label: const Text('Edit User'),
                 ),
                 OutlinedButton.icon(
-                  onPressed: () => _openAssignPlatformRoleDialog(context, ref),
+                  onPressed: isInviteOnly ? null : () => _openAssignPlatformRoleDialog(context, ref),
                   icon: const Icon(Icons.admin_panel_settings_outlined),
                   label: const Text('Platform Role'),
                 ),
                 OutlinedButton.icon(
-                  onPressed: () => _openAssignHoaRoleDialog(context, ref),
+                  onPressed: isInviteOnly ? null : () => _openAssignHoaRoleDialog(context, ref),
                   icon: const Icon(Icons.domain_outlined),
                   label: const Text('HOA Role'),
                 ),
                 FilledButton.icon(
-                  onPressed: user.isActive && !commandState.isLoading
+                  onPressed: !isInviteOnly && user.isActive && !commandState.isLoading
                       ? () => _confirmDeactivate(context, ref)
                       : null,
                   icon: const Icon(Icons.person_off_outlined),
@@ -115,7 +116,15 @@ class _UserDetailContent extends ConsumerWidget {
               return Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(child: _ProfileCard(user: user)),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        _ProfileCard(user: user),
+                        const SizedBox(height: 20),
+                        _InviteLifecycleCard(user: user),
+                      ],
+                    ),
+                  ),
                   const SizedBox(width: 20),
                   Expanded(child: _RoleCards(user: user)),
                 ],
@@ -125,6 +134,8 @@ class _UserDetailContent extends ConsumerWidget {
             return Column(
               children: [
                 _ProfileCard(user: user),
+                const SizedBox(height: 20),
+                _InviteLifecycleCard(user: user),
                 const SizedBox(height: 20),
                 _RoleCards(user: user),
               ],
@@ -196,12 +207,119 @@ class _ProfileCard extends StatelessWidget {
             _InfoRow(label: 'Name', value: user.displayName),
             _InfoRow(label: 'Email', value: user.email),
             _InfoRow(label: 'Phone', value: user.phone ?? 'Not set'),
-            _InfoRow(label: 'Status', value: user.status),
+            _InfoRow(label: 'Status', value: user.statusLabel),
             _InfoRow(label: 'Created', value: _formatDate(user.createdAt)),
             _InfoRow(label: 'Updated', value: _formatDate(user.updatedAt)),
           ],
         ),
       ),
+    );
+  }
+}
+
+
+class _InviteLifecycleCard extends ConsumerWidget {
+  const _InviteLifecycleCard({required this.user});
+
+  final AdminUser user;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final invite = user.latestInvite;
+    final commandState = ref.watch(userCommandProvider);
+
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(child: Text('Invite Lifecycle', style: Theme.of(context).textTheme.titleLarge)),
+                if (invite != null) Chip(label: Text(invite.statusLabel)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (invite == null)
+              const Text('No invite record found for this user.')
+            else ...[
+              _InfoRow(label: 'Invite Status', value: invite.statusLabel),
+              _InfoRow(label: 'Invited', value: _formatDateTime(invite.invitedAt)),
+              _InfoRow(label: 'Expires', value: _formatDateTime(invite.expiresAt)),
+              _InfoRow(label: 'Resent', value: invite.resentAt == null ? 'Never' : _formatDateTime(invite.resentAt!)),
+              _InfoRow(label: 'Resend Count', value: invite.resendCount.toString()),
+              if (invite.acceptedAt != null)
+                _InfoRow(label: 'Accepted', value: _formatDateTime(invite.acceptedAt!)),
+              if (invite.cancelledAt != null)
+                _InfoRow(label: 'Cancelled', value: _formatDateTime(invite.cancelledAt!)),
+              if (invite.failureReason != null && invite.failureReason!.trim().isNotEmpty)
+                _InfoRow(label: 'Failure Reason', value: invite.failureReason!),
+              if (invite.failureTimestamp != null)
+                _InfoRow(label: 'Failed At', value: _formatDateTime(invite.failureTimestamp!)),
+              if (invite.failureMessage != null && invite.failureMessage!.trim().isNotEmpty && invite.failureMessage != invite.failureReason)
+                _InfoRow(label: 'Failure Message', value: invite.failureMessage!),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: invite.canResend && !commandState.isLoading
+                        ? () => _resendInvite(context, ref, invite)
+                        : null,
+                    icon: const Icon(Icons.outgoing_mail),
+                    label: const Text('Resend Invite'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: invite.canCancel && !commandState.isLoading
+                        ? () => _confirmCancelInvite(context, ref, invite)
+                        : null,
+                    icon: const Icon(Icons.cancel_outlined),
+                    label: const Text('Cancel Invite'),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _resendInvite(BuildContext context, WidgetRef ref, AdminUserInvite invite) async {
+    final didResend = await ref.read(userCommandProvider.notifier).resendInvite(
+          userId: user.id,
+          inviteId: invite.id,
+        );
+    if (!context.mounted || !didResend) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Invite resent.')),
+    );
+  }
+
+  Future<void> _confirmCancelInvite(BuildContext context, WidgetRef ref, AdminUserInvite invite) async {
+    final didConfirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel Invite'),
+        content: Text('Cancel the pending invite for ${user.email}?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Keep Invite')),
+          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Cancel Invite')),
+        ],
+      ),
+    );
+
+    if (didConfirm != true) return;
+    final didCancel = await ref.read(userCommandProvider.notifier).cancelInvite(
+          userId: user.id,
+          inviteId: invite.id,
+        );
+    if (!context.mounted || !didCancel) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Invite cancelled.')),
     );
   }
 }
@@ -326,4 +444,13 @@ class _InfoRow extends StatelessWidget {
 String _formatDate(DateTime value) {
   final local = value.toLocal();
   return '${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')}/${local.year}';
+}
+
+String _formatDateTime(DateTime value) {
+  final local = value.toLocal();
+  final date = _formatDate(local);
+  final hour = local.hour > 12 ? local.hour - 12 : local.hour == 0 ? 12 : local.hour;
+  final minute = local.minute.toString().padLeft(2, '0');
+  final period = local.hour >= 12 ? 'PM' : 'AM';
+  return '$date $hour:$minute $period';
 }

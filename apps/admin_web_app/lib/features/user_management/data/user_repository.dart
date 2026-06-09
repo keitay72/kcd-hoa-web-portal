@@ -8,6 +8,8 @@ abstract interface class UserRepository {
   Future<List<AdminUser>> list({String? search, String? status});
   Future<AdminUser> getById(String id);
   Future<void> invite(InviteAdminUserInput input);
+  Future<void> resendInvite(InviteLifecycleActionInput input);
+  Future<void> cancelInvite(InviteLifecycleActionInput input);
   Future<AdminUser> update({required String id, required UpdateAdminUserInput input});
   Future<AdminUser> deactivate(String id);
   Future<void> assignPlatformRole(AssignPlatformRoleInput input);
@@ -34,6 +36,22 @@ class SupabaseUserRepository implements UserRepository {
   final SupabaseClient _client;
 
   static const _profileSelect = 'id, email, full_name, phone, status, created_at, updated_at';
+  static const _inviteSelect = '''
+    id,
+    user_id,
+    email,
+    role_code,
+    status,
+    invited_at,
+    accepted_at,
+    expires_at,
+    resent_at,
+    resend_count,
+    cancelled_at,
+    failure_message,
+    failure_reason,
+    failure_timestamp
+  ''';
   static const _platformRoleSelect = '''
     user_id,
     tenant_id,
@@ -54,8 +72,11 @@ class SupabaseUserRepository implements UserRepository {
 
   @override
   Future<List<AdminUser>> list({String? search, String? status}) async {
+    await _syncInviteAcceptances();
+
+    final isInviteStatus = status != null && status.startsWith('invite_');
     var query = _client.from('profiles').select(_profileSelect);
-    if (status != null && status.isNotEmpty) {
+    if (status != null && status.isNotEmpty && !isInviteStatus) {
       query = query.eq('status', status);
     }
 
@@ -65,11 +86,17 @@ class SupabaseUserRepository implements UserRepository {
 
     for (final row in profileRows) {
       final dto = AdminUserDto.fromJson(row);
-      if (needle != null && needle.isNotEmpty) {
-        final haystack = '${dto.email} ${dto.fullName ?? ''} ${dto.phone ?? ''}'.toLowerCase();
-        if (!haystack.contains(needle)) continue;
+      final user = await _hydrate(dto);
+      if (_matchesUserFilter(user, needle) && _matchesStatusFilter(user, status)) {
+        users.add(user);
       }
-      users.add(await _hydrate(dto));
+    }
+
+    if (_shouldIncludeInviteOnlyUsers(status)) {
+      final inviteOnlyUsers = await _inviteOnlyUsersForStatus(status);
+      for (final user in inviteOnlyUsers) {
+        if (_matchesUserFilter(user, needle)) users.add(user);
+      }
     }
 
     return users;
@@ -77,6 +104,15 @@ class SupabaseUserRepository implements UserRepository {
 
   @override
   Future<AdminUser> getById(String id) async {
+    await _syncInviteAcceptances();
+
+    if (id.startsWith('invite:')) {
+      final inviteId = id.substring('invite:'.length);
+      final invite = await _inviteById(inviteId);
+      if (invite == null) throw StateError('Invite not found');
+      return _inviteOnlyUser(invite);
+    }
+
     final row = await _client
         .from('profiles')
         .select(_profileSelect)
@@ -88,22 +124,17 @@ class SupabaseUserRepository implements UserRepository {
 
   @override
   Future<void> invite(InviteAdminUserInput input) async {
-    try {
-      final response = await _client.functions.invoke(
-        'invite-admin-user',
-        body: input.toJson(),
-      );
+    await _invokeInviteFunction(input.toJson());
+  }
 
-      if (response.status >= 400) {
-        throw InviteAdminUserUnavailableException(
-          'invite-admin-user returned HTTP ${response.status}. Deploy or fix the Edge Function before live invitations work.',
-        );
-      }
-    } on Exception catch (error) {
-      throw InviteAdminUserUnavailableException(
-        'invite-admin-user is unavailable: $error. Deploy the Edge Function before live invitations work.',
-      );
-    }
+  @override
+  Future<void> resendInvite(InviteLifecycleActionInput input) async {
+    await _invokeInviteFunction(input.toJson());
+  }
+
+  @override
+  Future<void> cancelInvite(InviteLifecycleActionInput input) async {
+    await _invokeInviteFunction(input.toJson());
   }
 
   @override
@@ -180,10 +211,140 @@ class SupabaseUserRepository implements UserRepository {
         .eq('role_id', assignment.roleId);
   }
 
+  bool _matchesUserFilter(AdminUser user, String? needle) {
+    if (needle == null || needle.isEmpty) return true;
+    final invite = user.latestInvite;
+    final haystack = ('${user.email} '
+            '${user.fullName ?? ''} '
+            '${user.phone ?? ''} '
+            '${user.roleSummary} '
+            '${user.statusLabel} '
+            '${invite?.failureReason ?? ''} '
+            '${invite?.failureMessage ?? ''}')
+        .toLowerCase();
+    return haystack.contains(needle);
+  }
+
+  bool _matchesStatusFilter(AdminUser user, String? status) {
+    if (status == null || status.isEmpty) return true;
+
+    final inviteStatus = user.latestInvite?.status;
+    return switch (status) {
+      'invite_pending' => user.status == 'invite_pending' || inviteStatus == 'pending',
+      'invite_expired' => user.status == 'invite_expired' || inviteStatus == 'expired',
+      'invite_failed' => user.status == 'invite_failed' || inviteStatus == 'failed',
+      'invite_cancelled' => inviteStatus == 'cancelled',
+      _ => user.status == status,
+    };
+  }
+
+  bool _shouldIncludeInviteOnlyUsers(String? status) {
+    return status == null ||
+        status == 'invite_failed' ||
+        status == 'invite_cancelled' ||
+        status == 'invite_expired';
+  }
+
+  Future<List<AdminUser>> _inviteOnlyUsersForStatus(String? status) async {
+    final inviteStatus = switch (status) {
+      'invite_failed' => 'failed',
+      'invite_cancelled' => 'cancelled',
+      'invite_expired' => 'expired',
+      _ => null,
+    };
+
+    var query = _client
+        .from('admin_user_invites')
+        .select(_inviteSelect)
+        .filter('user_id', 'is', null);
+
+    if (inviteStatus != null) query = query.eq('status', inviteStatus);
+
+    final rows = await query.order('created_at', ascending: false);
+
+    return rows
+        .map((row) => _inviteOnlyUser(AdminUserInviteDto.fromJson(row).toDomain()))
+        .toList();
+  }
+
+  AdminUser _inviteOnlyUser(AdminUserInvite invite) {
+    return AdminUser(
+      id: 'invite:${invite.id}',
+      email: invite.email,
+      fullName: null,
+      phone: null,
+      status: 'invite_${invite.status}',
+      createdAt: invite.invitedAt,
+      updatedAt: invite.failureTimestamp ?? invite.invitedAt,
+      platformRoles: const [],
+      hoaRoles: const [],
+      latestInvite: invite,
+    );
+  }
+
+  Future<AdminUserInvite?> _inviteById(String inviteId) async {
+    final row = await _client
+        .from('admin_user_invites')
+        .select(_inviteSelect)
+        .eq('id', inviteId)
+        .maybeSingle();
+
+    if (row == null) return null;
+    return AdminUserInviteDto.fromJson(row).toDomain();
+  }
+
+  Future<void> _invokeInviteFunction(Map<String, dynamic> body) async {
+    try {
+      final response = await _client.functions.invoke(
+        'invite-admin-user',
+        body: body,
+      );
+
+      if (response.status >= 400) {
+        final message = _messageFromResponse(response.data) ??
+            'invite-admin-user returned HTTP ${response.status}. Deploy or fix the Edge Function before live invitations work.';
+        throw InviteAdminUserUnavailableException(message);
+      }
+    } on InviteAdminUserUnavailableException {
+      rethrow;
+    } on Exception catch (error) {
+      throw InviteAdminUserUnavailableException(
+        'invite-admin-user is unavailable: $error. Deploy the Edge Function before live invitations work.',
+      );
+    }
+  }
+
+  String? _messageFromResponse(Object? data) {
+    if (data is Map && data['message'] != null) return data['message'].toString();
+    if (data is Map && data['error'] != null) return data['error'].toString();
+    return null;
+  }
+
+  Future<void> _syncInviteAcceptances() async {
+    await _client.rpc('sync_admin_invite_acceptances');
+  }
+
   Future<AdminUser> _hydrate(AdminUserDto dto) async {
     final platformRoles = await _platformRoles(dto.id);
     final hoaRoles = await _hoaRoles(dto.id);
-    return dto.toDomain(platformRoles: platformRoles, hoaRoles: hoaRoles);
+    final invite = await _latestInvite(dto.id);
+    return dto.toDomain(
+      platformRoles: platformRoles,
+      hoaRoles: hoaRoles,
+      latestInvite: invite,
+    );
+  }
+
+  Future<AdminUserInvite?> _latestInvite(String userId) async {
+    final rows = await _client
+        .from('admin_user_invites')
+        .select(_inviteSelect)
+        .eq('user_id', userId)
+        .order('created_at', ascending: false)
+        .limit(1);
+
+    if (rows.isEmpty) return null;
+    return AdminUserInviteDto.fromJson(rows.first).toDomain();
   }
 
   Future<List<UserPlatformRoleAssignment>> _platformRoles(String userId) async {

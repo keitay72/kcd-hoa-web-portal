@@ -33,6 +33,24 @@ class InviteAdminUserInput {
   }
 }
 
+
+class InviteLifecycleActionInput {
+  const InviteLifecycleActionInput({
+    required this.action,
+    required this.inviteId,
+  });
+
+  final String action;
+  final String inviteId;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'action': action,
+      'invite_id': inviteId,
+    };
+  }
+}
+
 class UpdateAdminUserInput {
   const UpdateAdminUserInput({
     required this.fullName,
