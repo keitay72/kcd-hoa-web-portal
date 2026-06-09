@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/rbac/admin_access.dart';
+import '../core/rbac/permission_rules.dart';
+import '../core/rbac/protected_admin_page.dart';
+import '../core/rbac/rbac_providers.dart';
+import '../core/rbac/unauthorized_page.dart';
 import '../core/supabase/supabase_provider.dart';
 import '../features/address_registry/presentation/address_detail_page.dart';
 import '../features/address_registry/presentation/address_list_page.dart';
@@ -16,33 +21,14 @@ import '../features/hoa_management/presentation/hoa_detail_page.dart';
 import '../features/hoa_management/presentation/hoa_list_page.dart';
 import '../features/schedules_admin/presentation/service_schedule_detail_page.dart';
 import '../features/schedules_admin/presentation/service_schedule_list_page.dart';
+import '../features/ticket_operations/domain/ticket.dart';
+import '../features/ticket_operations/presentation/ticket_dashboard_page.dart';
+import '../features/ticket_operations/presentation/ticket_detail_page.dart';
+import '../features/ticket_operations/presentation/ticket_list_page.dart';
 import '../features/verification_admin/presentation/resident_verification_detail_page.dart';
 import '../features/verification_admin/presentation/resident_verification_list_page.dart';
 
-final currentAdminRoleProvider = FutureProvider.autoDispose<String>((ref) async {
-  final user = ref.watch(currentUserProvider);
-  if (user == null) {
-    return 'Signed out';
-  }
-
-  final rows = await ref
-      .watch(supabaseClientProvider)
-      .from('user_platform_roles')
-      .select('roles(code, name)')
-      .eq('user_id', user.id);
-
-  if (rows.isEmpty) {
-    return 'No role assigned';
-  }
-
-  final roleNames = rows.map((row) {
-    final role = row['roles'] as Map<String, dynamic>?;
-    return role?['name'] as String? ?? role?['code'] as String? ?? 'Unknown role';
-  }).toList()
-    ..sort();
-
-  return roleNames.join(', ');
-});
+final currentAdminRoleProvider = currentAdminRoleSummaryProvider;
 
 final adminRouterProvider = Provider<GoRouter>((ref) {
   ref.watch(authStateProvider);
@@ -80,99 +66,136 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/admin',
             name: 'adminHome',
-            builder: (context, state) => const AdminHomePage(),
+            builder: (context, state) => const AdminHomePage().protectedBy(AdminPermissions.dashboard),
           ),
           GoRoute(
             path: '/admin/hoas',
             name: 'hoaList',
-            builder: (context, state) => const HoaListPage(),
+            builder: (context, state) => const HoaListPage().protectedBy(AdminPermissions.hoaRead),
           ),
           GoRoute(
             path: '/admin/hoas/:hoaId',
             name: 'hoaDetail',
             builder: (context, state) => HoaDetailPage(
               hoaId: state.pathParameters['hoaId']!,
-            ),
+            ).protectedBy(AdminPermissions.hoaRead),
           ),
           GoRoute(
             path: '/admin/addresses',
             name: 'addressList',
-            builder: (context, state) => const AddressListPage(),
+            builder: (context, state) => const AddressListPage().protectedBy(AdminPermissions.addressRead),
           ),
           GoRoute(
             path: '/admin/addresses/:addressId',
             name: 'addressDetail',
             builder: (context, state) => AddressDetailPage(
               addressId: state.pathParameters['addressId']!,
-            ),
+            ).protectedBy(AdminPermissions.addressRead),
           ),
           GoRoute(
             path: '/admin/activation-codes',
             name: 'activationCodeList',
-            builder: (context, state) => const ActivationCodeListPage(),
+            builder: (context, state) => const ActivationCodeListPage().protectedBy(AdminPermissions.activationCodes),
           ),
           GoRoute(
             path: '/admin/activation-codes/:activationCodeId',
             name: 'activationCodeDetail',
             builder: (context, state) => ActivationCodeDetailPage(
               activationCodeId: state.pathParameters['activationCodeId']!,
-            ),
+            ).protectedBy(AdminPermissions.activationCodes),
           ),
           GoRoute(
             path: '/admin/resident-verification',
             name: 'residentVerificationList',
-            builder: (context, state) => const ResidentVerificationListPage(),
+            builder: (context, state) => const ResidentVerificationListPage().protectedBy(AdminPermissions.verificationRead),
           ),
           GoRoute(
             path: '/admin/resident-verification/:verificationId',
             name: 'residentVerificationDetail',
             builder: (context, state) => ResidentVerificationDetailPage(
               verificationId: state.pathParameters['verificationId']!,
-            ),
+            ).protectedBy(AdminPermissions.verificationRead),
           ),
           GoRoute(
             path: '/admin/announcements',
             name: 'announcementList',
-            builder: (context, state) => const AnnouncementListPage(),
+            builder: (context, state) => const AnnouncementListPage().protectedBy(AdminPermissions.announcementsRead),
           ),
           GoRoute(
             path: '/admin/announcements/:announcementId',
             name: 'announcementDetail',
             builder: (context, state) => AnnouncementDetailPage(
               announcementId: state.pathParameters['announcementId']!,
-            ),
+            ).protectedBy(AdminPermissions.announcementsRead),
           ),
           GoRoute(
             path: '/admin/documents',
             name: 'documentList',
-            builder: (context, state) => const DocumentListPage(),
+            builder: (context, state) => const DocumentListPage().protectedBy(AdminPermissions.documentsRead),
           ),
           GoRoute(
             path: '/admin/documents/:documentId',
             name: 'documentDetail',
             builder: (context, state) => DocumentDetailPage(
               documentId: state.pathParameters['documentId']!,
-            ),
+            ).protectedBy(AdminPermissions.documentsRead),
           ),
           GoRoute(
             path: '/admin/service-schedules',
             name: 'serviceScheduleList',
-            builder: (context, state) => const ServiceScheduleListPage(),
+            builder: (context, state) => const ServiceScheduleListPage().protectedBy(AdminPermissions.schedulesRead),
           ),
           GoRoute(
             path: '/admin/service-schedules/:scheduleId',
             name: 'serviceScheduleDetail',
             builder: (context, state) => ServiceScheduleDetailPage(
               scheduleId: state.pathParameters['scheduleId']!,
-            ),
+            ).protectedBy(AdminPermissions.schedulesRead),
           ),
           GoRoute(
             path: '/admin/tickets',
-            name: 'tickets',
-            builder: (context, state) => const AdminComingSoonPage(
-              title: 'Tickets',
-              description: 'Ticket operations will be implemented next.',
-            ),
+            name: 'ticketList',
+            builder: (context, state) => const TicketListPage().protectedBy(AdminPermissions.ticketsRead),
+          ),
+          GoRoute(
+            path: '/admin/tickets/csr',
+            name: 'ticketCsrDashboard',
+            builder: (context, state) => const TicketDashboardPage(
+              queue: TicketQueue.csr,
+            ).protectedBy(AdminPermissions.ticketsUpdate),
+          ),
+          GoRoute(
+            path: '/admin/tickets/dispatch',
+            name: 'ticketDispatchDashboard',
+            builder: (context, state) => const TicketDashboardPage(
+              queue: TicketQueue.dispatch,
+            ).protectedBy(AdminPermissions.ticketsUpdate),
+          ),
+          GoRoute(
+            path: '/admin/tickets/urgent',
+            name: 'ticketUrgentQueue',
+            builder: (context, state) => const TicketDashboardPage(
+              queue: TicketQueue.urgent,
+            ).protectedBy(AdminPermissions.ticketsUpdate),
+          ),
+          GoRoute(
+            path: '/admin/tickets/aging',
+            name: 'ticketAgingQueue',
+            builder: (context, state) => const TicketDashboardPage(
+              queue: TicketQueue.aging,
+            ).protectedBy(AdminPermissions.ticketsUpdate),
+          ),
+          GoRoute(
+            path: '/admin/tickets/:ticketId',
+            name: 'ticketDetail',
+            builder: (context, state) => TicketDetailPage(
+              ticketId: state.pathParameters['ticketId']!,
+            ).protectedBy(AdminPermissions.ticketsRead),
+          ),
+          GoRoute(
+            path: '/admin/unauthorized',
+            name: 'unauthorized',
+            builder: (context, state) => const UnauthorizedPage(),
           ),
           GoRoute(
             path: '/admin/audit-logs',
@@ -180,7 +203,7 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const AdminComingSoonPage(
               title: 'Audit Logs',
               description: 'Audit log viewer will be implemented next.',
-            ),
+            ).protectedBy(AdminPermissions.auditRead),
           ),
         ],
       ),
@@ -265,6 +288,7 @@ class _AdminSidebar extends ConsumerWidget {
   static const _items = [
     _AdminNavItem(
       label: 'Dashboard',
+      permissionRule: AdminPermissions.dashboard,
       path: '/admin',
       icon: Icons.dashboard_outlined,
       activePrefixes: ['/admin'],
@@ -272,54 +296,63 @@ class _AdminSidebar extends ConsumerWidget {
     ),
     _AdminNavItem(
       label: 'HOA Management',
+      permissionRule: AdminPermissions.hoaRead,
       path: '/admin/hoas',
       icon: Icons.domain_outlined,
       activePrefixes: ['/admin/hoas'],
     ),
     _AdminNavItem(
       label: 'Address Registry',
+      permissionRule: AdminPermissions.addressRead,
       path: '/admin/addresses',
       icon: Icons.location_on_outlined,
       activePrefixes: ['/admin/addresses'],
     ),
     _AdminNavItem(
       label: 'Activation Codes',
+      permissionRule: AdminPermissions.activationCodes,
       path: '/admin/activation-codes',
       icon: Icons.password_outlined,
       activePrefixes: ['/admin/activation-codes'],
     ),
     _AdminNavItem(
       label: 'Resident Verification',
+      permissionRule: AdminPermissions.verificationRead,
       path: '/admin/resident-verification',
       icon: Icons.verified_user_outlined,
       activePrefixes: ['/admin/resident-verification'],
     ),
     _AdminNavItem(
       label: 'Announcements',
+      permissionRule: AdminPermissions.announcementsRead,
       path: '/admin/announcements',
       icon: Icons.campaign_outlined,
       activePrefixes: ['/admin/announcements'],
     ),
     _AdminNavItem(
       label: 'Documents',
+      permissionRule: AdminPermissions.documentsRead,
       path: '/admin/documents',
       icon: Icons.description_outlined,
       activePrefixes: ['/admin/documents'],
     ),
     _AdminNavItem(
       label: 'Service Schedules',
+      permissionRule: AdminPermissions.schedulesRead,
       path: '/admin/service-schedules',
       icon: Icons.event_repeat_outlined,
       activePrefixes: ['/admin/service-schedules'],
     ),
     _AdminNavItem(
       label: 'Tickets',
+      permissionRule: AdminPermissions.ticketsRead,
       path: '/admin/tickets',
       icon: Icons.confirmation_number_outlined,
       activePrefixes: ['/admin/tickets'],
     ),
     _AdminNavItem(
       label: 'Audit Logs',
+      permissionRule: AdminPermissions.auditRead,
       path: '/admin/audit-logs',
       icon: Icons.fact_check_outlined,
       activePrefixes: ['/admin/audit-logs'],
@@ -330,6 +363,11 @@ class _AdminSidebar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
     final role = ref.watch(currentAdminRoleProvider);
+    final access = ref.watch(adminAccessProvider);
+    final visibleItems = access.maybeWhen(
+      data: (value) => _items.where((item) => item.canShow(value)).toList(),
+      orElse: () => [_items.first],
+    );
     final width = isCollapsed ? 84.0 : 292.0;
 
     return AnimatedContainer(
@@ -381,9 +419,9 @@ class _AdminSidebar extends ConsumerWidget {
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
-                itemCount: _items.length,
+                itemCount: visibleItems.length,
                 itemBuilder: (context, index) {
-                  final item = _items[index];
+                  final item = visibleItems[index];
                   final isActive = item.isActive(currentPath);
 
                   return Padding(
@@ -548,6 +586,7 @@ class _AdminUserPanel extends StatelessWidget {
 class _AdminNavItem {
   const _AdminNavItem({
     required this.label,
+    required this.permissionRule,
     required this.path,
     required this.icon,
     required this.activePrefixes,
@@ -555,10 +594,16 @@ class _AdminNavItem {
   });
 
   final String label;
+  final AdminPermissionRule permissionRule;
   final String path;
   final IconData icon;
   final List<String> activePrefixes;
   final bool exact;
+
+  bool canShow(AdminAccess access) {
+    if (permissionRule.isOpen) return true;
+    return access.canAny(permissionRule.permissions);
+  }
 
   bool isActive(String currentPath) {
     if (exact) {
@@ -576,6 +621,7 @@ class AdminHomePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
     final role = ref.watch(currentAdminRoleProvider);
+    final access = ref.watch(adminAccessProvider);
 
     return Padding(
       padding: const EdgeInsets.all(24),
@@ -596,24 +642,59 @@ class AdminHomePage extends ConsumerWidget {
           const SizedBox(height: 24),
           const Text('Supabase connection is active.'),
           const SizedBox(height: 24),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              FilledButton.icon(
-                onPressed: () => context.go('/admin/hoas'),
-                icon: const Icon(Icons.domain_outlined),
-                label: const Text('Manage HOAs'),
-              ),
-              FilledButton.icon(
-                onPressed: () => context.go('/admin/addresses'),
-                icon: const Icon(Icons.location_on_outlined),
-                label: const Text('Address Registry'),
-              ),
-            ],
+          access.when(
+            data: (value) => _AdminQuickActions(access: value),
+            loading: () => const LinearProgressIndicator(),
+            error: (error, _) => Text('Unable to load permissions: $error'),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _AdminQuickActions extends StatelessWidget {
+  const _AdminQuickActions({required this.access});
+
+  final AdminAccess access;
+
+  @override
+  Widget build(BuildContext context) {
+    final actions = <Widget>[
+      if (access.can('hoa.read'))
+        FilledButton.icon(
+          onPressed: () => context.go('/admin/hoas'),
+          icon: const Icon(Icons.domain_outlined),
+          label: const Text('Manage HOAs'),
+        ),
+      if (access.can('addresses.read'))
+        FilledButton.icon(
+          onPressed: () => context.go('/admin/addresses'),
+          icon: const Icon(Icons.location_on_outlined),
+          label: const Text('Address Registry'),
+        ),
+      if (access.can('tickets.read'))
+        FilledButton.icon(
+          onPressed: () => context.go('/admin/tickets'),
+          icon: const Icon(Icons.confirmation_number_outlined),
+          label: const Text('Ticket Operations'),
+        ),
+      if (access.can('tickets.update'))
+        FilledButton.icon(
+          onPressed: () => context.go('/admin/tickets/dispatch'),
+          icon: const Icon(Icons.local_shipping_outlined),
+          label: const Text('Dispatch Queue'),
+        ),
+    ];
+
+    if (actions.isEmpty) {
+      return const Text('No admin actions are currently available for this role.');
+    }
+
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: actions,
     );
   }
 }

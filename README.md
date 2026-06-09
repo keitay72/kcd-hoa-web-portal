@@ -2,7 +2,7 @@
 
 Phase 1 admin web portal for KC Disposal's HOA resident services platform.
 
-The current build priority is the Flutter Web Admin App. The resident mobile app remains planned, but mobile implementation is deferred until the Admin Web App is operational.
+The current build priority is the Flutter Web Admin App in `apps/admin_web_app`. The resident mobile app remains planned, but mobile implementation is deferred until the Admin Web App is operational.
 
 ## Current Stack
 
@@ -27,7 +27,11 @@ Implemented in `apps/admin_web_app`:
 - Collapsible desktop sidebar
 - Mobile drawer navigation
 - Current signed-in user display
-- Current role display from `user_platform_roles` and `roles`
+- Current role display from Supabase role assignments
+- Role-Based Access Control UI integration
+- Permission-based navigation visibility
+- Protected admin route wrappers
+- Unauthorized access page
 - HOA Management
 - Address Registry Management
 - Bulk address CSV import
@@ -36,10 +40,13 @@ Implemented in `apps/admin_web_app`:
 - Document Management with Supabase Storage uploads and signed downloads
 - Announcement Management with draft/published/archived workflows
 - Service Schedule Management with HOA-wide defaults and optional address overrides
+- Ticket Operations Management
+- Ticket Dispatch and Workflow Management
+- CSR and Dispatch ticket queue dashboards
+- Ticket assignment, internal notes, priority changes, workflow automation, metrics, and SLA indicators
 
-Planned Phase 1 admin areas with routes reserved in the navigation shell:
+Planned Phase 1 admin area with route reserved in the navigation shell:
 
-- Tickets
 - Audit Logs
 
 ## Repository Layout
@@ -58,6 +65,7 @@ The Admin Web App uses feature-first organization:
 
 - `lib/app`: App bootstrap, router, and admin navigation shell
 - `lib/core/supabase`: Supabase client providers
+- `lib/core/rbac`: Role service, permission service, access model, providers, route protection, and unauthorized page
 - `lib/features/auth_admin`: Admin sign-in flow
 - `lib/features/hoa_management`: HOA list/detail/create/edit workflows
 - `lib/features/address_registry`: Address list/detail/create/edit/import workflows
@@ -66,12 +74,76 @@ The Admin Web App uses feature-first organization:
 - `lib/features/documents_cms`: Document list/detail/upload/edit/archive/download workflows
 - `lib/features/announcements_cms`: Announcement list/detail/create/edit/archive/publish workflows
 - `lib/features/schedules_admin`: HOA-wide service schedule and optional address override workflows
+- `lib/features/ticket_operations`: Ticket list/detail/status/assignment/priority/notes/queue/workflow workflows
 
 Each implemented feature follows a lightweight clean architecture shape:
 
 - `domain`: Domain models and input objects
 - `data`: DTOs and Supabase repositories
 - `presentation`: Pages, dialogs, and Riverpod providers
+
+## RBAC Model
+
+The Admin Web App resolves access from the deployed Supabase role and permission catalog.
+
+Source tables:
+
+- `roles`
+- `permissions`
+- `role_permissions`
+- `user_platform_roles`
+- `user_hoa_memberships`
+
+Supported Phase 1 admin roles:
+
+- `sys_admin`
+- `mgmt`
+- `csr`
+- `dispatch`
+- `hoa_manager`
+- `hoa_board`
+
+RBAC behavior:
+
+- Navigation items are hidden when the signed-in user lacks the required permission.
+- Direct route access is blocked by protected admin page wrappers.
+- Unauthorized users see the Admin Unauthorized page instead of the requested content.
+- Platform-wide staff roles are resolved from `user_platform_roles`.
+- HOA-scoped roles are resolved from active `user_hoa_memberships` records.
+- Permission checks use the seeded `role_permissions` catalog as the source of truth.
+
+## Ticket Operations
+
+Ticket Operations uses the deployed Phase 1 ticket tables:
+
+- `tickets`
+- `ticket_events`
+- `ticket_attachments`
+- `profiles`
+- `hoa_communities`
+- `hoa_addresses`
+- `user_platform_roles`
+
+Implemented workflows:
+
+- Ticket list and detail views
+- Status changes
+- Staff assignment and reassignment through `ticket_events`
+- Internal note entry through the admin timeline
+- Priority management and escalation
+- CSR queue dashboard
+- Dispatch queue dashboard
+- Urgent and aging queue views
+- SLA state indicators
+- Ticket metrics counters
+- Workflow automation action
+- Attachment signed URL viewer
+
+Current ticket status labels map to the existing database status values. For example, `Open` maps to `triaged`, and `Assigned` maps to `assigned`.
+
+### Internal Notes Security Note
+
+Internal notes are currently stored as tagged `ticket_events` rows for the admin workflow timeline. Current Phase 1 RLS allows users who can read a ticket to read its ticket events. Before resident-facing ticket timelines are exposed, true private internal notes should be moved to a dedicated `ticket_internal_notes` table or protected with a visibility column and stricter RLS.
 
 ## Supabase Backend
 
