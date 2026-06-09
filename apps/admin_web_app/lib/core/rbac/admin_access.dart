@@ -35,6 +35,7 @@ class AdminAccess {
   bool get isSystemAdmin => hasRole('sys_admin');
   bool get hasAnyRole => platformRoles.isNotEmpty || hoaRoles.isNotEmpty;
   bool get hasPlatformRole => platformRoles.isNotEmpty;
+  bool get isHoaScopedOnly => !hasPlatformRole && hoaRoles.isNotEmpty;
 
   List<AdminRoleAssignment> get allRoles => [
         ...platformRoles,
@@ -66,6 +67,8 @@ class AdminAccess {
   bool canAll(Iterable<String> permissionCodes) {
     return isSystemAdmin || permissionCodes.every(permissions.contains);
   }
+
+  List<String> get hoaScopeIds => hoaRoles.map((role) => role.hoaId).whereType<String>().toSet().toList();
 
   bool canAccessHoa(String hoaId) {
     return hasPlatformRole || hoaRoles.any((role) => role.hoaId == hoaId);

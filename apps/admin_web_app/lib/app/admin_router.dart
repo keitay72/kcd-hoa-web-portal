@@ -19,12 +19,20 @@ import '../features/documents_cms/presentation/document_detail_page.dart';
 import '../features/documents_cms/presentation/document_list_page.dart';
 import '../features/hoa_management/presentation/hoa_detail_page.dart';
 import '../features/hoa_management/presentation/hoa_list_page.dart';
+import '../features/hoa_manager_experience/presentation/hoa_announcements_page.dart';
+import '../features/hoa_manager_experience/presentation/hoa_documents_page.dart';
+import '../features/hoa_manager_experience/presentation/hoa_manager_dashboard_page.dart';
+import '../features/hoa_manager_experience/presentation/hoa_resident_list_page.dart';
+import '../features/hoa_manager_experience/presentation/hoa_service_schedules_page.dart';
+import '../features/hoa_manager_experience/presentation/hoa_tickets_page.dart';
 import '../features/schedules_admin/presentation/service_schedule_detail_page.dart';
 import '../features/schedules_admin/presentation/service_schedule_list_page.dart';
 import '../features/ticket_operations/domain/ticket.dart';
 import '../features/ticket_operations/presentation/ticket_dashboard_page.dart';
 import '../features/ticket_operations/presentation/ticket_detail_page.dart';
 import '../features/ticket_operations/presentation/ticket_list_page.dart';
+import '../features/user_management/presentation/user_detail_page.dart';
+import '../features/user_management/presentation/user_list_page.dart';
 import '../features/verification_admin/presentation/resident_verification_detail_page.dart';
 import '../features/verification_admin/presentation/resident_verification_list_page.dart';
 
@@ -67,6 +75,36 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
             path: '/admin',
             name: 'adminHome',
             builder: (context, state) => const AdminHomePage().protectedBy(AdminPermissions.dashboard),
+          ),
+          GoRoute(
+            path: '/admin/hoa',
+            name: 'hoaManagerDashboard',
+            builder: (context, state) => const HoaManagerDashboardPage().protectedBy(AdminPermissions.hoaScoped),
+          ),
+          GoRoute(
+            path: '/admin/hoa/residents',
+            name: 'hoaResidentList',
+            builder: (context, state) => const HoaResidentListPage().protectedBy(AdminPermissions.hoaScoped),
+          ),
+          GoRoute(
+            path: '/admin/hoa/documents',
+            name: 'hoaDocuments',
+            builder: (context, state) => const HoaDocumentsPage().protectedBy(AdminPermissions.hoaDocuments),
+          ),
+          GoRoute(
+            path: '/admin/hoa/announcements',
+            name: 'hoaAnnouncements',
+            builder: (context, state) => const HoaAnnouncementsPage().protectedBy(AdminPermissions.hoaAnnouncements),
+          ),
+          GoRoute(
+            path: '/admin/hoa/tickets',
+            name: 'hoaTickets',
+            builder: (context, state) => const HoaTicketsPage().protectedBy(AdminPermissions.hoaTickets),
+          ),
+          GoRoute(
+            path: '/admin/hoa/service-schedules',
+            name: 'hoaServiceSchedules',
+            builder: (context, state) => const HoaServiceSchedulesPage().protectedBy(AdminPermissions.hoaSchedules),
           ),
           GoRoute(
             path: '/admin/hoas',
@@ -191,6 +229,18 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => TicketDetailPage(
               ticketId: state.pathParameters['ticketId']!,
             ).protectedBy(AdminPermissions.ticketsRead),
+          ),
+          GoRoute(
+            path: '/admin/users',
+            name: 'userList',
+            builder: (context, state) => const UserListPage().protectedBy(AdminPermissions.rolesManage),
+          ),
+          GoRoute(
+            path: '/admin/users/:userId',
+            name: 'userDetail',
+            builder: (context, state) => UserDetailPage(
+              userId: state.pathParameters['userId']!,
+            ).protectedBy(AdminPermissions.rolesManage),
           ),
           GoRoute(
             path: '/admin/unauthorized',
@@ -351,11 +401,65 @@ class _AdminSidebar extends ConsumerWidget {
       activePrefixes: ['/admin/tickets'],
     ),
     _AdminNavItem(
+      label: 'Users & Roles',
+      permissionRule: AdminPermissions.rolesManage,
+      path: '/admin/users',
+      icon: Icons.manage_accounts_outlined,
+      activePrefixes: ['/admin/users'],
+    ),
+    _AdminNavItem(
       label: 'Audit Logs',
       permissionRule: AdminPermissions.auditRead,
       path: '/admin/audit-logs',
       icon: Icons.fact_check_outlined,
       activePrefixes: ['/admin/audit-logs'],
+    ),
+  ];
+
+
+  static const _hoaItems = [
+    _AdminNavItem(
+      label: 'HOA Dashboard',
+      permissionRule: AdminPermissions.hoaScoped,
+      path: '/admin/hoa',
+      icon: Icons.dashboard_outlined,
+      activePrefixes: ['/admin/hoa'],
+      exact: true,
+    ),
+    _AdminNavItem(
+      label: 'Residents',
+      permissionRule: AdminPermissions.hoaScoped,
+      path: '/admin/hoa/residents',
+      icon: Icons.people_outline,
+      activePrefixes: ['/admin/hoa/residents'],
+    ),
+    _AdminNavItem(
+      label: 'Documents',
+      permissionRule: AdminPermissions.hoaDocuments,
+      path: '/admin/hoa/documents',
+      icon: Icons.description_outlined,
+      activePrefixes: ['/admin/hoa/documents'],
+    ),
+    _AdminNavItem(
+      label: 'Announcements',
+      permissionRule: AdminPermissions.hoaAnnouncements,
+      path: '/admin/hoa/announcements',
+      icon: Icons.campaign_outlined,
+      activePrefixes: ['/admin/hoa/announcements'],
+    ),
+    _AdminNavItem(
+      label: 'Tickets',
+      permissionRule: AdminPermissions.hoaTickets,
+      path: '/admin/hoa/tickets',
+      icon: Icons.confirmation_number_outlined,
+      activePrefixes: ['/admin/hoa/tickets'],
+    ),
+    _AdminNavItem(
+      label: 'Service Schedules',
+      permissionRule: AdminPermissions.hoaSchedules,
+      path: '/admin/hoa/service-schedules',
+      icon: Icons.event_repeat_outlined,
+      activePrefixes: ['/admin/hoa/service-schedules'],
     ),
   ];
 
@@ -365,7 +469,10 @@ class _AdminSidebar extends ConsumerWidget {
     final role = ref.watch(currentAdminRoleProvider);
     final access = ref.watch(adminAccessProvider);
     final visibleItems = access.maybeWhen(
-      data: (value) => _items.where((item) => item.canShow(value)).toList(),
+      data: (value) {
+        final source = value.isHoaScopedOnly ? _hoaItems : _items;
+        return source.where((item) => item.canShow(value)).toList();
+      },
       orElse: () => [_items.first],
     );
     final width = isCollapsed ? 84.0 : 292.0;
@@ -602,7 +709,11 @@ class _AdminNavItem {
 
   bool canShow(AdminAccess access) {
     if (permissionRule.isOpen) return true;
-    return access.canAny(permissionRule.permissions);
+    final hasPermissions = permissionRule.permissions.isEmpty ||
+        access.canAny(permissionRule.permissions);
+    final hasRoles = permissionRule.roleCodes.isEmpty ||
+        access.hasAnyRoleCode(permissionRule.roleCodes);
+    return hasPermissions && hasRoles;
   }
 
   bool isActive(String currentPath) {
@@ -616,6 +727,53 @@ class _AdminNavItem {
 
 class AdminHomePage extends ConsumerWidget {
   const AdminHomePage({super.key});
+
+
+  static const _hoaItems = [
+    _AdminNavItem(
+      label: 'HOA Dashboard',
+      permissionRule: AdminPermissions.hoaScoped,
+      path: '/admin/hoa',
+      icon: Icons.dashboard_outlined,
+      activePrefixes: ['/admin/hoa'],
+      exact: true,
+    ),
+    _AdminNavItem(
+      label: 'Residents',
+      permissionRule: AdminPermissions.hoaScoped,
+      path: '/admin/hoa/residents',
+      icon: Icons.people_outline,
+      activePrefixes: ['/admin/hoa/residents'],
+    ),
+    _AdminNavItem(
+      label: 'Documents',
+      permissionRule: AdminPermissions.hoaDocuments,
+      path: '/admin/hoa/documents',
+      icon: Icons.description_outlined,
+      activePrefixes: ['/admin/hoa/documents'],
+    ),
+    _AdminNavItem(
+      label: 'Announcements',
+      permissionRule: AdminPermissions.hoaAnnouncements,
+      path: '/admin/hoa/announcements',
+      icon: Icons.campaign_outlined,
+      activePrefixes: ['/admin/hoa/announcements'],
+    ),
+    _AdminNavItem(
+      label: 'Tickets',
+      permissionRule: AdminPermissions.hoaTickets,
+      path: '/admin/hoa/tickets',
+      icon: Icons.confirmation_number_outlined,
+      activePrefixes: ['/admin/hoa/tickets'],
+    ),
+    _AdminNavItem(
+      label: 'Service Schedules',
+      permissionRule: AdminPermissions.hoaSchedules,
+      path: '/admin/hoa/service-schedules',
+      icon: Icons.event_repeat_outlined,
+      activePrefixes: ['/admin/hoa/service-schedules'],
+    ),
+  ];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -660,7 +818,54 @@ class _AdminQuickActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final actions = <Widget>[
+    final actions = access.isHoaScopedOnly ? _hoaActions(context) : _platformActions(context);
+
+    if (actions.isEmpty) {
+      return const Text('No admin actions are currently available for this role.');
+    }
+
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: actions,
+    );
+  }
+
+  List<Widget> _hoaActions(BuildContext context) {
+    return [
+      FilledButton.icon(
+        onPressed: () => context.go('/admin/hoa'),
+        icon: const Icon(Icons.dashboard_outlined),
+        label: const Text('HOA Dashboard'),
+      ),
+      FilledButton.icon(
+        onPressed: () => context.go('/admin/hoa/residents'),
+        icon: const Icon(Icons.people_outline),
+        label: const Text('Residents'),
+      ),
+      if (access.can('announcements.read'))
+        FilledButton.icon(
+          onPressed: () => context.go('/admin/hoa/announcements'),
+          icon: const Icon(Icons.campaign_outlined),
+          label: const Text('Announcements'),
+        ),
+      if (access.can('documents.read'))
+        FilledButton.icon(
+          onPressed: () => context.go('/admin/hoa/documents'),
+          icon: const Icon(Icons.description_outlined),
+          label: const Text('Documents'),
+        ),
+      if (access.can('tickets.read'))
+        FilledButton.icon(
+          onPressed: () => context.go('/admin/hoa/tickets'),
+          icon: const Icon(Icons.confirmation_number_outlined),
+          label: const Text('Tickets'),
+        ),
+    ];
+  }
+
+  List<Widget> _platformActions(BuildContext context) {
+    return [
       if (access.can('hoa.read'))
         FilledButton.icon(
           onPressed: () => context.go('/admin/hoas'),
@@ -686,16 +891,6 @@ class _AdminQuickActions extends StatelessWidget {
           label: const Text('Dispatch Queue'),
         ),
     ];
-
-    if (actions.isEmpty) {
-      return const Text('No admin actions are currently available for this role.');
-    }
-
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      children: actions,
-    );
   }
 }
 

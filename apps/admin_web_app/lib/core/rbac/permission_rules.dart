@@ -1,13 +1,37 @@
 class AdminPermissionRule {
-  const AdminPermissionRule.any(this.permissions);
+  const AdminPermissionRule.any(
+    this.permissions, {
+    this.roleCodes = const {},
+  });
 
   final Set<String> permissions;
+  final Set<String> roleCodes;
 
-  bool get isOpen => permissions.isEmpty;
+  bool get isOpen => permissions.isEmpty && roleCodes.isEmpty;
 }
 
 class AdminPermissions {
   static const dashboard = AdminPermissionRule.any({});
+  static const hoaScoped = AdminPermissionRule.any(
+    {'hoa.read'},
+    roleCodes: {'hoa_manager', 'hoa_board'},
+  );
+  static const hoaDocuments = AdminPermissionRule.any(
+    {'documents.read'},
+    roleCodes: {'hoa_manager', 'hoa_board'},
+  );
+  static const hoaAnnouncements = AdminPermissionRule.any(
+    {'announcements.read'},
+    roleCodes: {'hoa_manager', 'hoa_board'},
+  );
+  static const hoaSchedules = AdminPermissionRule.any(
+    {'schedules.read'},
+    roleCodes: {'hoa_manager', 'hoa_board'},
+  );
+  static const hoaTickets = AdminPermissionRule.any(
+    {'tickets.read'},
+    roleCodes: {'hoa_manager', 'hoa_board'},
+  );
   static const hoaRead = AdminPermissionRule.any({'hoa.read'});
   static const addressRead = AdminPermissionRule.any({'addresses.read'});
   static const activationCodes = AdminPermissionRule.any({'verification.manage'});
@@ -18,4 +42,5 @@ class AdminPermissions {
   static const ticketsRead = AdminPermissionRule.any({'tickets.read'});
   static const ticketsUpdate = AdminPermissionRule.any({'tickets.update'});
   static const auditRead = AdminPermissionRule.any({'audit.read'});
+  static const rolesManage = AdminPermissionRule.any({'roles.manage'});
 }
