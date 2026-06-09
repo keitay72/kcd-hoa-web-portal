@@ -109,7 +109,7 @@ values
     '66666666-6666-6666-6666-666666666661',
     '22222222-2222-2222-2222-222222222221',
     '33333333-3333-3333-3333-333333333331',
-    encode(digest('OAK-101-DEMO', 'sha256'), 'hex'),
+    md5('OAK-101-DEMO'),
     now() + interval '30 days',
     'active'
   ),
@@ -117,7 +117,7 @@ values
     '66666666-6666-6666-6666-666666666662',
     '22222222-2222-2222-2222-222222222221',
     '33333333-3333-3333-3333-333333333332',
-    encode(digest('OAK-102-DEMO', 'sha256'), 'hex'),
+    md5('OAK-102-DEMO'),
     now() + interval '30 days',
     'active'
   ),
@@ -125,7 +125,7 @@ values
     '66666666-6666-6666-6666-666666666663',
     '22222222-2222-2222-2222-222222222222',
     '33333333-3333-3333-3333-333333333333',
-    encode(digest('LAKE-201-DEMO', 'sha256'), 'hex'),
+    md5('LAKE-201-DEMO'),
     now() + interval '30 days',
     'active'
   )
@@ -217,7 +217,11 @@ insert into public.service_schedules (
   address_id,
   service_type,
   service_day,
-  start_date,
+  schedule_rule,
+  route_name,
+  effective_date,
+  end_date,
+  status,
   notes
 )
 values
@@ -227,8 +231,12 @@ values
     null,
     'trash',
     2,
+    'Tuesday',
+    'Oak Meadows Trash Route',
     current_date,
-    'Oak Meadows weekly trash pickup'
+    null,
+    'active',
+    'Oak Meadows HOA-wide weekly trash pickup'
   ),
   (
     '99999999-0000-0000-0000-000000000002',
@@ -236,8 +244,12 @@ values
     null,
     'recycling',
     4,
+    'Thursday',
+    'Oak Meadows Recycling Route',
     current_date,
-    'Oak Meadows weekly recycling pickup'
+    null,
+    'active',
+    'Oak Meadows HOA-wide weekly recycling pickup'
   ),
   (
     '99999999-0000-0000-0000-000000000003',
@@ -245,8 +257,25 @@ values
     null,
     'trash',
     3,
+    'Wednesday',
+    'Lakeside Trash Route',
     current_date,
-    'Lakeside weekly trash pickup'
+    null,
+    'active',
+    'Lakeside HOA-wide weekly trash pickup'
+  ),
+  (
+    '99999999-0000-0000-0000-000000000004',
+    '22222222-2222-2222-2222-222222222222',
+    null,
+    'bulk',
+    null,
+    'First Saturday',
+    'Lakeside Bulk Pickup Route',
+    current_date,
+    null,
+    'active',
+    'Lakeside HOA-wide monthly bulk pickup'
   )
 on conflict (id) do update
 set
@@ -254,7 +283,11 @@ set
   address_id = excluded.address_id,
   service_type = excluded.service_type,
   service_day = excluded.service_day,
-  start_date = excluded.start_date,
+  schedule_rule = excluded.schedule_rule,
+  route_name = excluded.route_name,
+  effective_date = excluded.effective_date,
+  end_date = excluded.end_date,
+  status = excluded.status,
   notes = excluded.notes;
 
 commit;
