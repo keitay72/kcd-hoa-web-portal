@@ -60,7 +60,7 @@ stable
 security definer
 set search_path = public, pg_temp
 as $$
-  select public.has_any_platform_role(array['sys_admin', 'csr', 'dispatch', 'mgmt']);
+  select public.has_any_platform_role(array['sys_admin', 'tenant_csr', 'tenant_dispatch', 'mgmt']);
 $$;
 
 create or replace function public.user_in_hoa(_hoa_id uuid)

@@ -37,7 +37,7 @@ class _SignInPageState extends ConsumerState<SignInPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  'KC Disposal Admin',
+                  'HOA Portal Admin',
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
                 const SizedBox(height: 6),

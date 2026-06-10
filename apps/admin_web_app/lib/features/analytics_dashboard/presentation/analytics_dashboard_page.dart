@@ -147,7 +147,7 @@ class _DashboardHeader extends StatelessWidget {
             Text('Analytics & Operations Dashboard', style: Theme.of(context).textTheme.headlineMedium),
             const SizedBox(height: 6),
             Text(
-              'Platform, ticket, staffing, and activity metrics for KC Disposal HOA operations.',
+              'Platform, ticket, staffing, and activity metrics across tenant HOA operations.',
               style: Theme.of(context).textTheme.bodyLarge,
             ),
           ],
@@ -327,11 +327,11 @@ class _OperationalMetricsPanel extends StatelessWidget {
           children: [
             Text('Operational Metrics', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 4),
-            const Text('Role coverage across HOA and KC Disposal users.'),
+            const Text('Role coverage across HOA and tenant staff users.'),
             const SizedBox(height: 18),
             _CompactMetric(label: 'HOA Managers', value: metrics.hoaManagers, icon: Icons.supervisor_account_outlined),
             _CompactMetric(label: 'HOA Board Members', value: metrics.hoaBoardMembers, icon: Icons.groups_outlined),
-            _CompactMetric(label: 'KC Staff', value: metrics.kcStaff, icon: Icons.badge_outlined),
+            _CompactMetric(label: 'Tenant Staff', value: metrics.kcStaff, icon: Icons.badge_outlined),
             _CompactMetric(label: 'Dispatch Users', value: metrics.dispatchUsers, icon: Icons.local_shipping_outlined),
             _CompactMetric(label: 'CSR Users', value: metrics.csrUsers, icon: Icons.support_agent_outlined),
           ],

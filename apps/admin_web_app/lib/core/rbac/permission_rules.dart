@@ -43,4 +43,16 @@ class AdminPermissions {
   static const ticketsUpdate = AdminPermissionRule.any({'tickets.update'});
   static const auditRead = AdminPermissionRule.any({'audit.read'});
   static const rolesManage = AdminPermissionRule.any({'roles.manage'});
+  static const tenantRead = AdminPermissionRule.any(
+    {'tenants.read'},
+    roleCodes: {'platform_owner', 'platform_admin', 'platform_support', 'platform_sales'},
+  );
+  static const tenantManage = AdminPermissionRule.any(
+    {'tenants.manage'},
+    roleCodes: {'platform_owner', 'platform_admin'},
+  );
+  static const commercialCatalog = AdminPermissionRule.any(
+    {'billing.manage'},
+    roleCodes: {'platform_owner', 'platform_admin'},
+  );
 }

@@ -6,12 +6,16 @@ class RoleCatalogEntryDto {
     required this.code,
     required this.name,
     this.description,
+    this.roleScope,
+    this.lifecycleStatus,
   });
 
   final int id;
   final String code;
   final String name;
   final String? description;
+  final String? roleScope;
+  final String? lifecycleStatus;
 
   factory RoleCatalogEntryDto.fromJson(Map<String, dynamic> json) {
     return RoleCatalogEntryDto(
@@ -19,6 +23,8 @@ class RoleCatalogEntryDto {
       code: json['code'] as String,
       name: json['name'] as String,
       description: json['description'] as String?,
+      roleScope: json['role_scope'] as String?,
+      lifecycleStatus: json['lifecycle_status'] as String?,
     );
   }
 
@@ -28,6 +34,8 @@ class RoleCatalogEntryDto {
       code: code,
       name: name,
       description: description,
+      roleScope: roleScope,
+      lifecycleStatus: lifecycleStatus,
     );
   }
 }

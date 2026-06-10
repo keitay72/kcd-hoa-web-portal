@@ -126,7 +126,7 @@ Deno.serve(async (request) => {
   const { data: residentRole, error: roleError } = await serviceClient
     .from('roles')
     .select('id')
-    .eq('code', 'resident')
+    .eq('code', 'hoa_resident')
     .single();
 
   if (roleError || !residentRole) {

@@ -19,7 +19,7 @@ class SupabaseRoleRepository implements RoleRepository {
   Future<List<RoleCatalogEntry>> roles() async {
     final rows = await _client
         .from('roles')
-        .select('id, code, name, description')
+        .select('id, code, name, description, role_scope, lifecycle_status')
         .order('name');
 
     return rows.map((row) => RoleCatalogEntryDto.fromJson(row).toDomain()).toList();

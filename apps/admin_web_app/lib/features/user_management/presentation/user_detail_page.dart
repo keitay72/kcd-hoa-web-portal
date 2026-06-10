@@ -355,7 +355,7 @@ class _PlatformRolesCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('KC Disposal Staff Roles', style: Theme.of(context).textTheme.titleLarge),
+            Text('Tenant Staff Roles', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 12),
             if (user.platformRoles.isEmpty)
               const Text('No platform roles assigned.')

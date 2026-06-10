@@ -349,14 +349,65 @@ class SupabaseUserRepository implements UserRepository {
 
   Future<List<UserPlatformRoleAssignment>> _platformRoles(String userId) async {
     final rows = await _client
-        .from('user_platform_roles')
-        .select(_platformRoleSelect)
+        .from('user_tenant_roles')
+        .select('user_id, tenant_id, role_id, created_at')
         .eq('user_id', userId)
         .order('created_at', ascending: false);
 
-    return rows
-        .map((row) => UserPlatformRoleAssignmentDto.fromJson(row).toDomain())
-        .toList();
+    final roles = await _roleDetailsById(
+      rows.map((row) => row['role_id'] as int),
+    );
+    final tenants = await _tenantNamesById(
+      rows.map((row) => row['tenant_id'] as String),
+    );
+
+    return rows.map((row) {
+      final roleId = row['role_id'] as int;
+      final tenantId = row['tenant_id'] as String;
+      final role = roles[roleId];
+      return UserPlatformRoleAssignment(
+        userId: row['user_id'] as String,
+        tenantId: tenantId,
+        roleId: roleId,
+        roleCode: role?.code ?? 'unknown',
+        roleName: role?.name ?? 'Unknown role',
+        tenantName: tenants[tenantId] ?? 'Tenant',
+        createdAt: DateTime.parse(row['created_at'] as String),
+      );
+    }).toList();
+  }
+
+  Future<Map<int, _RoleDetails>> _roleDetailsById(Iterable<int> roleIds) async {
+    final ids = roleIds.toSet();
+    if (ids.isEmpty) return const {};
+
+    final rows = await _client
+        .from('roles')
+        .select('id, code, name')
+        .filter('id', 'in', '(${ids.join(',')})');
+
+    return {
+      for (final row in rows)
+        row['id'] as int: _RoleDetails(
+          code: row['code'] as String? ?? 'unknown',
+          name: row['name'] as String? ?? row['code'] as String? ?? 'Unknown role',
+        ),
+    };
+  }
+
+  Future<Map<String, String>> _tenantNamesById(Iterable<String> tenantIds) async {
+    final ids = tenantIds.toSet();
+    if (ids.isEmpty) return const {};
+
+    final rows = await _client
+        .from('platform_tenants')
+        .select('id, name')
+        .filter('id', 'in', '(${ids.join(',')})');
+
+    return {
+      for (final row in rows)
+        row['id'] as String: row['name'] as String? ?? 'Tenant',
+    };
   }
 
   Future<List<UserHoaRoleAssignment>> _hoaRoles(String userId) async {
@@ -370,4 +421,11 @@ class SupabaseUserRepository implements UserRepository {
         .map((row) => UserHoaRoleAssignmentDto.fromJson(row).toDomain())
         .toList();
   }
+}
+
+class _RoleDetails {
+  const _RoleDetails({required this.code, required this.name});
+
+  final String code;
+  final String name;
 }

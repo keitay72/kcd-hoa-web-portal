@@ -62,8 +62,8 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-const platformRoles = new Set(['sys_admin', 'mgmt', 'csr', 'dispatch']);
-const hoaRoles = new Set(['hoa_manager', 'hoa_board', 'resident']);
+const platformRoles = new Set(['sys_admin', 'mgmt', 'tenant_csr', 'tenant_dispatch']);
+const hoaRoles = new Set(['hoa_manager', 'hoa_board', 'hoa_resident']);
 const namePattern = /^[A-Za-z][A-Za-z .'-]*$/;
 const emailPattern = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 

@@ -155,7 +155,7 @@ class UserPlatformRoleAssignmentDto {
       roleId: json['role_id'] as int,
       roleCode: role?['code'] as String? ?? 'unknown',
       roleName: role?['name'] as String? ?? 'Unknown role',
-      tenantName: tenant?['name'] as String? ?? 'KC Disposal',
+      tenantName: tenant?['name'] as String? ?? 'Tenant',
       createdAt: DateTime.parse(json['created_at'] as String),
     );
   }

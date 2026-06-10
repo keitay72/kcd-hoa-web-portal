@@ -18,6 +18,7 @@ import '../features/announcements_cms/presentation/announcement_list_page.dart';
 import '../features/auth_admin/presentation/sign_in_page.dart';
 import '../features/documents_cms/presentation/document_detail_page.dart';
 import '../features/documents_cms/presentation/document_list_page.dart';
+import '../features/commercial_catalog/presentation/commercial_catalog_page.dart';
 import '../features/hoa_management/presentation/hoa_detail_page.dart';
 import '../features/hoa_management/presentation/hoa_list_page.dart';
 import '../features/hoa_manager_experience/presentation/hoa_announcements_page.dart';
@@ -32,6 +33,8 @@ import '../features/ticket_operations/domain/ticket.dart';
 import '../features/ticket_operations/presentation/ticket_dashboard_page.dart';
 import '../features/ticket_operations/presentation/ticket_detail_page.dart';
 import '../features/ticket_operations/presentation/ticket_list_page.dart';
+import '../features/tenant_management/presentation/tenant_detail_page.dart';
+import '../features/tenant_management/presentation/tenant_list_page.dart';
 import '../features/user_management/presentation/user_detail_page.dart';
 import '../features/user_management/presentation/user_list_page.dart';
 import '../features/verification_admin/presentation/resident_verification_detail_page.dart';
@@ -106,6 +109,23 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
             path: '/admin/hoa/service-schedules',
             name: 'hoaServiceSchedules',
             builder: (context, state) => const HoaServiceSchedulesPage().protectedBy(AdminPermissions.hoaSchedules),
+          ),
+          GoRoute(
+            path: '/admin/commercial-catalog',
+            name: 'commercialCatalog',
+            builder: (context, state) => const CommercialCatalogPage().protectedBy(AdminPermissions.commercialCatalog),
+          ),
+          GoRoute(
+            path: '/admin/tenants',
+            name: 'tenantList',
+            builder: (context, state) => const TenantListPage().protectedBy(AdminPermissions.tenantRead),
+          ),
+          GoRoute(
+            path: '/admin/tenants/:tenantId',
+            name: 'tenantDetail',
+            builder: (context, state) => TenantDetailPage(
+              tenantId: state.pathParameters['tenantId']!,
+            ).protectedBy(AdminPermissions.tenantRead),
           ),
           GoRoute(
             path: '/admin/hoas',
@@ -293,7 +313,7 @@ class _AdminNavigationShellState extends ConsumerState<AdminNavigationShell> {
     if (isCompact) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('KC Disposal Admin'),
+          title: const Text('HOA Portal Admin'),
           actions: [
             IconButton(
               tooltip: 'Sign out',
@@ -344,6 +364,20 @@ class _AdminSidebar extends ConsumerWidget {
       icon: Icons.dashboard_outlined,
       activePrefixes: ['/admin'],
       exact: true,
+    ),
+    _AdminNavItem(
+      label: 'Plans & Add-Ons',
+      permissionRule: AdminPermissions.commercialCatalog,
+      path: '/admin/commercial-catalog',
+      icon: Icons.payments_outlined,
+      activePrefixes: ['/admin/commercial-catalog'],
+    ),
+    _AdminNavItem(
+      label: 'Platform Tenants',
+      permissionRule: AdminPermissions.tenantRead,
+      path: '/admin/tenants',
+      icon: Icons.business_center_outlined,
+      activePrefixes: ['/admin/tenants'],
     ),
     _AdminNavItem(
       label: 'HOA Management',
@@ -502,7 +536,7 @@ class _AdminSidebar extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'KC Disposal',
+                            'HOA Portal',
                             style: TextStyle(fontWeight: FontWeight.w800),
                           ),
                           Text('Admin Portal'),
@@ -655,22 +689,26 @@ class _AdminUserPanel extends StatelessWidget {
                 const CircleAvatar(child: Icon(Icons.person_outline)),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        email,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      Text(
-                        role,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
+                  child: Tooltip(
+                    message: '$email\n$role',
+                    waitDuration: const Duration(milliseconds: 350),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          email,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        Text(
+                          role,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],

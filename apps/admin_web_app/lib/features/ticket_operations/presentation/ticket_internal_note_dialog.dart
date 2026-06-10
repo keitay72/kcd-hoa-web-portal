@@ -43,7 +43,7 @@ class _TicketInternalNoteDialogState extends ConsumerState<TicketInternalNoteDia
                 maxLines: 8,
                 decoration: const InputDecoration(
                   labelText: 'Internal Note',
-                  helperText: 'Visible to KC Disposal staff only through the admin timeline.',
+                  helperText: 'Visible to tenant staff only through the admin timeline.',
                   border: OutlineInputBorder(),
                 ),
                 validator: (value) {

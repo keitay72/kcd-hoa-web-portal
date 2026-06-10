@@ -25,7 +25,7 @@ class _AssignPlatformRoleDialogState extends ConsumerState<AssignPlatformRoleDia
     final commandState = ref.watch(userCommandProvider);
 
     return AlertDialog(
-      title: const Text('Assign Platform Role'),
+      title: const Text('Assign Tenant Role'),
       content: SizedBox(
         width: 460,
         child: Column(
@@ -79,7 +79,7 @@ class _AssignPlatformRoleDialogState extends ConsumerState<AssignPlatformRoleDia
         ),
         FilledButton(
           onPressed: commandState.isLoading ? null : _submit,
-          child: const Text('Assign Role'),
+          child: const Text('Assign Tenant Role'),
         ),
       ],
     );

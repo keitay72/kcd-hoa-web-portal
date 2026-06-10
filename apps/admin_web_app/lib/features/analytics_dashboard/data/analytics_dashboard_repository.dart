@@ -91,9 +91,12 @@ class SupabaseAnalyticsDashboardRepository implements AnalyticsDashboardReposito
         .select('user_id, status, roles(code)')
         .eq('status', 'active');
 
-    final platformRoleRows = await _client
-        .from('user_platform_roles')
-        .select('user_id, roles(code)');
+    final tenantRoleRows = await _client
+        .from('user_tenant_roles')
+        .select('user_id, role_id');
+    final tenantRoleCodes = await _roleCodesById(
+      tenantRoleRows.map((row) => row['role_id'] as int),
+    );
 
     final hoaManagers = <String>{};
     final hoaBoardMembers = <String>{};
@@ -109,16 +112,22 @@ class SupabaseAnalyticsDashboardRepository implements AnalyticsDashboardReposito
     final kcStaff = <String>{};
     final dispatchUsers = <String>{};
     final csrUsers = <String>{};
-    for (final row in platformRoleRows) {
-      final role = row['roles'] as Map<String, dynamic>?;
-      final roleCode = role?['code'] as String?;
+    for (final row in tenantRoleRows) {
+      final roleCode = tenantRoleCodes[row['role_id'] as int];
       final userId = row['user_id'] as String?;
       if (userId == null) continue;
-      if ({'sys_admin', 'mgmt', 'csr', 'dispatch'}.contains(roleCode)) {
+      if ({
+        'tenant_admin',
+        'tenant_manager',
+        'sys_admin',
+        'mgmt',
+        'tenant_csr',
+        'tenant_dispatch',
+      }.contains(roleCode)) {
         kcStaff.add(userId);
       }
-      if (roleCode == 'dispatch') dispatchUsers.add(userId);
-      if (roleCode == 'csr') csrUsers.add(userId);
+      if (roleCode == 'tenant_dispatch') dispatchUsers.add(userId);
+      if (roleCode == 'tenant_csr') csrUsers.add(userId);
     }
 
     return OperationalMetrics(
@@ -128,6 +137,21 @@ class SupabaseAnalyticsDashboardRepository implements AnalyticsDashboardReposito
       dispatchUsers: dispatchUsers.length,
       csrUsers: csrUsers.length,
     );
+  }
+
+  Future<Map<int, String>> _roleCodesById(Iterable<int> roleIds) async {
+    final ids = roleIds.toSet();
+    if (ids.isEmpty) return const {};
+
+    final rows = await _client
+        .from('roles')
+        .select('id, code')
+        .filter('id', 'in', '(${ids.join(',')})');
+
+    return {
+      for (final row in rows)
+        row['id'] as int: row['code'] as String? ?? 'unknown',
+    };
   }
 
   Future<List<RecentTicketActivity>> _recentTickets() async {
@@ -187,7 +211,7 @@ class SupabaseAnalyticsDashboardRepository implements AnalyticsDashboardReposito
       final role = row['roles'] as Map<String, dynamic>?;
       final roleCode = role?['code'] as String?;
       final userId = row['user_id'] as String?;
-      if (roleCode == 'resident' && userId != null) residentIds.add(userId);
+      if (roleCode == 'hoa_resident' && userId != null) residentIds.add(userId);
     }
 
     return residentIds.length;

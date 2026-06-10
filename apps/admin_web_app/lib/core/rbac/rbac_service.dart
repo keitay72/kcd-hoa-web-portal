@@ -18,11 +18,13 @@ class DefaultRbacService implements RbacService {
 
   @override
   Future<AdminAccess> accessForUser(String userId) async {
-    final platformRoles = await _roleService.platformRolesForUser(userId);
+    final globalRoles = await _roleService.globalRolesForUser(userId);
+    final tenantRoles = await _roleService.tenantRolesForUser(userId);
     final hoaRoles = await _roleService.hoaRolesForUser(userId);
 
     final roleCodes = {
-      ...platformRoles.map((role) => role.code),
+      ...globalRoles.map((role) => role.code),
+      ...tenantRoles.map((role) => role.code),
       ...hoaRoles.map((role) => role.code),
     }..remove('unknown');
 
@@ -30,7 +32,8 @@ class DefaultRbacService implements RbacService {
 
     return AdminAccess(
       userId: userId,
-      platformRoles: platformRoles,
+      globalRoles: globalRoles,
+      tenantRoles: tenantRoles,
       hoaRoles: hoaRoles,
       permissions: permissions,
     );

@@ -11,7 +11,7 @@ class AdminApp extends ConsumerWidget {
     final router = ref.watch(adminRouterProvider);
 
     return MaterialApp.router(
-      title: 'KC Disposal Admin',
+      title: 'HOA Portal Admin',
       routerConfig: router,
       debugShowCheckedModeBanner: false,
       theme: ThemeData(

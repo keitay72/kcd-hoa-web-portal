@@ -112,7 +112,7 @@ class _InviteUserDialogState extends ConsumerState<InviteUserDialog> {
                 const SizedBox(height: 16),
                 SegmentedButton<String>(
                   segments: const [
-                    ButtonSegment(value: 'platform', label: Text('KC Staff')),
+                    ButtonSegment(value: 'platform', label: Text('Tenant Staff')),
                     ButtonSegment(value: 'hoa', label: Text('HOA User')),
                   ],
                   selected: {_category},

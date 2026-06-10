@@ -26,7 +26,8 @@ final adminAccessProvider = FutureProvider.autoDispose<AdminAccess>((ref) async 
   if (user == null) {
     return const AdminAccess(
       userId: '',
-      platformRoles: [],
+      globalRoles: [],
+      tenantRoles: [],
       hoaRoles: [],
       permissions: {},
     );

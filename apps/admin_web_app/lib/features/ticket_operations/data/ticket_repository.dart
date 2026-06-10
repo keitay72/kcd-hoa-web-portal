@@ -124,26 +124,27 @@ class SupabaseTicketRepository implements TicketRepository {
   @override
   Future<List<TicketAssigneeOption>> assigneeOptions() async {
     final rows = await _client
-        .from('user_platform_roles')
-        .select('user_id, profile:profiles!user_platform_roles_user_id_fkey(full_name, email), roles(code)');
+        .from('user_tenant_roles')
+        .select('user_id, role_id');
 
-    final labels = <String, String>{};
+    final roleCodes = await _roleCodesById(
+      rows.map((row) => row['role_id'] as int),
+    );
+    final eligibleUserIds = <String>{};
     final rolesByUser = <String, Set<String>>{};
+
     for (final row in rows) {
-      final role = row['roles'] as Map<String, dynamic>?;
-      final roleCode = role?['code'] as String?;
-      if (!{'csr', 'dispatch', 'sys_admin'}.contains(roleCode)) {
+      final roleCode = roleCodes[row['role_id'] as int];
+      if (!{'tenant_csr', 'tenant_dispatch', 'tenant_admin', 'sys_admin'}.contains(roleCode)) {
         continue;
       }
 
-      final profile = row['profile'] as Map<String, dynamic>?;
       final userId = row['user_id'] as String;
-      labels[userId] = profile?['full_name'] as String? ??
-          profile?['email'] as String? ??
-          userId;
+      eligibleUserIds.add(userId);
       rolesByUser.putIfAbsent(userId, () => <String>{}).add(roleCode!);
     }
 
+    final labels = await _profileLabelsById(eligibleUserIds);
     final options = rolesByUser.entries.map((entry) {
       return TicketAssigneeOption(
         userId: entry.key,
@@ -153,6 +154,38 @@ class SupabaseTicketRepository implements TicketRepository {
     }).toList();
 
     return options..sort((a, b) => a.label.compareTo(b.label));
+  }
+
+  Future<Map<int, String>> _roleCodesById(Iterable<int> roleIds) async {
+    final ids = roleIds.toSet();
+    if (ids.isEmpty) return const {};
+
+    final rows = await _client
+        .from('roles')
+        .select('id, code')
+        .filter('id', 'in', '(${ids.join(',')})');
+
+    return {
+      for (final row in rows)
+        row['id'] as int: row['code'] as String? ?? 'unknown',
+    };
+  }
+
+  Future<Map<String, String>> _profileLabelsById(Iterable<String> userIds) async {
+    final ids = userIds.toSet();
+    if (ids.isEmpty) return const {};
+
+    final rows = await _client
+        .from('profiles')
+        .select('id, full_name, email')
+        .filter('id', 'in', '(${ids.join(',')})');
+
+    return {
+      for (final row in rows)
+        row['id'] as String: row['full_name'] as String? ??
+            row['email'] as String? ??
+            row['id'] as String,
+    };
   }
 
   @override
