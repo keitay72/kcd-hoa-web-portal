@@ -8,6 +8,7 @@ import '../core/rbac/protected_admin_page.dart';
 import '../core/rbac/rbac_providers.dart';
 import '../core/rbac/unauthorized_page.dart';
 import '../core/supabase/supabase_provider.dart';
+import '../features/analytics_dashboard/presentation/analytics_dashboard_page.dart';
 import '../features/address_registry/presentation/address_detail_page.dart';
 import '../features/address_registry/presentation/address_list_page.dart';
 import '../features/activation_codes/presentation/activation_code_detail_page.dart';
@@ -74,7 +75,7 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/admin',
             name: 'adminHome',
-            builder: (context, state) => const AdminHomePage().protectedBy(AdminPermissions.dashboard),
+            builder: (context, state) => const AnalyticsDashboardPage().protectedBy(AdminPermissions.dashboard),
           ),
           GoRoute(
             path: '/admin/hoa',
@@ -722,175 +723,6 @@ class _AdminNavItem {
     }
 
     return activePrefixes.any((prefix) => currentPath.startsWith(prefix));
-  }
-}
-
-class AdminHomePage extends ConsumerWidget {
-  const AdminHomePage({super.key});
-
-
-  static const _hoaItems = [
-    _AdminNavItem(
-      label: 'HOA Dashboard',
-      permissionRule: AdminPermissions.hoaScoped,
-      path: '/admin/hoa',
-      icon: Icons.dashboard_outlined,
-      activePrefixes: ['/admin/hoa'],
-      exact: true,
-    ),
-    _AdminNavItem(
-      label: 'Residents',
-      permissionRule: AdminPermissions.hoaScoped,
-      path: '/admin/hoa/residents',
-      icon: Icons.people_outline,
-      activePrefixes: ['/admin/hoa/residents'],
-    ),
-    _AdminNavItem(
-      label: 'Documents',
-      permissionRule: AdminPermissions.hoaDocuments,
-      path: '/admin/hoa/documents',
-      icon: Icons.description_outlined,
-      activePrefixes: ['/admin/hoa/documents'],
-    ),
-    _AdminNavItem(
-      label: 'Announcements',
-      permissionRule: AdminPermissions.hoaAnnouncements,
-      path: '/admin/hoa/announcements',
-      icon: Icons.campaign_outlined,
-      activePrefixes: ['/admin/hoa/announcements'],
-    ),
-    _AdminNavItem(
-      label: 'Tickets',
-      permissionRule: AdminPermissions.hoaTickets,
-      path: '/admin/hoa/tickets',
-      icon: Icons.confirmation_number_outlined,
-      activePrefixes: ['/admin/hoa/tickets'],
-    ),
-    _AdminNavItem(
-      label: 'Service Schedules',
-      permissionRule: AdminPermissions.hoaSchedules,
-      path: '/admin/hoa/service-schedules',
-      icon: Icons.event_repeat_outlined,
-      activePrefixes: ['/admin/hoa/service-schedules'],
-    ),
-  ];
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(currentUserProvider);
-    final role = ref.watch(currentAdminRoleProvider);
-    final access = ref.watch(adminAccessProvider);
-
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Admin Dashboard',
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
-          const SizedBox(height: 8),
-          Text('Signed in as ${user?.email ?? user?.id ?? 'admin'}'),
-          const SizedBox(height: 4),
-          Text(
-            'Role: ${role.valueOrNull ?? 'Loading role...'}',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 24),
-          const Text('Supabase connection is active.'),
-          const SizedBox(height: 24),
-          access.when(
-            data: (value) => _AdminQuickActions(access: value),
-            loading: () => const LinearProgressIndicator(),
-            error: (error, _) => Text('Unable to load permissions: $error'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AdminQuickActions extends StatelessWidget {
-  const _AdminQuickActions({required this.access});
-
-  final AdminAccess access;
-
-  @override
-  Widget build(BuildContext context) {
-    final actions = access.isHoaScopedOnly ? _hoaActions(context) : _platformActions(context);
-
-    if (actions.isEmpty) {
-      return const Text('No admin actions are currently available for this role.');
-    }
-
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      children: actions,
-    );
-  }
-
-  List<Widget> _hoaActions(BuildContext context) {
-    return [
-      FilledButton.icon(
-        onPressed: () => context.go('/admin/hoa'),
-        icon: const Icon(Icons.dashboard_outlined),
-        label: const Text('HOA Dashboard'),
-      ),
-      FilledButton.icon(
-        onPressed: () => context.go('/admin/hoa/residents'),
-        icon: const Icon(Icons.people_outline),
-        label: const Text('Residents'),
-      ),
-      if (access.can('announcements.read'))
-        FilledButton.icon(
-          onPressed: () => context.go('/admin/hoa/announcements'),
-          icon: const Icon(Icons.campaign_outlined),
-          label: const Text('Announcements'),
-        ),
-      if (access.can('documents.read'))
-        FilledButton.icon(
-          onPressed: () => context.go('/admin/hoa/documents'),
-          icon: const Icon(Icons.description_outlined),
-          label: const Text('Documents'),
-        ),
-      if (access.can('tickets.read'))
-        FilledButton.icon(
-          onPressed: () => context.go('/admin/hoa/tickets'),
-          icon: const Icon(Icons.confirmation_number_outlined),
-          label: const Text('Tickets'),
-        ),
-    ];
-  }
-
-  List<Widget> _platformActions(BuildContext context) {
-    return [
-      if (access.can('hoa.read'))
-        FilledButton.icon(
-          onPressed: () => context.go('/admin/hoas'),
-          icon: const Icon(Icons.domain_outlined),
-          label: const Text('Manage HOAs'),
-        ),
-      if (access.can('addresses.read'))
-        FilledButton.icon(
-          onPressed: () => context.go('/admin/addresses'),
-          icon: const Icon(Icons.location_on_outlined),
-          label: const Text('Address Registry'),
-        ),
-      if (access.can('tickets.read'))
-        FilledButton.icon(
-          onPressed: () => context.go('/admin/tickets'),
-          icon: const Icon(Icons.confirmation_number_outlined),
-          label: const Text('Ticket Operations'),
-        ),
-      if (access.can('tickets.update'))
-        FilledButton.icon(
-          onPressed: () => context.go('/admin/tickets/dispatch'),
-          icon: const Icon(Icons.local_shipping_outlined),
-          label: const Text('Dispatch Queue'),
-        ),
-    ];
   }
 }
 
