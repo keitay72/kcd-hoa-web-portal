@@ -115,3 +115,14 @@ class TenantOnboardingInput {
   final DateTime? launchReadyAt;
   final DateTime? launchedAt;
 }
+
+
+class TenantStaffAssignmentInput {
+  const TenantStaffAssignmentInput({
+    required this.userId,
+    required this.roleId,
+  });
+
+  final String userId;
+  final int roleId;
+}

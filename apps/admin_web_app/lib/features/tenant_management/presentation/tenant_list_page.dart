@@ -84,13 +84,14 @@ class _TenantListPageState extends ConsumerState<TenantListPage> {
                           ),
                         ),
                         title: Text(tenant.name),
-                        subtitle: Text('${tenant.code} · ${tenant.statusLabel}'),
+                        subtitle: _TenantSubtitle(tenant: tenant),
                         trailing: Wrap(
                           spacing: 8,
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             if (tenant.isPrimary)
                               const Chip(label: Text('Primary')),
+                            _OnboardingStatusChip(tenant: tenant),
                             const Icon(Icons.chevron_right),
                           ],
                         ),
@@ -135,6 +136,81 @@ class _TenantListPageState extends ConsumerState<TenantListPage> {
     if (tenant != null && mounted) {
       context.go('/admin/tenants/${tenant.id}');
     }
+  }
+}
+
+class _TenantSubtitle extends StatelessWidget {
+  const _TenantSubtitle({required this.tenant});
+
+  final PlatformTenant tenant;
+
+  @override
+  Widget build(BuildContext context) {
+    final parts = [
+      tenant.code,
+      tenant.statusLabel,
+      'Onboarding: ${tenant.onboardingStatusLabel}',
+    ];
+    if (tenant.onboardingBlockedReason != null) {
+      parts.add('Blocked: ${tenant.onboardingBlockedReason}');
+    }
+
+    return Tooltip(
+      message: parts.join('\n'),
+      waitDuration: const Duration(milliseconds: 400),
+      child: Text(
+        parts.join(' · '),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+}
+
+class _OnboardingStatusChip extends StatelessWidget {
+  const _OnboardingStatusChip({required this.tenant});
+
+  final PlatformTenant tenant;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final backgroundColor = tenant.isLaunched
+        ? colorScheme.primaryContainer
+        : tenant.isLaunchReady
+            ? colorScheme.tertiaryContainer
+            : tenant.isOnboardingBlocked
+                ? colorScheme.errorContainer
+                : colorScheme.surfaceVariant;
+    final foregroundColor = tenant.isLaunched
+        ? colorScheme.onPrimaryContainer
+        : tenant.isLaunchReady
+            ? colorScheme.onTertiaryContainer
+            : tenant.isOnboardingBlocked
+                ? colorScheme.onErrorContainer
+                : colorScheme.onSurfaceVariant;
+
+    return Tooltip(
+      message: tenant.onboardingBlockedReason ?? tenant.onboardingStatusLabel,
+      waitDuration: const Duration(milliseconds: 400),
+      child: Chip(
+        avatar: Icon(
+          tenant.isLaunched
+              ? Icons.check_circle_outline
+              : tenant.isLaunchReady
+                  ? Icons.rocket_launch_outlined
+                  : tenant.isOnboardingBlocked
+                      ? Icons.warning_amber_outlined
+                      : Icons.pending_actions_outlined,
+          size: 18,
+          color: foregroundColor,
+        ),
+        label: Text(tenant.onboardingStatusLabel),
+        backgroundColor: backgroundColor,
+        labelStyle: TextStyle(color: foregroundColor),
+        side: BorderSide(color: backgroundColor),
+      ),
+    );
   }
 }
 

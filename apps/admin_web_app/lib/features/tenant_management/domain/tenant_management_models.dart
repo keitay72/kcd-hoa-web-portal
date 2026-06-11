@@ -7,6 +7,10 @@ class PlatformTenant {
     required this.isPrimary,
     required this.createdAt,
     required this.updatedAt,
+    this.onboardingStatus,
+    this.onboardingBlockedReason,
+    this.onboardingLaunchReadyAt,
+    this.onboardingLaunchedAt,
   });
 
   final String id;
@@ -16,6 +20,36 @@ class PlatformTenant {
   final bool isPrimary;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final String? onboardingStatus;
+  final String? onboardingBlockedReason;
+  final DateTime? onboardingLaunchReadyAt;
+  final DateTime? onboardingLaunchedAt;
+
+  String get onboardingStatusLabel => _titleCase((onboardingStatus ?? 'not_started').replaceAll('_', ' '));
+  bool get isOnboardingBlocked => onboardingStatus == 'blocked';
+  bool get isLaunchReady => onboardingStatus == 'ready_to_launch' || onboardingLaunchReadyAt != null;
+  bool get isLaunched => onboardingStatus == 'launched' || onboardingLaunchedAt != null;
+
+  PlatformTenant copyWith({
+    String? onboardingStatus,
+    String? onboardingBlockedReason,
+    DateTime? onboardingLaunchReadyAt,
+    DateTime? onboardingLaunchedAt,
+  }) {
+    return PlatformTenant(
+      id: id,
+      code: code,
+      name: name,
+      status: status,
+      isPrimary: isPrimary,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+      onboardingStatus: onboardingStatus ?? this.onboardingStatus,
+      onboardingBlockedReason: onboardingBlockedReason ?? this.onboardingBlockedReason,
+      onboardingLaunchReadyAt: onboardingLaunchReadyAt ?? this.onboardingLaunchReadyAt,
+      onboardingLaunchedAt: onboardingLaunchedAt ?? this.onboardingLaunchedAt,
+    );
+  }
 
   String get statusLabel => _titleCase(status.replaceAll('_', ' '));
 }
@@ -90,7 +124,14 @@ class TenantSmsSettings {
   final String? sendingPhoneNumber;
   final int? monthlyMessageLimit;
 
+  String get providerLabel => _titleCase(provider.replaceAll('_', ' '));
   String get statusLabel => _titleCase(status.replaceAll('_', ' '));
+
+  String? get formattedSendingPhoneNumber {
+    final digits = sendingPhoneNumber?.replaceAll(RegExp(r'\D'), '') ?? '';
+    if (digits.length != 10) return sendingPhoneNumber;
+    return '(${digits.substring(0, 3)}) ${digits.substring(3, 6)}-${digits.substring(6)}';
+  }
 }
 
 class TenantBillingContact {
@@ -109,6 +150,79 @@ class TenantBillingContact {
   final String email;
   final String? phone;
   final bool isPrimary;
+}
+
+class TenantHoaSummary {
+  const TenantHoaSummary({
+    required this.id,
+    required this.code,
+    required this.name,
+    required this.status,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String code;
+  final String name;
+  final String status;
+  final DateTime? createdAt;
+
+  String get statusLabel => _titleCase(status.replaceAll('_', ' '));
+  bool get isActive => status == 'active';
+}
+
+class TenantStaffAssignment {
+  const TenantStaffAssignment({
+    required this.userId,
+    required this.email,
+    required this.roleId,
+    required this.roleCode,
+    required this.roleName,
+    required this.tenantId,
+    required this.createdAt,
+    this.fullName,
+    this.phone,
+    this.status,
+  });
+
+  final String userId;
+  final String email;
+  final String? fullName;
+  final String? phone;
+  final String? status;
+  final int roleId;
+  final String roleCode;
+  final String roleName;
+  final String tenantId;
+  final DateTime? createdAt;
+
+  String get displayName {
+    final name = fullName?.trim();
+    return name == null || name.isEmpty ? email : name;
+  }
+
+  String get statusLabel => _titleCase((status ?? 'active').replaceAll('_', ' '));
+}
+
+class TenantAssignableUser {
+  const TenantAssignableUser({
+    required this.id,
+    required this.email,
+    this.fullName,
+    this.status,
+  });
+
+  final String id;
+  final String email;
+  final String? fullName;
+  final String? status;
+
+  String get displayName {
+    final name = fullName?.trim();
+    return name == null || name.isEmpty ? email : name;
+  }
+
+  String get label => '$displayName <$email>';
 }
 
 class SubscriptionPlanSummary {
@@ -269,11 +383,15 @@ class OnboardingChecklistItem {
     required this.label,
     required this.isComplete,
     required this.description,
+    required this.action,
+    required this.actionLabel,
   });
 
   final String label;
   final bool isComplete;
   final String description;
+  final String action;
+  final String actionLabel;
 }
 
 class TenantDetail {
@@ -288,6 +406,9 @@ class TenantDetail {
     required this.availableAddons,
     required this.enabledAddons,
     required this.onboardingStatus,
+    required this.tenantStaff,
+    required this.assignableUsers,
+    required this.tenantHoas,
     required this.tenantAdminCount,
     required this.hoaCount,
   });
@@ -302,6 +423,9 @@ class TenantDetail {
   final List<AddonCatalogEntry> availableAddons;
   final List<TenantAddonSummary> enabledAddons;
   final TenantOnboardingStatus? onboardingStatus;
+  final List<TenantStaffAssignment> tenantStaff;
+  final List<TenantAssignableUser> assignableUsers;
+  final List<TenantHoaSummary> tenantHoas;
   final int tenantAdminCount;
   final int hoaCount;
 
@@ -330,46 +454,73 @@ class TenantDetail {
         label: 'Tenant created',
         isComplete: true,
         description: tenant.name,
+        action: 'edit_tenant',
+        actionLabel: 'Review tenant',
       ),
       OnboardingChecklistItem(
         label: 'Subscription assigned',
         isComplete: currentSubscription?.planId != null && currentSubscription?.priceId != null,
         description: currentSubscription?.planName ?? 'Assign a plan and rate.',
+        action: 'subscription',
+        actionLabel: currentSubscription == null ? 'Assign plan' : 'Review plan',
       ),
       OnboardingChecklistItem(
         label: 'Billing contact added',
         isComplete: billingContacts.isNotEmpty,
         description: billingContacts.isEmpty ? 'Add at least one billing contact.' : billingContacts.first.email,
+        action: 'billing_contact',
+        actionLabel: billingContacts.isEmpty ? 'Add contact' : 'Review contact',
       ),
       OnboardingChecklistItem(
         label: 'Support contact configured',
         isComplete: settings?.supportEmail != null || settings?.supportPhone != null,
         description: settings?.supportEmail ?? settings?.supportPhone ?? 'Add support email or phone.',
+        action: 'settings',
+        actionLabel: 'Edit support',
       ),
       OnboardingChecklistItem(
         label: 'Email sender configured',
-        isComplete: emailSettings?.provider == 'platform_managed' || emailSettings?.senderEmail != null,
-        description: emailSettings?.senderEmail ?? emailSettings?.providerLabel ?? 'Configure tenant email settings.',
+        isComplete: emailSettings?.provider == 'platform_managed' ||
+            (emailSettings?.senderEmail != null &&
+                emailSettings?.senderDomain != null &&
+                emailSettings?.verificationStatus == 'verified'),
+        description: emailSettings == null
+            ? 'Configure tenant email settings.'
+            : emailSettings!.provider == 'platform_managed'
+                ? 'Platform Managed sender selected.'
+                : emailSettings!.verificationStatus == 'verified'
+                    ? emailSettings!.senderEmail ?? 'Tenant sender verified.'
+                    : 'Tenant sender requires verified domain setup.',
+        action: 'email_settings',
+        actionLabel: 'Configure email',
       ),
       OnboardingChecklistItem(
         label: 'SMS decision recorded',
         isComplete: smsAddon == null || smsSettings?.status == 'pending' || smsSettings?.status == 'active',
         description: smsAddon == null ? 'SMS add-on is not enabled.' : 'SMS status: ${smsSettings?.statusLabel ?? 'Not configured'}',
+        action: 'sms_settings',
+        actionLabel: 'Review SMS',
       ),
       OnboardingChecklistItem(
         label: 'Tenant admin assigned',
         isComplete: tenantAdminCount > 0,
         description: tenantAdminCount > 0 ? '$tenantAdminCount tenant admin/manager role(s).' : 'Invite or assign a tenant admin.',
+        action: 'tenant_admin',
+        actionLabel: tenantAdminCount > 0 ? 'Manage staff' : 'Assign admin',
       ),
       OnboardingChecklistItem(
         label: 'First HOA created',
         isComplete: hoaCount > 0,
         description: hoaCount > 0 ? '$hoaCount HOA community record(s).' : "Create the tenant's first HOA.",
+        action: 'first_hoa',
+        actionLabel: hoaCount > 0 ? 'View HOAs' : 'Create HOA',
       ),
       OnboardingChecklistItem(
         label: 'Marked ready to launch',
         isComplete: onboardingStatus?.launchReadyAt != null || onboardingStatus?.status == 'ready_to_launch' || onboardingStatus?.status == 'launched',
         description: onboardingStatus?.statusLabel ?? 'Mark ready once configuration is complete.',
+        action: 'onboarding_status',
+        actionLabel: 'Update status',
       ),
     ];
   }

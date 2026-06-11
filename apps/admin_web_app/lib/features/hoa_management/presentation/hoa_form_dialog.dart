@@ -9,10 +9,14 @@ import 'hoa_providers.dart';
 class HoaFormDialog extends ConsumerStatefulWidget {
   const HoaFormDialog({
     this.initialValue,
+    this.tenantId,
+    this.title,
     super.key,
   });
 
   final HoaCommunity? initialValue;
+  final String? tenantId;
+  final String? title;
 
   @override
   ConsumerState<HoaFormDialog> createState() => _HoaFormDialogState();
@@ -63,7 +67,7 @@ class _HoaFormDialogState extends ConsumerState<HoaFormDialog> {
     );
 
     return AlertDialog(
-      title: Text(_isEditing ? 'Edit HOA' : 'Create HOA'),
+      title: Text(widget.title ?? (_isEditing ? 'Edit HOA' : 'Create HOA')),
       content: SizedBox(
         width: 560,
         child: Form(
@@ -171,7 +175,7 @@ class _HoaFormDialogState extends ConsumerState<HoaFormDialog> {
     final controller = ref.read(hoaFormControllerProvider.notifier);
     final result = _isEditing
         ? await controller.updateHoa(id: widget.initialValue!.id, input: input)
-        : await controller.create(input);
+        : await controller.create(input, tenantId: widget.tenantId);
 
     if (result != null && mounted) {
       Navigator.of(context).pop(result);

@@ -63,6 +63,13 @@ abstract interface class TenantManagementRepository {
     required String tenantId,
     required TenantOnboardingInput input,
   });
+
+  Future<void> assignTenantStaff({
+    required String tenantId,
+    required TenantStaffAssignmentInput input,
+  });
+
+  Future<void> removeTenantStaff(TenantStaffAssignment assignment);
 }
 
 class SupabaseTenantManagementRepository implements TenantManagementRepository {
@@ -72,7 +79,9 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
 
   @override
   Future<List<PlatformTenant>> listTenants(TenantListFilters filters) async {
-    var query = _client.from('platform_tenants').select();
+    var query = _client
+        .from('platform_tenants')
+        .select('*, tenant_onboarding_status(status, blocked_reason, launch_ready_at, launched_at)');
     if (filters.status != null && filters.status!.isNotEmpty) {
       query = query.eq('status', filters.status!);
     }
@@ -147,8 +156,13 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
         .order('name', ascending: true);
 
     final availablePlans = await _listAvailablePlans();
-    final tenantAdminCount = await _tenantAdminCount(tenantId);
-    final hoaCount = await _tenantHoaCount(tenantId);
+    final tenantStaff = await _listTenantStaff(tenantId);
+    final assignableUsers = await _listAssignableUsers();
+    final tenantHoas = await _listTenantHoas(tenantId);
+    final tenantAdminCount = tenantStaff
+        .where((staff) => const {'tenant_admin', 'tenant_manager', 'sys_admin', 'mgmt'}.contains(staff.roleCode))
+        .length;
+    final hoaCount = tenantHoas.length;
 
     return TenantDetail(
       tenant: PlatformTenantDto(json: tenantRow).toDomain(),
@@ -177,6 +191,9 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
       onboardingStatus: onboardingRow == null
           ? null
           : TenantOnboardingStatusDto(json: onboardingRow).toDomain(),
+      tenantStaff: tenantStaff,
+      assignableUsers: assignableUsers,
+      tenantHoas: tenantHoas,
       tenantAdminCount: tenantAdminCount,
       hoaCount: hoaCount,
     );
@@ -280,6 +297,21 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
       },
       onConflict: 'tenant_id',
     );
+
+    final smsAddonId = await _addonIdForCode('sms_notifications');
+    if (smsAddonId == null) return;
+
+    final addonStatus = switch (input.status) {
+      'active' => 'enabled',
+      'pending' => 'requested',
+      'suspended' => 'suspended',
+      _ => 'disabled',
+    };
+    await setAddonStatus(
+      tenantId: tenantId,
+      addonId: smsAddonId,
+      status: addonStatus,
+    );
   }
 
   @override
@@ -361,6 +393,15 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
           .update(payload)
           .eq('id', subscriptionId);
     }
+  }
+
+  Future<String?> _addonIdForCode(String code) async {
+    final row = await _client
+        .from('addon_catalog')
+        .select('id')
+        .eq('code', code)
+        .maybeSingle();
+    return row?['id'] as String?;
   }
 
   Future<List<SubscriptionPlanSummary>> _listAvailablePlans() async {
@@ -471,6 +512,89 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
       payload,
       onConflict: 'tenant_id',
     );
+  }
+
+  @override
+  Future<void> assignTenantStaff({
+    required String tenantId,
+    required TenantStaffAssignmentInput input,
+  }) async {
+    await _client.from('user_platform_roles').upsert({
+      'user_id': input.userId,
+      'tenant_id': tenantId,
+      'role_id': input.roleId,
+      'assigned_by': _client.auth.currentUser?.id,
+    });
+  }
+
+  @override
+  Future<void> removeTenantStaff(TenantStaffAssignment assignment) async {
+    await _client
+        .from('user_platform_roles')
+        .delete()
+        .eq('user_id', assignment.userId)
+        .eq('tenant_id', assignment.tenantId)
+        .eq('role_id', assignment.roleId);
+  }
+
+  Future<List<TenantStaffAssignment>> _listTenantStaff(String tenantId) async {
+    final rows = await _client
+        .from('user_platform_roles')
+        .select('user_id, tenant_id, role_id, created_at, roles!inner(code, name)')
+        .eq('tenant_id', tenantId)
+        .inFilter('roles.code', [
+          'tenant_admin',
+          'tenant_manager',
+          'tenant_csr',
+          'tenant_dispatch',
+          'sys_admin',
+          'mgmt',
+          'csr',
+          'dispatch',
+        ])
+        .order('created_at', ascending: false);
+
+    final userIds = rows.map((row) => row['user_id'] as String).toSet().toList();
+    final profilesById = <String, Map<String, dynamic>>{};
+    if (userIds.isNotEmpty) {
+      final profileRows = await _client
+          .from('profiles')
+          .select('id, email, full_name, phone, status')
+          .inFilter('id', userIds);
+      for (final row in profileRows) {
+        profilesById[row['id'] as String] = row;
+      }
+    }
+
+    return rows
+        .map(
+          (row) => TenantStaffAssignmentDto(
+            json: row,
+            profileJson: profilesById[row['user_id'] as String],
+          ).toDomain(),
+        )
+        .toList();
+  }
+
+  Future<List<TenantAssignableUser>> _listAssignableUsers() async {
+    final rows = await _client
+        .from('profiles')
+        .select('id, email, full_name, status')
+        .neq('status', 'disabled')
+        .order('full_name', ascending: true)
+        .order('email', ascending: true);
+
+    return rows.map((row) => TenantAssignableUserDto(json: row).toDomain()).toList();
+  }
+
+  Future<List<TenantHoaSummary>> _listTenantHoas(String tenantId) async {
+    final rows = await _client
+        .from('hoa_communities')
+        .select('id, code, name, status, created_at')
+        .eq('tenant_id', tenantId)
+        .order('name', ascending: true);
+
+    return rows.map((row) => TenantHoaSummaryDto(json: row).toDomain()).toList();
   }
 
   Future<int> _tenantAdminCount(String tenantId) async {

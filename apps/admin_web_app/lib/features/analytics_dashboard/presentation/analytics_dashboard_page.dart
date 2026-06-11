@@ -32,97 +32,107 @@ class _AnalyticsDashboardContent extends ConsumerWidget {
         ref.invalidate(analyticsDashboardProvider);
         await ref.read(analyticsDashboardProvider.future);
       },
-      child: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          _DashboardHeader(loadedAt: snapshot.loadedAt),
-          const SizedBox(height: 20),
-          _SectionHeader(
-            title: 'Platform Metrics',
-            subtitle: 'Current HOA platform health at a glance.',
-          ),
-          const SizedBox(height: 12),
-          _MetricGrid(
-            cards: [
-              _MetricCardData(
-                label: 'Total HOAs',
-                value: snapshot.platformMetrics.totalHoas,
-                icon: Icons.domain_outlined,
-                color: Colors.teal,
-                onTapPath: '/admin/hoas',
-              ),
-              _MetricCardData(
-                label: 'Active Residents',
-                value: snapshot.platformMetrics.activeResidents,
-                icon: Icons.people_outline,
-                color: Colors.green,
-                onTapPath: '/admin/resident-verification',
-              ),
-              _MetricCardData(
-                label: 'Pending Verifications',
-                value: snapshot.platformMetrics.pendingResidentVerifications,
-                icon: Icons.verified_user_outlined,
-                color: Colors.orange,
-                onTapPath: '/admin/resident-verification',
-              ),
-              _MetricCardData(
-                label: 'Active Activation Codes',
-                value: snapshot.platformMetrics.activeActivationCodes,
-                icon: Icons.password_outlined,
-                color: Colors.indigo,
-                onTapPath: '/admin/activation-codes',
-              ),
-              _MetricCardData(
-                label: 'Documents',
-                value: snapshot.platformMetrics.documentsCount,
-                icon: Icons.description_outlined,
-                color: Colors.blue,
-                onTapPath: '/admin/documents',
-              ),
-              _MetricCardData(
-                label: 'Announcements',
-                value: snapshot.platformMetrics.announcementsCount,
-                icon: Icons.campaign_outlined,
-                color: Colors.pink,
-                onTapPath: '/admin/announcements',
-              ),
-            ],
-          ),
-          const SizedBox(height: 28),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isWide = constraints.maxWidth >= 1080;
-              final ticketPanel = _TicketMetricsPanel(metrics: snapshot.ticketMetrics);
-              final operationsPanel = _OperationalMetricsPanel(metrics: snapshot.operationalMetrics);
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final pagePadding = constraints.maxWidth < 600 ? 16.0 : 24.0;
 
-              if (!isWide) {
-                return Column(
-                  children: [
-                    ticketPanel,
-                    const SizedBox(height: 20),
-                    operationsPanel,
-                  ],
-                );
-              }
-
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: ticketPanel),
-                  const SizedBox(width: 20),
-                  Expanded(child: operationsPanel),
+          return ListView(
+            padding: EdgeInsets.all(pagePadding),
+            children: [
+              _DashboardHeader(loadedAt: snapshot.loadedAt),
+              const SizedBox(height: 20),
+              _SectionHeader(
+                title: 'Platform Metrics',
+                subtitle: 'Current HOA platform health at a glance.',
+              ),
+              const SizedBox(height: 12),
+              _MetricGrid(
+                cards: [
+                  _MetricCardData(
+                    label: 'Total HOAs',
+                    value: snapshot.platformMetrics.totalHoas,
+                    icon: Icons.domain_outlined,
+                    color: Colors.teal,
+                    onTapPath: '/admin/hoas',
+                  ),
+                  _MetricCardData(
+                    label: 'Active Residents',
+                    value: snapshot.platformMetrics.activeResidents,
+                    icon: Icons.people_outline,
+                    color: Colors.green,
+                    onTapPath: '/admin/resident-verification',
+                  ),
+                  _MetricCardData(
+                    label: 'Pending Verifications',
+                    value: snapshot.platformMetrics.pendingResidentVerifications,
+                    icon: Icons.verified_user_outlined,
+                    color: Colors.orange,
+                    onTapPath: '/admin/resident-verification',
+                  ),
+                  _MetricCardData(
+                    label: 'Active Activation Codes',
+                    value: snapshot.platformMetrics.activeActivationCodes,
+                    icon: Icons.password_outlined,
+                    color: Colors.indigo,
+                    onTapPath: '/admin/activation-codes',
+                  ),
+                  _MetricCardData(
+                    label: 'Documents',
+                    value: snapshot.platformMetrics.documentsCount,
+                    icon: Icons.description_outlined,
+                    color: Colors.blue,
+                    onTapPath: '/admin/documents',
+                  ),
+                  _MetricCardData(
+                    label: 'Announcements',
+                    value: snapshot.platformMetrics.announcementsCount,
+                    icon: Icons.campaign_outlined,
+                    color: Colors.pink,
+                    onTapPath: '/admin/announcements',
+                  ),
                 ],
-              );
-            },
-          ),
-          const SizedBox(height: 28),
-          _SectionHeader(
-            title: 'Recent Activity',
-            subtitle: 'Latest operational events from the live Supabase data set.',
-          ),
-          const SizedBox(height: 12),
-          _RecentActivityGrid(snapshot: snapshot),
-        ],
+              ),
+              const SizedBox(height: 28),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isWide = constraints.maxWidth >= 1080;
+                  final ticketPanel = _TicketMetricsPanel(
+                    metrics: snapshot.ticketMetrics,
+                  );
+                  final operationsPanel = _OperationalMetricsPanel(
+                    metrics: snapshot.operationalMetrics,
+                  );
+
+                  if (!isWide) {
+                    return Column(
+                      children: [
+                        ticketPanel,
+                        const SizedBox(height: 20),
+                        operationsPanel,
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: ticketPanel),
+                      const SizedBox(width: 20),
+                      Expanded(child: operationsPanel),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 28),
+              _SectionHeader(
+                title: 'Recent Activity',
+                subtitle: 'Latest operational events from the live Supabase data set.',
+              ),
+              const SizedBox(height: 12),
+              _RecentActivityGrid(snapshot: snapshot),
+            ],
+          );
+        },
       ),
     );
   }
@@ -519,10 +529,21 @@ class _RecentActivityCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(icon),
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Icon(icon),
+                ),
                 const SizedBox(width: 10),
-                Text(title, style: Theme.of(context).textTheme.titleLarge),
+                Expanded(
+                  child: Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 12),
@@ -559,13 +580,24 @@ class _ActivityTile extends StatelessWidget {
       contentPadding: EdgeInsets.zero,
       title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
-      trailing: Wrap(
-        spacing: 8,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          Text(meta, style: Theme.of(context).textTheme.bodySmall),
-          const Icon(Icons.chevron_right),
-        ],
+      trailing: SizedBox(
+        width: 96,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                meta,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.right,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+            const Icon(Icons.chevron_right),
+          ],
+        ),
       ),
       onTap: onTap,
     );

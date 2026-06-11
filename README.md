@@ -57,12 +57,14 @@ Implemented or in progress:
 - CSR and Dispatch queue dashboards
 - User and Role Management
 - Invite lifecycle handling for admin users
+- Invite acceptance and password setup flow
 - Analytics and Operations Dashboard
 - Platform Tenant Management
 - Tenant commercial settings
 - Subscription plan catalog foundations
 - Stripe checkout/webhook placeholder functions
 - Tenant onboarding workflow
+- Tenant launch-readiness guardrails
 
 Reserved or planned:
 
@@ -236,6 +238,9 @@ Important migration groups:
 - `0023_canonical_role_code_renames.sql`: Canonical role code migration.
 - `0024_tenant_commercial_settings.sql`: Commercial/subscription/add-on settings foundation.
 - `0025_tenant_onboarding_status.sql`: Tenant onboarding lifecycle tracking.
+- `0026_admin_invite_platform_role_access.sql`: Invite lifecycle access for canonical platform roles.
+- `0027_invite_acceptance_self_service.sql`: Self-service invite acceptance tracking.
+- `0028_profile_password_setup_tracking.sql`: Profile password setup tracking for invited users.
 
 The deployed Supabase schema is treated as the source of truth for application queries.
 
@@ -243,7 +248,7 @@ The deployed Supabase schema is treated as the source of truth for application q
 
 Current Edge Functions include:
 
-- `invite-admin-user`: Invites admin users without exposing the service role key to Flutter.
+- `invite-admin-user`: Invites admin users without exposing the service role key to Flutter. It records invite lifecycle state and supports pending, accepted, failed, expired, and cancelled invites.
 - `verify-address`: Address verification workflow support.
 - `verify-activation-code`: Resident activation code verification workflow support.
 - `create-tenant-checkout-session`: Stripe-ready placeholder for tenant subscription checkout.
@@ -300,7 +305,7 @@ Stripe setup notes live in:
 
 ## Tenant Onboarding Workflow
 
-Tenant onboarding is tracked in `tenant_onboarding_status`.
+Tenant onboarding is tracked in `tenant_onboarding_status`. The Tenant Detail page now treats onboarding as an operational checklist instead of a passive status field.
 
 Supported states:
 
@@ -332,6 +337,15 @@ The Tenant Detail page displays onboarding progress based on real configuration 
 - Tenant admin assigned
 - First HOA created
 - Marked ready to launch
+
+Checklist items are actionable. Selecting an item opens the relevant workflow, such as subscription assignment, billing contact setup, tenant settings, email settings, SMS settings, tenant admin assignment, HOA creation, or onboarding status updates.
+
+Launch-readiness behavior:
+
+- `ready_to_launch` and `launched` are blocked until required checklist items are complete.
+- The onboarding dialog displays the exact blockers preventing launch.
+- Launch-ready and launched timestamps are cleared when blockers exist.
+- The tenant list and tenant detail data refresh after onboarding actions.
 
 ## Service Schedule Model
 
@@ -401,6 +415,34 @@ Recommended future production design:
 - Store encrypted activation code values only when business requirements demand admin re-display.
 - Restrict plaintext viewing to approved roles, such as platform administrators and tenant CSR users.
 - Audit every plaintext view, regeneration, resend, and print action.
+
+## Admin Invite Acceptance
+
+Admin invitations use Supabase Auth invite links plus the custom Admin Web App acceptance route.
+
+Local invite acceptance URL:
+
+```text
+http://192.168.0.141:8080/#/accept-invite?token_hash={{ .TokenHash }}&type=invite
+```
+
+Important behavior:
+
+- Invite links route to `AcceptInvitePage`.
+- The app verifies the invite token with Supabase Auth.
+- Invited users must create a password before accessing the admin shell.
+- Accepted invites update lifecycle state through `mark_current_user_admin_invite_accepted()`.
+- The app clears sensitive token fragments from the browser URL after processing.
+- Expired or reused invite links show a friendly app page instead of raw Supabase JSON.
+
+Supabase Auth URL configuration should include the local admin URL during development:
+
+```text
+http://192.168.0.141:8080/
+http://192.168.0.141:8080/#/accept-invite
+```
+
+For production, replace these with the deployed admin domain.
 
 ## Environment Setup
 
@@ -473,7 +515,7 @@ Set secrets from `backend`:
 
 ```bash
 cd /Users/keithtaylor/Projects/KCD-HOA-Web-Portal/backend
-npx supabase secrets set ADMIN_INVITE_REDIRECT_URL="http://192.168.0.141:8080/"
+npx supabase secrets set ADMIN_INVITE_REDIRECT_URL="http://192.168.0.141:8080/accept-invite"
 ```
 
 Future Stripe secrets:
@@ -526,13 +568,13 @@ Current focus:
 
 Recommended next steps:
 
-1. Finish tenant onboarding UX and launch-readiness checklist.
-2. Continue tenant management screens for settings, email, SMS, billing contacts, and add-ons.
-3. Finalize canonical role migration in app UI and repositories.
-4. Add platform audit visibility for tenant onboarding, billing changes, and role assignments.
-5. Configure Stripe once the owner creates the Stripe account.
-6. Deploy and verify Stripe webhooks in test mode.
-7. Build production tenant email configuration workflow.
-8. Build Twilio/SMS add-on configuration workflow.
-9. Harden private ticket notes before resident ticket visibility ships.
+1. Continue tenant management polish for settings, email, SMS, billing contacts, add-ons, and onboarding edge cases.
+2. Finalize canonical role migration in remaining app UI and repositories.
+3. Add platform audit visibility for tenant onboarding, billing changes, invite lifecycle events, and role assignments.
+4. Configure Stripe once the owner creates the Stripe account.
+5. Deploy and verify Stripe webhooks in test mode.
+6. Build production tenant email configuration workflow.
+7. Build Twilio/SMS add-on configuration workflow.
+8. Harden private ticket notes before resident ticket visibility ships.
+9. Add user-facing tenant launch checklist reports for platform sales/support handoff.
 10. Resume resident portal/mobile development only after the admin SaaS foundation is stable.

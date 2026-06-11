@@ -7,7 +7,22 @@ import 'user_form_fields.dart';
 import 'user_management_providers.dart';
 
 class InviteUserDialog extends ConsumerStatefulWidget {
-  const InviteUserDialog({super.key});
+  const InviteUserDialog({
+    this.title = 'Invite User',
+    this.initialCategory,
+    this.initialRoleCode,
+    this.initialTenantId,
+    this.initialHoaId,
+    this.lockScope = false,
+    super.key,
+  });
+
+  final String title;
+  final String? initialCategory;
+  final String? initialRoleCode;
+  final String? initialTenantId;
+  final String? initialHoaId;
+  final bool lockScope;
 
   @override
   ConsumerState<InviteUserDialog> createState() => _InviteUserDialogState();
@@ -21,7 +36,7 @@ class _InviteUserDialogState extends ConsumerState<InviteUserDialog> {
   final _lastNameController = TextEditingController();
   final _phoneController = TextEditingController();
 
-  String _category = 'platform';
+  late String _category;
   String? _roleCode;
   String? _tenantId;
   String? _hoaId;
@@ -30,6 +45,10 @@ class _InviteUserDialogState extends ConsumerState<InviteUserDialog> {
   @override
   void initState() {
     super.initState();
+    _category = widget.initialCategory ?? 'platform';
+    _roleCode = widget.initialRoleCode;
+    _tenantId = widget.initialTenantId;
+    _hoaId = widget.initialHoaId;
     for (final controller in [
       _emailController,
       _firstNameController,
@@ -60,7 +79,7 @@ class _InviteUserDialogState extends ConsumerState<InviteUserDialog> {
     final canSubmit = _hasValidFieldValues() && _hasRequiredSelections();
 
     return AlertDialog(
-      title: const Text('Invite User'),
+      title: Text(widget.title),
       content: SizedBox(
         width: 600,
         child: Form(
@@ -116,15 +135,17 @@ class _InviteUserDialogState extends ConsumerState<InviteUserDialog> {
                     ButtonSegment(value: 'hoa', label: Text('HOA User')),
                   ],
                   selected: {_category},
-                  onSelectionChanged: (value) {
-                    setState(() {
-                      _category = value.first;
-                      _roleCode = null;
-                      _tenantId = null;
-                      _hoaId = null;
-                    });
-                    _refreshFormState();
-                  },
+                  onSelectionChanged: widget.lockScope
+                      ? null
+                      : (value) {
+                          setState(() {
+                            _category = value.first;
+                            _roleCode = null;
+                            _tenantId = null;
+                            _hoaId = null;
+                          });
+                          _refreshFormState();
+                        },
                 ),
                 const SizedBox(height: 16),
                 roles.when(
@@ -133,10 +154,12 @@ class _InviteUserDialogState extends ConsumerState<InviteUserDialog> {
                         ? items.where((role) => role.isPlatformRole).toList()
                         : items.where((role) => role.isHoaRole).toList(),
                     value: _roleCode,
-                    onChanged: (value) {
-                      setState(() => _roleCode = value);
-                      _refreshFormState();
-                    },
+                    onChanged: widget.lockScope
+                        ? null
+                        : (value) {
+                            setState(() => _roleCode = value);
+                            _refreshFormState();
+                          },
                   ),
                   loading: () => const LinearProgressIndicator(),
                   error: (error, _) => Text('Unable to load roles: $error'),
@@ -147,10 +170,12 @@ class _InviteUserDialogState extends ConsumerState<InviteUserDialog> {
                     data: (items) => _TenantSelect(
                       tenants: items,
                       value: _tenantId ?? _primaryTenantId(items),
-                      onChanged: (value) {
-                        setState(() => _tenantId = value);
-                        _refreshFormState();
-                      },
+                      onChanged: widget.lockScope
+                          ? null
+                          : (value) {
+                              setState(() => _tenantId = value);
+                              _refreshFormState();
+                            },
                     ),
                     loading: () => const LinearProgressIndicator(),
                     error: (error, _) => Text('Unable to load tenants: $error'),
@@ -160,10 +185,12 @@ class _InviteUserDialogState extends ConsumerState<InviteUserDialog> {
                     data: (items) => _HoaSelect(
                       hoas: items,
                       value: _hoaId,
-                      onChanged: (value) {
-                        setState(() => _hoaId = value);
-                        _refreshFormState();
-                      },
+                      onChanged: widget.lockScope
+                          ? null
+                          : (value) {
+                              setState(() => _hoaId = value);
+                              _refreshFormState();
+                            },
                     ),
                     loading: () => const LinearProgressIndicator(),
                     error: (error, _) => Text('Unable to load HOAs: $error'),
@@ -295,7 +322,7 @@ class _RoleSelect extends StatelessWidget {
 
   final List<RoleCatalogEntry> roles;
   final String? value;
-  final ValueChanged<String?> onChanged;
+  final ValueChanged<String?>? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -315,7 +342,7 @@ class _TenantSelect extends StatelessWidget {
 
   final List<PlatformTenantOption> tenants;
   final String? value;
-  final ValueChanged<String?> onChanged;
+  final ValueChanged<String?>? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -334,7 +361,7 @@ class _HoaSelect extends StatelessWidget {
 
   final List<HoaScopeOption> hoas;
   final String? value;
-  final ValueChanged<String?> onChanged;
+  final ValueChanged<String?>? onChanged;
 
   @override
   Widget build(BuildContext context) {

@@ -15,6 +15,7 @@ import '../features/activation_codes/presentation/activation_code_detail_page.da
 import '../features/activation_codes/presentation/activation_code_list_page.dart';
 import '../features/announcements_cms/presentation/announcement_detail_page.dart';
 import '../features/announcements_cms/presentation/announcement_list_page.dart';
+import '../features/auth_admin/presentation/accept_invite_page.dart';
 import '../features/auth_admin/presentation/sign_in_page.dart';
 import '../features/documents_cms/presentation/document_detail_page.dart';
 import '../features/documents_cms/presentation/document_list_page.dart';
@@ -49,7 +50,16 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
     initialLocation: '/admin',
     redirect: (context, state) {
       final user = ref.read(currentUserProvider);
-      final isSignIn = state.uri.path == '/sign-in';
+      final path = state.uri.path;
+      final isSignIn = path == '/sign-in';
+      final isAcceptInvite = path == '/accept-invite' || path.startsWith('/accept-invite/');
+
+      if (isAcceptInvite) {
+        if (path != '/accept-invite') {
+          return state.uri.replace(path: '/accept-invite').toString();
+        }
+        return null;
+      }
 
       if (user == null) {
         return isSignIn ? null : '/sign-in';
@@ -66,6 +76,11 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
         path: '/sign-in',
         name: 'signIn',
         builder: (context, state) => const SignInPage(),
+      ),
+      GoRoute(
+        path: '/accept-invite',
+        name: 'acceptInvite',
+        builder: (context, state) => const AcceptInvitePage(),
       ),
       ShellRoute(
         builder: (context, state, child) {
@@ -301,6 +316,15 @@ class _AdminNavigationShellState extends ConsumerState<AdminNavigationShell> {
 
   @override
   Widget build(BuildContext context) {
+    final passwordSetupRequired = ref.watch(currentAdminProfileProvider).maybeWhen(
+          data: (profile) => profile?.requiresPasswordSetup ?? false,
+          orElse: () => false,
+        );
+
+    if (passwordSetupRequired) {
+      return const AcceptInvitePage();
+    }
+
     final isCompact = MediaQuery.sizeOf(context).width < 900;
     final nav = _AdminSidebar(
       currentPath: widget.currentPath,
@@ -342,6 +366,80 @@ class _AdminNavigationShellState extends ConsumerState<AdminNavigationShell> {
 
   Future<void> _signOut() async {
     await ref.read(supabaseClientProvider).auth.signOut();
+  }
+}
+
+
+class _SidebarHeader extends StatelessWidget {
+  const _SidebarHeader({
+    required this.isCollapsed,
+    required this.onToggleCollapsed,
+  });
+
+  final bool isCollapsed;
+  final VoidCallback? onToggleCollapsed;
+
+  @override
+  Widget build(BuildContext context) {
+    final toggle = onToggleCollapsed == null
+        ? null
+        : IconButton(
+            tooltip: isCollapsed ? 'Expand sidebar' : 'Collapse sidebar',
+            onPressed: onToggleCollapsed,
+            icon: Icon(
+              isCollapsed
+                  ? Icons.keyboard_double_arrow_right
+                  : Icons.keyboard_double_arrow_left,
+            ),
+          );
+
+    if (isCollapsed) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(10, 14, 10, 10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Tooltip(
+              message: 'HOA Portal Admin',
+              child: CircleAvatar(
+                radius: 20,
+                child: Icon(Icons.delete_outline),
+              ),
+            ),
+            if (toggle != null) ...[
+              const SizedBox(height: 6),
+              toggle,
+            ],
+          ],
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+      child: Row(
+        children: [
+          const CircleAvatar(
+            radius: 20,
+            child: Icon(Icons.delete_outline),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'HOA Portal',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                Text('Admin Portal'),
+              ],
+            ),
+          ),
+          if (toggle != null) toggle,
+        ],
+      ),
+    );
   }
 }
 
@@ -502,6 +600,7 @@ class _AdminSidebar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
     final role = ref.watch(currentAdminRoleProvider);
+    final profile = ref.watch(currentAdminProfileProvider);
     final access = ref.watch(adminAccessProvider);
     final visibleItems = access.maybeWhen(
       data: (value) {
@@ -513,7 +612,9 @@ class _AdminSidebar extends ConsumerWidget {
     final width = isCollapsed ? 84.0 : 292.0;
 
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
+      // Width animation briefly creates invalid intermediate layouts for the
+      // collapsed rail, so switch instantly and keep the UI overflow-free.
+      duration: Duration.zero,
       curve: Curves.easeOutCubic,
       width: width,
       color: Theme.of(context).colorScheme.surface,
@@ -521,41 +622,9 @@ class _AdminSidebar extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-              child: Row(
-                children: [
-                  const CircleAvatar(
-                    radius: 20,
-                    child: Icon(Icons.delete_outline),
-                  ),
-                  if (!isCollapsed) ...[
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'HOA Portal',
-                            style: TextStyle(fontWeight: FontWeight.w800),
-                          ),
-                          Text('Admin Portal'),
-                        ],
-                      ),
-                    ),
-                  ],
-                  if (onToggleCollapsed != null)
-                    IconButton(
-                      tooltip: isCollapsed ? 'Expand sidebar' : 'Collapse sidebar',
-                      onPressed: onToggleCollapsed,
-                      icon: Icon(
-                        isCollapsed
-                            ? Icons.keyboard_double_arrow_right
-                            : Icons.keyboard_double_arrow_left,
-                      ),
-                    ),
-                ],
-              ),
+            _SidebarHeader(
+              isCollapsed: isCollapsed,
+              onToggleCollapsed: onToggleCollapsed,
             ),
             const Divider(height: 1),
             Expanded(
@@ -626,7 +695,16 @@ class _AdminSidebar extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.all(12),
               child: _AdminUserPanel(
-                email: user?.email ?? user?.id ?? 'Unknown user',
+                displayName: profile.when(
+                  data: (value) => value?.displayName ?? user?.email ?? user?.id ?? 'Unknown user',
+                  loading: () => user?.email ?? user?.id ?? 'Loading user...',
+                  error: (_, __) => user?.email ?? user?.id ?? 'Unknown user',
+                ),
+                email: profile.when(
+                  data: (value) => value?.email ?? user?.email ?? user?.id ?? 'Unknown user',
+                  loading: () => user?.email ?? user?.id ?? 'Loading user...',
+                  error: (_, __) => user?.email ?? user?.id ?? 'Unknown user',
+                ),
                 role: role.when(
                   data: (value) => value,
                   loading: () => 'Loading role...',
@@ -647,12 +725,14 @@ class _AdminSidebar extends ConsumerWidget {
 
 class _AdminUserPanel extends StatelessWidget {
   const _AdminUserPanel({
+    required this.displayName,
     required this.email,
     required this.role,
     required this.isCollapsed,
     required this.onSignOut,
   });
 
+  final String displayName;
   final String email;
   final String role;
   final bool isCollapsed;
@@ -660,11 +740,15 @@ class _AdminUserPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tooltipMessage = displayName == email
+        ? '$email\n$role'
+        : '$displayName\n$email\n$role';
+
     if (isCollapsed) {
       return Column(
         children: [
           Tooltip(
-            message: '$email\n$role',
+            message: tooltipMessage,
             child: const CircleAvatar(child: Icon(Icons.person_outline)),
           ),
           const SizedBox(height: 8),
@@ -690,17 +774,24 @@ class _AdminUserPanel extends StatelessWidget {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Tooltip(
-                    message: '$email\n$role',
+                    message: tooltipMessage,
                     waitDuration: const Duration(milliseconds: 350),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          email,
+                          displayName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
+                        if (displayName != email)
+                          Text(
+                            email,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
                         Text(
                           role,
                           maxLines: 1,
@@ -728,7 +819,6 @@ class _AdminUserPanel extends StatelessWidget {
     );
   }
 }
-
 class _AdminNavItem {
   const _AdminNavItem({
     required this.label,

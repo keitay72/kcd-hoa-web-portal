@@ -10,7 +10,7 @@ abstract interface class HoaRepository {
 
   Future<HoaCommunity> getById(String id);
 
-  Future<HoaCommunity> create(HoaCommunityInput input);
+  Future<HoaCommunity> create(HoaCommunityInput input, {String? tenantId});
 
   Future<HoaCommunity> update({
     required String id,
@@ -52,12 +52,12 @@ class SupabaseHoaRepository implements HoaRepository {
   }
 
   @override
-  Future<HoaCommunity> create(HoaCommunityInput input) async {
-    final tenantId = await _primaryTenantId();
+  Future<HoaCommunity> create(HoaCommunityInput input, {String? tenantId}) async {
+    final targetTenantId = tenantId ?? await _primaryTenantId();
     final code = await availableCodeForName(name: input.name);
     final row = await _client
         .from('hoa_communities')
-        .insert(input.toInsertJson(tenantId: tenantId, code: code))
+        .insert(input.toInsertJson(tenantId: targetTenantId, code: code))
         .select()
         .single();
 

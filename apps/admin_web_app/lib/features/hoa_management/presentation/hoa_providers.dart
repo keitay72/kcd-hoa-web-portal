@@ -63,10 +63,10 @@ class HoaFormController extends AutoDisposeAsyncNotifier<void> {
   @override
   FutureOr<void> build() {}
 
-  Future<HoaCommunity?> create(HoaCommunityInput input) async {
+  Future<HoaCommunity?> create(HoaCommunityInput input, {String? tenantId}) async {
     state = const AsyncLoading();
     final result = await AsyncValue.guard(() {
-      return ref.read(hoaRepositoryProvider).create(input);
+      return ref.read(hoaRepositoryProvider).create(input, tenantId: tenantId);
     });
 
     if (result.hasError) {

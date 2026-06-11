@@ -10,6 +10,19 @@ String? _text(dynamic value) {
   return text == null || text.isEmpty ? null : text;
 }
 
+dynamic _onboardingValue(dynamic value, String key) {
+  if (value is List && value.isNotEmpty) {
+    final first = value.first;
+    return first is Map<String, dynamic> ? first[key] : null;
+  }
+  if (value is Map<String, dynamic>) return value[key];
+  return null;
+}
+
+String? _onboardingText(dynamic value, String key) {
+  return _text(_onboardingValue(value, key));
+}
+
 class PlatformTenantDto {
   const PlatformTenantDto({required this.json});
 
@@ -24,6 +37,10 @@ class PlatformTenantDto {
       isPrimary: json['is_primary'] as bool? ?? false,
       createdAt: _date(json['created_at']),
       updatedAt: _date(json['updated_at']),
+      onboardingStatus: _onboardingText(json['tenant_onboarding_status'], 'status'),
+      onboardingBlockedReason: _onboardingText(json['tenant_onboarding_status'], 'blocked_reason'),
+      onboardingLaunchReadyAt: _date(_onboardingValue(json['tenant_onboarding_status'], 'launch_ready_at')),
+      onboardingLaunchedAt: _date(_onboardingValue(json['tenant_onboarding_status'], 'launched_at')),
     );
   }
 }
@@ -181,6 +198,65 @@ class TenantOnboardingStatusDto {
       blockedReason: _text(json['blocked_reason']),
       notes: _text(json['notes']),
       updatedBy: _text(json['updated_by']),
+    );
+  }
+}
+
+
+class TenantStaffAssignmentDto {
+  const TenantStaffAssignmentDto({
+    required this.json,
+    required this.profileJson,
+  });
+
+  final Map<String, dynamic> json;
+  final Map<String, dynamic>? profileJson;
+
+  TenantStaffAssignment toDomain() {
+    final role = json['roles'] as Map<String, dynamic>? ?? const {};
+    return TenantStaffAssignment(
+      userId: json['user_id'] as String,
+      email: _text(profileJson?['email']) ?? 'Unknown email',
+      fullName: _text(profileJson?['full_name']),
+      phone: _text(profileJson?['phone']),
+      status: _text(profileJson?['status']),
+      roleId: json['role_id'] as int,
+      roleCode: role['code'] as String? ?? '',
+      roleName: role['name'] as String? ?? 'Tenant Role',
+      tenantId: json['tenant_id'] as String,
+      createdAt: _date(json['created_at']),
+    );
+  }
+}
+
+class TenantAssignableUserDto {
+  const TenantAssignableUserDto({required this.json});
+
+  final Map<String, dynamic> json;
+
+  TenantAssignableUser toDomain() {
+    return TenantAssignableUser(
+      id: json['id'] as String,
+      email: json['email'] as String,
+      fullName: _text(json['full_name']),
+      status: _text(json['status']),
+    );
+  }
+}
+
+
+class TenantHoaSummaryDto {
+  const TenantHoaSummaryDto({required this.json});
+
+  final Map<String, dynamic> json;
+
+  TenantHoaSummary toDomain() {
+    return TenantHoaSummary(
+      id: json['id'] as String,
+      code: json['code'] as String,
+      name: json['name'] as String,
+      status: json['status'] as String? ?? 'active',
+      createdAt: _date(json['created_at']),
     );
   }
 }

@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../hoa_management/presentation/hoa_form_dialog.dart';
+import '../../user_management/presentation/invite_user_dialog.dart';
 import '../domain/tenant_management_models.dart';
 import 'billing_contact_dialog.dart';
 import 'tenant_email_settings_dialog.dart';
@@ -10,6 +12,7 @@ import 'tenant_form_dialog.dart';
 import 'tenant_management_providers.dart';
 import 'tenant_onboarding_dialog.dart';
 import 'tenant_settings_dialog.dart';
+import 'tenant_staff_assignment_dialog.dart';
 import 'tenant_sms_settings_dialog.dart';
 import 'tenant_subscription_dialog.dart';
 
@@ -91,15 +94,24 @@ class _TenantDetailView extends ConsumerWidget {
             children: [
               _OnboardingCard(detail: detail),
               const SizedBox(height: 16),
-              Wrap(
-                spacing: 16,
-                runSpacing: 16,
-                children: [
-                  _SettingsCard(detail: detail),
-                  _EmailSettingsCard(detail: detail),
-                  _SmsSettingsCard(detail: detail),
-                  _SubscriptionCard(detail: detail),
-                ],
+              _TenantStaffCard(detail: detail),
+              const SizedBox(height: 16),
+              _TenantHoasCard(detail: detail),
+              const SizedBox(height: 16),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final cardWidth = _tenantSummaryCardWidth(constraints.maxWidth);
+                  return Wrap(
+                    spacing: 16,
+                    runSpacing: 16,
+                    children: [
+                      _SettingsCard(detail: detail, width: cardWidth),
+                      _EmailSettingsCard(detail: detail, width: cardWidth),
+                      _SmsSettingsCard(detail: detail, width: cardWidth),
+                      _SubscriptionCard(detail: detail, width: cardWidth),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 16),
               _BillingContactsCard(detail: detail),
@@ -126,13 +138,13 @@ class _TenantDetailView extends ConsumerWidget {
 }
 
 
-class _OnboardingCard extends StatelessWidget {
+class _OnboardingCard extends ConsumerWidget {
   const _OnboardingCard({required this.detail});
 
   final TenantDetail detail;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final status = detail.onboardingStatus;
     final progressPercent = (detail.onboardingProgress * 100).round();
     final checklist = detail.onboardingChecklist;
@@ -166,14 +178,7 @@ class _OnboardingCard extends StatelessWidget {
                 Chip(label: Text(status?.statusLabel ?? 'Not Started')),
                 const SizedBox(width: 8),
                 TextButton.icon(
-                  onPressed: () => showDialog<Object?>(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (_) => TenantOnboardingDialog(
-                      tenantId: detail.tenant.id,
-                      status: status,
-                    ),
-                  ),
+                  onPressed: () => _openOnboardingStatus(context, ref),
                   icon: const Icon(Icons.edit_outlined),
                   label: const Text('Update'),
                 ),
@@ -212,7 +217,10 @@ class _OnboardingCard extends StatelessWidget {
                       .map(
                         (item) => SizedBox(
                           width: cardWidth,
-                          child: _ChecklistTile(item: item),
+                          child: _ChecklistTile(
+                            item: item,
+                            onTap: () => _handleChecklistAction(context, ref, item),
+                          ),
                         ),
                       )
                       .toList(),
@@ -224,56 +232,212 @@ class _OnboardingCard extends StatelessWidget {
       ),
     );
   }
+
+  Future<void> _handleChecklistAction(
+    BuildContext context,
+    WidgetRef ref,
+    OnboardingChecklistItem item,
+  ) async {
+    switch (item.action) {
+      case 'edit_tenant':
+        await _showAndRefresh(
+          context,
+          ref,
+          TenantFormDialog(tenant: detail.tenant),
+        );
+        return;
+      case 'subscription':
+        await _showAndRefresh(
+          context,
+          ref,
+          TenantSubscriptionDialog(
+            tenantId: detail.tenant.id,
+            availablePlans: detail.availablePlans,
+            subscription: _currentSubscription(detail.subscriptions),
+          ),
+        );
+        return;
+      case 'billing_contact':
+        await _showAndRefresh(
+          context,
+          ref,
+          BillingContactDialog(
+            tenantId: detail.tenant.id,
+            contact: detail.billingContacts.isEmpty ? null : detail.billingContacts.first,
+          ),
+        );
+        return;
+      case 'settings':
+        await _showAndRefresh(
+          context,
+          ref,
+          TenantSettingsDialog(
+            tenantId: detail.tenant.id,
+            settings: detail.settings,
+          ),
+        );
+        return;
+      case 'email_settings':
+        await _showAndRefresh(
+          context,
+          ref,
+          TenantEmailSettingsDialog(
+            tenantId: detail.tenant.id,
+            settings: detail.emailSettings,
+          ),
+        );
+        return;
+      case 'sms_settings':
+        await _showAndRefresh(
+          context,
+          ref,
+          TenantSmsSettingsDialog(
+            tenantId: detail.tenant.id,
+            settings: detail.smsSettings,
+          ),
+        );
+        return;
+      case 'tenant_admin':
+        if (detail.assignableUsers.isEmpty) {
+          await _showAndRefresh(
+            context,
+            ref,
+            InviteUserDialog(
+              title: 'Invite Tenant Admin',
+              initialCategory: 'platform',
+              initialRoleCode: 'tenant_admin',
+              initialTenantId: detail.tenant.id,
+              lockScope: true,
+            ),
+          );
+        } else {
+          await _showAndRefresh(
+            context,
+            ref,
+            TenantStaffAssignmentDialog(detail: detail),
+          );
+        }
+        return;
+      case 'first_hoa':
+        if (detail.hoaCount > 0) {
+          context.go('/admin/hoas');
+          return;
+        }
+        await _showAndRefresh(
+          context,
+          ref,
+          HoaFormDialog(
+            tenantId: detail.tenant.id,
+            title: 'Create First HOA',
+          ),
+        );
+        return;
+      case 'onboarding_status':
+        await _openOnboardingStatus(context, ref);
+        return;
+      default:
+        return;
+    }
+  }
+
+  Future<void> _openOnboardingStatus(BuildContext context, WidgetRef ref) async {
+    await _showAndRefresh(
+      context,
+      ref,
+      TenantOnboardingDialog(
+        tenantId: detail.tenant.id,
+        detail: detail,
+        status: detail.onboardingStatus,
+      ),
+    );
+  }
+
+  Future<void> _showAndRefresh(
+    BuildContext context,
+    WidgetRef ref,
+    Widget dialog,
+  ) async {
+    await showDialog<Object?>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => dialog,
+    );
+    ref.invalidate(tenantDetailProvider(detail.tenant.id));
+    ref.invalidate(tenantListProvider);
+  }
 }
 
 class _ChecklistTile extends StatelessWidget {
-  const _ChecklistTile({required this.item});
+  const _ChecklistTile({required this.item, required this.onTap});
 
   final OnboardingChecklistItem item;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
+    final borderColor = item.isComplete
+        ? colorScheme.primary.withOpacity(0.35)
+        : colorScheme.outlineVariant;
+    final backgroundColor = item.isComplete
+        ? colorScheme.primaryContainer.withOpacity(0.22)
+        : colorScheme.surface;
+
+    return Material(
+      color: backgroundColor,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: item.isComplete
-              ? colorScheme.primary.withOpacity(0.35)
-              : colorScheme.outlineVariant,
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: borderColor),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    item.isComplete ? Icons.check_circle : Icons.radio_button_unchecked,
+                    color: item.isComplete ? colorScheme.primary : colorScheme.outline,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.label,
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          item.description,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: onTap,
+                  icon: Icon(item.isComplete ? Icons.visibility_outlined : Icons.arrow_forward),
+                  label: Text(item.actionLabel),
+                ),
+              ),
+            ],
+          ),
         ),
-        color: item.isComplete
-            ? colorScheme.primaryContainer.withOpacity(0.22)
-            : colorScheme.surface,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            item.isComplete ? Icons.check_circle : Icons.radio_button_unchecked,
-            color: item.isComplete ? colorScheme.primary : colorScheme.outline,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.label,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  item.description,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -322,10 +486,18 @@ class _WarningPanel extends StatelessWidget {
   }
 }
 
+
+double _tenantSummaryCardWidth(double availableWidth) {
+  if (availableWidth >= 1320) return (availableWidth - 32) / 3;
+  if (availableWidth >= 760) return (availableWidth - 16) / 2;
+  return availableWidth;
+}
+
 class _SettingsCard extends ConsumerWidget {
-  const _SettingsCard({required this.detail});
+  const _SettingsCard({required this.detail, required this.width});
 
   final TenantDetail detail;
+  final double width;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -333,6 +505,7 @@ class _SettingsCard extends ConsumerWidget {
     return _TenantCard(
       title: 'Branding & Support',
       icon: Icons.tune_outlined,
+      width: width,
       action: TextButton.icon(
         onPressed: () => _open(context),
         icon: const Icon(Icons.edit_outlined),
@@ -362,9 +535,10 @@ class _SettingsCard extends ConsumerWidget {
 }
 
 class _EmailSettingsCard extends StatelessWidget {
-  const _EmailSettingsCard({required this.detail});
+  const _EmailSettingsCard({required this.detail, required this.width});
 
   final TenantDetail detail;
+  final double width;
 
   @override
   Widget build(BuildContext context) {
@@ -372,6 +546,7 @@ class _EmailSettingsCard extends StatelessWidget {
     return _TenantCard(
       title: 'Email Configuration',
       icon: Icons.mark_email_read_outlined,
+      width: width,
       action: TextButton.icon(
         onPressed: () => showDialog<Object?>(
           context: context,
@@ -385,6 +560,8 @@ class _EmailSettingsCard extends StatelessWidget {
         label: const Text('Edit'),
       ),
       children: [
+        _EmailReadinessBanner(settings: settings),
+        const SizedBox(height: 10),
         _InfoLine(label: 'Provider', value: settings?.providerLabel ?? 'Platform Managed'),
         _InfoLine(label: 'Verification', value: settings?.verificationStatusLabel ?? 'Not Configured'),
         _InfoLine(label: 'Sender domain', value: settings?.senderDomain ?? 'Not set'),
@@ -395,17 +572,67 @@ class _EmailSettingsCard extends StatelessWidget {
   }
 }
 
+class _EmailReadinessBanner extends StatelessWidget {
+  const _EmailReadinessBanner({required this.settings});
+
+  final TenantEmailSettings? settings;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isPlatformManaged = settings == null || settings!.provider == 'platform_managed';
+    final isVerified = settings?.verificationStatus == 'verified';
+    final isReady = isPlatformManaged || isVerified;
+    final message = isPlatformManaged
+        ? 'Platform sender is active. Tenant sender can be configured later.'
+        : isVerified
+            ? 'Tenant sender domain is verified.'
+            : 'Tenant sender setup is required before launch.';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: isReady
+            ? colorScheme.primaryContainer.withOpacity(0.3)
+            : colorScheme.errorContainer.withOpacity(0.35),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            isReady ? Icons.check_circle_outline : Icons.warning_amber_outlined,
+            color: isReady ? colorScheme.primary : colorScheme.error,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: Text(message)),
+        ],
+      ),
+    );
+  }
+}
+
 class _SmsSettingsCard extends StatelessWidget {
-  const _SmsSettingsCard({required this.detail});
+  const _SmsSettingsCard({required this.detail, required this.width});
 
   final TenantDetail detail;
+  final double width;
 
   @override
   Widget build(BuildContext context) {
     final settings = detail.smsSettings;
+    final addon = _smsAddon(detail);
+    final status = settings?.status ?? 'disabled';
+    final hasPhone = _hasText(settings?.sendingPhoneNumber);
+    final hasMessagingService = _hasText(settings?.twilioMessagingServiceSid);
+    final canSend = status == 'active' && hasPhone && hasMessagingService;
+
     return _TenantCard(
       title: 'SMS Add-On',
       icon: Icons.sms_outlined,
+      width: width,
       action: TextButton.icon(
         onPressed: () => showDialog<Object?>(
           context: context,
@@ -416,23 +643,133 @@ class _SmsSettingsCard extends StatelessWidget {
           ),
         ),
         icon: const Icon(Icons.edit_outlined),
-        label: const Text('Edit'),
+        label: const Text('Configure'),
       ),
       children: [
-        _InfoLine(label: 'Provider', value: settings?.provider ?? 'twilio'),
-        _InfoLine(label: 'Status', value: settings?.statusLabel ?? 'Disabled'),
-        _InfoLine(label: 'Phone number', value: settings?.sendingPhoneNumber ?? 'Not set'),
+        _SmsStatusBanner(
+          status: status,
+          canSend: canSend,
+          addonStatus: addon?.status,
+        ),
+        const SizedBox(height: 12),
+        _InfoLine(label: 'Provider', value: settings?.providerLabel ?? 'Twilio'),
+        _InfoLine(label: 'SMS setting', value: settings?.statusLabel ?? 'Disabled'),
+        _InfoLine(label: 'Add-on status', value: addon?.statusLabel ?? 'Disabled'),
+        _InfoLine(label: 'Phone number', value: settings?.formattedSendingPhoneNumber ?? 'Not set'),
         _InfoLine(label: 'Message limit', value: settings?.monthlyMessageLimit?.toString() ?? 'Not set'),
+        _InfoLine(label: 'Twilio subaccount', value: settings?.twilioSubaccountSid ?? 'Not set'),
         _InfoLine(label: 'Messaging service', value: settings?.twilioMessagingServiceSid ?? 'Not set'),
+        const SizedBox(height: 8),
+        _MiniChecklistRow(label: 'Tenant wants SMS', complete: status == 'pending' || status == 'active'),
+        _MiniChecklistRow(label: 'Sending number assigned', complete: hasPhone),
+        _MiniChecklistRow(label: 'Messaging service connected', complete: hasMessagingService),
       ],
+    );
+  }
+
+  TenantAddonSummary? _smsAddon(TenantDetail detail) {
+    for (final addon in detail.enabledAddons) {
+      if (addon.addonCode == 'sms_notifications') return addon;
+    }
+    return null;
+  }
+
+  bool _hasText(String? value) => value != null && value.trim().isNotEmpty;
+}
+
+class _SmsStatusBanner extends StatelessWidget {
+  const _SmsStatusBanner({
+    required this.status,
+    required this.canSend,
+    required this.addonStatus,
+  });
+
+  final String status;
+  final bool canSend;
+  final String? addonStatus;
+
+  String _statusLabel(String value) {
+    return value
+        .replaceAll('_', ' ')
+        .split(' ')
+        .where((part) => part.isNotEmpty)
+        .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+        .join(' ');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isPositive = canSend || status == 'pending';
+    final message = switch (status) {
+      'active' when canSend => 'SMS is active and ready for tenant notifications.',
+      'active' => 'SMS is marked active but setup is incomplete. Confirm phone number and messaging service.',
+      'pending' => 'Tenant wants SMS. Finish Twilio setup before launch.',
+      'suspended' => 'SMS is suspended. Tenant messages should not be sent.',
+      _ => 'SMS is disabled. Enable when the tenant approves the texting add-on.',
+    };
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: isPositive
+            ? colorScheme.primaryContainer.withOpacity(0.35)
+            : colorScheme.surfaceContainerHighest,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            canSend ? Icons.check_circle_outline : Icons.sms_failed_outlined,
+            color: canSend ? colorScheme.primary : null,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              addonStatus == null
+                  ? message
+                  : '$message Add-on: ${_statusLabel(addonStatus!)}.',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniChecklistRow extends StatelessWidget {
+  const _MiniChecklistRow({required this.label, required this.complete});
+
+  final String label;
+  final bool complete;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Icon(
+            complete ? Icons.check_circle_outline : Icons.radio_button_unchecked,
+            size: 18,
+            color: complete ? Theme.of(context).colorScheme.primary : null,
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: Text(label)),
+        ],
+      ),
     );
   }
 }
 
 class _SubscriptionCard extends ConsumerWidget {
-  const _SubscriptionCard({required this.detail});
+  const _SubscriptionCard({required this.detail, required this.width});
 
   final TenantDetail detail;
+  final double width;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -440,6 +777,7 @@ class _SubscriptionCard extends ConsumerWidget {
     return _TenantCard(
       title: 'Subscription',
       icon: Icons.credit_card_outlined,
+      width: width,
       action: Wrap(
         spacing: 8,
         children: [
@@ -725,23 +1063,249 @@ class _AddonsCard extends ConsumerWidget {
   }
 }
 
+class _TenantHoasCard extends ConsumerWidget {
+  const _TenantHoasCard({required this.detail});
+
+  final TenantDetail detail;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.apartment_outlined),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Tenant HOAs',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      Text(
+                        '${detail.tenantHoas.length} HOA community record(s)',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: () => _openCreateHoa(context, ref),
+                  icon: const Icon(Icons.add_business_outlined),
+                  label: Text(detail.tenantHoas.isEmpty ? 'Create First HOA' : 'Add HOA'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (detail.tenantHoas.isEmpty)
+              const Text('No HOA communities have been created for this tenant yet.')
+            else
+              ...detail.tenantHoas.map(
+                (hoa) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: CircleAvatar(
+                    child: Icon(hoa.isActive ? Icons.home_work_outlined : Icons.home_work),
+                  ),
+                  title: Text(hoa.name),
+                  subtitle: Text('${hoa.code} · ${hoa.statusLabel}'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.go('/admin/hoas/${hoa.id}'),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openCreateHoa(BuildContext context, WidgetRef ref) async {
+    final created = await showDialog<Object?>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => HoaFormDialog(
+        tenantId: detail.tenant.id,
+        title: detail.tenantHoas.isEmpty
+            ? 'Create First HOA for ${detail.tenant.name}'
+            : 'Add HOA for ${detail.tenant.name}',
+      ),
+    );
+    if (created == null || !context.mounted) return;
+
+    ref.invalidate(tenantDetailProvider(detail.tenant.id));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('HOA community created.')),
+    );
+  }
+}
+
+class _TenantStaffCard extends ConsumerWidget {
+  const _TenantStaffCard({required this.detail});
+
+  final TenantDetail detail;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final mutation = ref.watch(tenantMutationControllerProvider);
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.admin_panel_settings_outlined),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Tenant Staff',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    TextButton.icon(
+                      onPressed: mutation.isLoading
+                          ? null
+                          : () => _openInviteTenantAdmin(context, ref),
+                      icon: const Icon(Icons.mail_outline),
+                      label: const Text('Invite Admin'),
+                    ),
+                    TextButton.icon(
+                      onPressed: mutation.isLoading
+                          ? null
+                          : () => showDialog<Object?>(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (_) => TenantStaffAssignmentDialog(detail: detail),
+                              ),
+                      icon: const Icon(Icons.person_add_alt_outlined),
+                      label: const Text('Assign Staff'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (detail.tenantStaff.isEmpty)
+              const Text('No tenant staff assigned yet. Assign a tenant admin before launch.')
+            else
+              ...detail.tenantStaff.map(
+                (staff) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+                  title: Text(staff.displayName),
+                  subtitle: Tooltip(
+                    message: [
+                      staff.email,
+                      staff.roleName,
+                      staff.statusLabel,
+                    ].join('\n'),
+                    waitDuration: const Duration(milliseconds: 400),
+                    child: Text(
+                      [staff.email, staff.roleName, staff.statusLabel].join(' · '),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  trailing: IconButton(
+                    tooltip: 'Remove tenant role',
+                    onPressed: mutation.isLoading
+                        ? null
+                        : () => _confirmRemove(context, ref, staff),
+                    icon: const Icon(Icons.person_remove_outlined),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openInviteTenantAdmin(BuildContext context, WidgetRef ref) async {
+    final invited = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => InviteUserDialog(
+        title: 'Invite Tenant Admin',
+        initialCategory: 'platform',
+        initialRoleCode: 'tenant_admin',
+        initialTenantId: detail.tenant.id,
+        lockScope: true,
+      ),
+    );
+    if (invited != true || !context.mounted) return;
+
+    ref.invalidate(tenantDetailProvider(detail.tenant.id));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Tenant admin invitation sent.')),
+    );
+  }
+
+  Future<void> _confirmRemove(
+    BuildContext context,
+    WidgetRef ref,
+    TenantStaffAssignment staff,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Remove Tenant Role?'),
+        content: Text('Remove ${staff.roleName} from ${staff.displayName}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    final removed = await ref.read(tenantMutationControllerProvider.notifier).removeTenantStaff(staff);
+    if (!context.mounted) return;
+    if (removed) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Removed ${staff.roleName} from ${staff.displayName}.')),
+      );
+    }
+  }
+}
+
 class _TenantCard extends StatelessWidget {
   const _TenantCard({
     required this.title,
     required this.icon,
     required this.children,
     this.action,
+    this.width = 420,
   });
 
   final String title;
   final IconData icon;
   final List<Widget> children;
   final Widget? action;
+  final double width;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 420,
+      width: width,
       child: Card(
         margin: EdgeInsets.zero,
         child: Padding(

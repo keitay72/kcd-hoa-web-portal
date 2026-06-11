@@ -165,6 +165,26 @@ class TenantMutationController extends AutoDisposeAsyncNotifier<void> {
     );
   }
 
+  Future<bool> assignTenantStaff({
+    required String tenantId,
+    required TenantStaffAssignmentInput input,
+  }) {
+    return _run(
+      tenantId: tenantId,
+      action: () => ref.read(tenantManagementRepositoryProvider).assignTenantStaff(
+            tenantId: tenantId,
+            input: input,
+          ),
+    );
+  }
+
+  Future<bool> removeTenantStaff(TenantStaffAssignment assignment) {
+    return _run(
+      tenantId: assignment.tenantId,
+      action: () => ref.read(tenantManagementRepositoryProvider).removeTenantStaff(assignment),
+    );
+  }
+
   Future<bool> saveOnboardingStatus({
     required String tenantId,
     required TenantOnboardingInput input,
