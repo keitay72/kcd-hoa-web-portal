@@ -29,7 +29,7 @@ type ParsedInvite = {
   tenantId: string | null;
   hoaId: string | null;
   isGlobalPlatformRole: boolean;
-  isPlatformRole: boolean;
+  isTenantRole: boolean;
 };
 
 type ParseResult =
@@ -64,7 +64,7 @@ const corsHeaders = {
 };
 
 const globalPlatformRoles = new Set(['platform_owner', 'platform_admin', 'platform_support', 'platform_sales']);
-const platformRoles = new Set(['tenant_admin', 'tenant_manager', 'tenant_csr', 'tenant_dispatch', 'sys_admin', 'mgmt']);
+const tenantRoles = new Set(['tenant_admin', 'tenant_manager', 'tenant_csr', 'tenant_dispatch']);
 const hoaRoles = new Set(['hoa_manager', 'hoa_board', 'hoa_resident']);
 const namePattern = /^[A-Za-z][A-Za-z .'-]*$/;
 const emailPattern = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -175,10 +175,10 @@ function parsePayload(payload: InviteAdminUserRequest): ParseResult {
   if (lastNameError) return { ok: false, error: lastNameError };
 
   if (phone.length !== 10) return { ok: false, error: 'Phone must be a 10-digit US phone number' };
-  if (!globalPlatformRoles.has(role) && !platformRoles.has(role) && !hoaRoles.has(role)) return { ok: false, error: 'Role is invalid' };
+  if (!globalPlatformRoles.has(role) && !tenantRoles.has(role) && !hoaRoles.has(role)) return { ok: false, error: 'Role is invalid' };
   if (globalPlatformRoles.has(role) && (tenantId || hoaId)) return { ok: false, error: 'Platform roles must not include tenant_id or hoa_id' };
-  if (platformRoles.has(role) && hoaId) return { ok: false, error: 'Tenant staff roles must not include hoa_id' };
-  if (platformRoles.has(role) && !tenantId) return { ok: false, error: 'Tenant staff roles require tenant_id' };
+  if (tenantRoles.has(role) && hoaId) return { ok: false, error: 'Tenant staff roles must not include hoa_id' };
+  if (tenantRoles.has(role) && !tenantId) return { ok: false, error: 'Tenant staff roles require tenant_id' };
   if (hoaRoles.has(role) && !hoaId) return { ok: false, error: 'HOA roles require hoa_id' };
 
   return {
@@ -194,7 +194,7 @@ function parsePayload(payload: InviteAdminUserRequest): ParseResult {
       tenantId,
       hoaId,
       isGlobalPlatformRole: globalPlatformRoles.has(role),
-      isPlatformRole: platformRoles.has(role),
+      isTenantRole: tenantRoles.has(role),
     },
   };
 }
@@ -213,7 +213,7 @@ function inputFromInviteRow(row: InviteRow): ParsedInvite {
     tenantId: row.tenant_id,
     hoaId: row.hoa_id,
     isGlobalPlatformRole: globalPlatformRoles.has(role),
-    isPlatformRole: platformRoles.has(role),
+    isTenantRole: tenantRoles.has(role),
   };
 }
 
@@ -262,15 +262,7 @@ async function callerCanManageInvites(supabase: SupabaseClient, userId: string) 
   if (globalRoleError) throw globalRoleError;
   if (Array.isArray(globalRoles) && globalRoles.length > 0) return true;
 
-  const { data: legacyRoles, error: legacyRoleError } = await supabase
-    .from('user_platform_roles')
-    .select('roles!inner(code)')
-    .eq('user_id', userId)
-    .eq('roles.code', 'sys_admin')
-    .limit(1);
-
-  if (legacyRoleError) throw legacyRoleError;
-  return Array.isArray(legacyRoles) && legacyRoles.length > 0;
+  return false;
 }
 
 async function primaryTenantId(supabase: SupabaseClient) {
@@ -397,7 +389,7 @@ async function assignRole(
     return;
   }
 
-  if (input.isPlatformRole) {
+  if (input.isTenantRole) {
     const { error } = await supabase.from('user_platform_roles').upsert({
       user_id: userId,
       tenant_id: tenantId,
@@ -463,8 +455,8 @@ async function recordInvite(
     phone: input.phone,
     role_id: roleId,
     role_code: input.role,
-    tenant_id: input.isPlatformRole ? tenantId : null,
-    hoa_id: input.isPlatformRole ? null : input.hoaId,
+    tenant_id: input.isTenantRole ? tenantId : null,
+    hoa_id: input.isTenantRole ? null : input.hoaId,
     status,
     invited_by: actorUserId,
     accepted_at: status === 'accepted' ? new Date().toISOString() : null,
@@ -515,6 +507,7 @@ async function writeAuditLog(
 
   const { error } = await supabase.from('admin_audit_logs').insert({
     actor_user_id: actorUserId,
+    tenant_id: input?.tenantId ?? null,
     hoa_id: input?.hoaId ?? null,
     action,
     entity_type: 'admin_user_invite',
@@ -548,14 +541,14 @@ async function handleInvite(
   console.info('invite-admin-user invite requested', {
     email: maskEmail(input.email),
     role: input.role,
-    scope: input.isGlobalPlatformRole ? 'platform' : input.isPlatformRole ? 'tenant' : 'hoa',
+    scope: input.isGlobalPlatformRole ? 'platform' : input.isTenantRole ? 'tenant' : 'hoa',
   });
 
   const role = await roleForCode(supabase, input.role);
   if (!role) return badRequest('Role does not exist');
 
-  const resolvedTenantId = input.isPlatformRole ? input.tenantId ?? await primaryTenantId(supabase) ?? null : null;
-  if (input.isPlatformRole && !resolvedTenantId) return badRequest('tenant_id is required for tenant staff roles');
+  const resolvedTenantId = input.isTenantRole ? input.tenantId ?? await primaryTenantId(supabase) ?? null : null;
+  if (input.isTenantRole && !resolvedTenantId) return badRequest('tenant_id is required for tenant staff roles');
   if (resolvedTenantId && !(await ensureTenantExists(supabase, resolvedTenantId))) return badRequest('tenant_id does not exist');
   if (input.hoaId && !(await ensureHoaExists(supabase, input.hoaId))) return badRequest('hoa_id does not exist');
 

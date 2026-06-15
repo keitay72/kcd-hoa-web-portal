@@ -7,6 +7,9 @@ import '../core/rbac/permission_rules.dart';
 import '../core/rbac/protected_admin_page.dart';
 import '../core/rbac/rbac_providers.dart';
 import '../core/rbac/unauthorized_page.dart';
+import '../core/subscriptions/protected_tenant_feature_page.dart';
+import '../core/subscriptions/subscription_providers.dart';
+import '../core/subscriptions/tenant_entitlements.dart';
 import '../core/supabase/supabase_provider.dart';
 import '../features/analytics_dashboard/presentation/analytics_dashboard_page.dart';
 import '../features/address_registry/presentation/address_detail_page.dart';
@@ -15,6 +18,7 @@ import '../features/activation_codes/presentation/activation_code_detail_page.da
 import '../features/activation_codes/presentation/activation_code_list_page.dart';
 import '../features/announcements_cms/presentation/announcement_detail_page.dart';
 import '../features/announcements_cms/presentation/announcement_list_page.dart';
+import '../features/audit_logs/presentation/audit_log_list_page.dart';
 import '../features/auth_admin/presentation/accept_invite_page.dart';
 import '../features/auth_admin/presentation/sign_in_page.dart';
 import '../features/documents_cms/presentation/document_detail_page.dart';
@@ -93,7 +97,9 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/admin',
             name: 'adminHome',
-            builder: (context, state) => const AnalyticsDashboardPage().protectedBy(AdminPermissions.dashboard),
+            builder: (context, state) => const AnalyticsDashboardPage()
+                .protectedByFeature(TenantFeature.analyticsDashboard)
+                .protectedBy(AdminPermissions.dashboard),
           ),
           GoRoute(
             path: '/admin/hoa',
@@ -236,28 +242,36 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
             name: 'ticketCsrDashboard',
             builder: (context, state) => const TicketDashboardPage(
               queue: TicketQueue.csr,
-            ).protectedBy(AdminPermissions.ticketsUpdate),
+            )
+                .protectedByFeature(TenantFeature.advancedTicketManagement)
+                .protectedBy(AdminPermissions.ticketsUpdate),
           ),
           GoRoute(
             path: '/admin/tickets/dispatch',
             name: 'ticketDispatchDashboard',
             builder: (context, state) => const TicketDashboardPage(
               queue: TicketQueue.dispatch,
-            ).protectedBy(AdminPermissions.ticketsUpdate),
+            )
+                .protectedByFeature(TenantFeature.dispatchDashboard)
+                .protectedBy(AdminPermissions.ticketsUpdate),
           ),
           GoRoute(
             path: '/admin/tickets/urgent',
             name: 'ticketUrgentQueue',
             builder: (context, state) => const TicketDashboardPage(
               queue: TicketQueue.urgent,
-            ).protectedBy(AdminPermissions.ticketsUpdate),
+            )
+                .protectedByFeature(TenantFeature.advancedTicketManagement)
+                .protectedBy(AdminPermissions.ticketsUpdate),
           ),
           GoRoute(
             path: '/admin/tickets/aging',
             name: 'ticketAgingQueue',
             builder: (context, state) => const TicketDashboardPage(
               queue: TicketQueue.aging,
-            ).protectedBy(AdminPermissions.ticketsUpdate),
+            )
+                .protectedByFeature(TenantFeature.advancedTicketManagement)
+                .protectedBy(AdminPermissions.ticketsUpdate),
           ),
           GoRoute(
             path: '/admin/tickets/:ticketId',
@@ -269,14 +283,18 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/admin/users',
             name: 'userList',
-            builder: (context, state) => const UserListPage().protectedBy(AdminPermissions.rolesManage),
+            builder: (context, state) => const UserListPage()
+                .protectedByFeature(TenantFeature.roleManagement)
+                .protectedBy(AdminPermissions.rolesManage),
           ),
           GoRoute(
             path: '/admin/users/:userId',
             name: 'userDetail',
             builder: (context, state) => UserDetailPage(
               userId: state.pathParameters['userId']!,
-            ).protectedBy(AdminPermissions.rolesManage),
+            )
+                .protectedByFeature(TenantFeature.roleManagement)
+                .protectedBy(AdminPermissions.rolesManage),
           ),
           GoRoute(
             path: '/admin/unauthorized',
@@ -286,10 +304,7 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/admin/audit-logs',
             name: 'auditLogs',
-            builder: (context, state) => const AdminComingSoonPage(
-              title: 'Audit Logs',
-              description: 'Audit log viewer will be implemented next.',
-            ).protectedBy(AdminPermissions.auditRead),
+            builder: (context, state) => const AuditLogListPage().protectedBy(AdminPermissions.auditRead),
           ),
         ],
       ),
@@ -462,6 +477,7 @@ class _AdminSidebar extends ConsumerWidget {
       icon: Icons.dashboard_outlined,
       activePrefixes: ['/admin'],
       exact: true,
+      feature: TenantFeature.analyticsDashboard,
     ),
     _AdminNavItem(
       label: 'Plans & Add-Ons',
@@ -539,6 +555,7 @@ class _AdminSidebar extends ConsumerWidget {
       path: '/admin/users',
       icon: Icons.manage_accounts_outlined,
       activePrefixes: ['/admin/users'],
+      feature: TenantFeature.roleManagement,
     ),
     _AdminNavItem(
       label: 'Audit Logs',
@@ -605,7 +622,7 @@ class _AdminSidebar extends ConsumerWidget {
     final visibleItems = access.maybeWhen(
       data: (value) {
         final source = value.isHoaScopedOnly ? _hoaItems : _items;
-        return source.where((item) => item.canShow(value)).toList();
+        return source.where((item) => item.canShow(value, ref)).toList();
       },
       orElse: () => [_items.first],
     );
@@ -827,6 +844,7 @@ class _AdminNavItem {
     required this.icon,
     required this.activePrefixes,
     this.exact = false,
+    this.feature,
   });
 
   final String label;
@@ -835,14 +853,24 @@ class _AdminNavItem {
   final IconData icon;
   final List<String> activePrefixes;
   final bool exact;
+  final TenantFeature? feature;
 
-  bool canShow(AdminAccess access) {
+  bool canShow(AdminAccess access, WidgetRef ref) {
     if (permissionRule.isOpen) return true;
     final hasPermissions = permissionRule.permissions.isEmpty ||
         access.canAny(permissionRule.permissions);
     final hasRoles = permissionRule.roleCodes.isEmpty ||
         access.hasAnyRoleCode(permissionRule.roleCodes);
-    return hasPermissions && hasRoles;
+    if (!hasPermissions || !hasRoles) return false;
+
+    final feature = this.feature;
+    if (feature == null || access.isPlatformOperator) return true;
+    if (access.tenantScopeIds.isEmpty) return true;
+
+    return ref.watch(adminFeatureEntitlementProvider(feature)).maybeWhen(
+          data: (result) => result.isEnabled,
+          orElse: () => false,
+        );
   }
 
   bool isActive(String currentPath) {

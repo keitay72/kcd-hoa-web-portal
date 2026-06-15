@@ -41,6 +41,17 @@ class PlatformTenantDto {
       onboardingBlockedReason: _onboardingText(json['tenant_onboarding_status'], 'blocked_reason'),
       onboardingLaunchReadyAt: _date(_onboardingValue(json['tenant_onboarding_status'], 'launch_ready_at')),
       onboardingLaunchedAt: _date(_onboardingValue(json['tenant_onboarding_status'], 'launched_at')),
+      subscriptionStatus: _text(json['subscription_status']),
+      subscriptionPlanName: _text(json['subscription_plan_name']),
+      subscriptionBillingMode: _text(json['subscription_billing_mode']),
+      subscriptionHasStripePrice:
+          json['subscription_has_stripe_price'] as bool? ?? false,
+      hoaCount: json['hoa_count'] as int? ?? 0,
+      residentCount: json['resident_count'] as int? ?? 0,
+      tenantAdminCount: json['tenant_admin_count'] as int? ?? 0,
+      billingContactCount: json['billing_contact_count'] as int? ?? 0,
+      includedHoaCount: json['included_hoa_count'] as int?,
+      includedResidentCount: json['included_resident_count'] as int?,
     );
   }
 }
@@ -175,6 +186,9 @@ class TenantSubscriptionSummaryDto {
       billingInterval: _text(price?['billing_interval']),
       currency: _text(price?['currency']),
       unitAmountCents: price?['unit_amount_cents'] as int?,
+      billingMode: json['billing_mode'] as String? ?? 'manual',
+      freeBetaEndsAt: _date(json['free_beta_ends_at']),
+      billingNotes: _text(json['billing_notes']),
       currentPeriodStart: _date(json['current_period_start']),
       currentPeriodEnd: _date(json['current_period_end']),
       trialEndsAt: _date(json['trial_ends_at']),

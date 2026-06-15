@@ -3,6 +3,7 @@ class AnalyticsDashboardSnapshot {
     required this.platformMetrics,
     required this.ticketMetrics,
     required this.operationalMetrics,
+    required this.launchReadinessMetrics,
     required this.recentTickets,
     required this.recentResidentRegistrations,
     required this.recentHoaCreations,
@@ -13,6 +14,7 @@ class AnalyticsDashboardSnapshot {
   final PlatformMetrics platformMetrics;
   final TicketMetricsBreakdown ticketMetrics;
   final OperationalMetrics operationalMetrics;
+  final TenantLaunchReadinessMetrics launchReadinessMetrics;
   final List<RecentTicketActivity> recentTickets;
   final List<RecentResidentRegistration> recentResidentRegistrations;
   final List<RecentHoaCreation> recentHoaCreations;
@@ -63,16 +65,57 @@ class OperationalMetrics {
   const OperationalMetrics({
     required this.hoaManagers,
     required this.hoaBoardMembers,
-    required this.kcStaff,
+    required this.tenantStaff,
     required this.dispatchUsers,
     required this.csrUsers,
   });
 
   final int hoaManagers;
   final int hoaBoardMembers;
-  final int kcStaff;
+  final int tenantStaff;
   final int dispatchUsers;
   final int csrUsers;
+}
+
+
+class TenantLaunchReadinessMetrics {
+  const TenantLaunchReadinessMetrics({
+    required this.totalTenants,
+    required this.readyToLaunch,
+    required this.launched,
+    required this.blocked,
+    required this.missingSubscription,
+    required this.missingBillingContact,
+    required this.missingTenantAdmin,
+    required this.missingHoa,
+    required this.stripePending,
+    required this.overIncludedLimits,
+  });
+
+  final int totalTenants;
+  final int readyToLaunch;
+  final int launched;
+  final int blocked;
+  final int missingSubscription;
+  final int missingBillingContact;
+  final int missingTenantAdmin;
+  final int missingHoa;
+  final int stripePending;
+  final int overIncludedLimits;
+
+  int get setupAttentionTotal =>
+      missingSubscription +
+      missingBillingContact +
+      missingTenantAdmin +
+      missingHoa +
+      stripePending +
+      overIncludedLimits +
+      blocked;
+
+  double get launchProgress {
+    if (totalTenants == 0) return 0;
+    return (readyToLaunch + launched) / totalTenants;
+  }
 }
 
 class RecentTicketActivity {

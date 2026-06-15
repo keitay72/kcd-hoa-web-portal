@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../audit_logs/data/admin_audit_logger.dart';
 import '../domain/admin_user.dart';
 import '../domain/user_management_inputs.dart';
 import 'admin_user_dto.dart';
@@ -34,6 +35,8 @@ class SupabaseUserRepository implements UserRepository {
   const SupabaseUserRepository(this._client);
 
   final SupabaseClient _client;
+
+  AdminAuditLogger get _audit => AdminAuditLogger(_client);
 
   static const _profileSelect = 'id, email, full_name, phone, status, created_at, updated_at';
   static const _inviteSelect = '''
@@ -142,18 +145,37 @@ class SupabaseUserRepository implements UserRepository {
     required String id,
     required UpdateAdminUserInput input,
   }) async {
+    final before = await _client
+        .from('profiles')
+        .select(_profileSelect)
+        .eq('id', id)
+        .maybeSingle();
+    final payload = input.toJson();
     final row = await _client
         .from('profiles')
-        .update(input.toJson())
+        .update(payload)
         .eq('id', id)
         .select(_profileSelect)
         .single();
+
+    await _audit.log(
+      action: 'user.profile_updated',
+      entityType: 'profile',
+      entityId: id,
+      beforeJson: before == null ? null : Map<String, dynamic>.from(before),
+      afterJson: Map<String, dynamic>.from(row),
+    );
 
     return _hydrate(AdminUserDto.fromJson(row));
   }
 
   @override
   Future<AdminUser> deactivate(String id) async {
+    final before = await _client
+        .from('profiles')
+        .select(_profileSelect)
+        .eq('id', id)
+        .maybeSingle();
     final row = await _client
         .from('profiles')
         .update({'status': 'disabled'})
@@ -167,48 +189,101 @@ class SupabaseUserRepository implements UserRepository {
         .eq('user_id', id)
         .eq('status', 'active');
 
+    await _audit.log(
+      action: 'user.deactivated',
+      entityType: 'profile',
+      entityId: id,
+      beforeJson: before == null ? null : Map<String, dynamic>.from(before),
+      afterJson: Map<String, dynamic>.from(row),
+    );
+
     return _hydrate(AdminUserDto.fromJson(row));
   }
 
   @override
   Future<void> assignPlatformRole(AssignPlatformRoleInput input) async {
-    await _client.from('user_platform_roles').upsert({
+    final payload = <String, dynamic>{
       'user_id': input.userId,
       'tenant_id': input.tenantId,
       'role_id': input.roleId,
       'assigned_by': _client.auth.currentUser?.id,
-    });
+    };
+    await _client.from('user_platform_roles').upsert(payload);
+    await _audit.log(
+      action: 'role.tenant_assigned',
+      entityType: 'user_platform_role',
+      entityId: '${input.userId}:${input.tenantId}:${input.roleId}',
+      tenantId: input.tenantId,
+      afterJson: payload,
+    );
   }
 
   @override
   Future<void> assignHoaRole(AssignHoaRoleInput input) async {
-    await _client.from('user_hoa_memberships').upsert({
+    final payload = <String, dynamic>{
       'user_id': input.userId,
       'hoa_id': input.hoaId,
       'role_id': input.roleId,
       'status': 'active',
       'assigned_by': _client.auth.currentUser?.id,
-    });
+    };
+    await _client.from('user_hoa_memberships').upsert(payload);
+    await _audit.log(
+      action: 'role.hoa_assigned',
+      entityType: 'user_hoa_membership',
+      entityId: '${input.userId}:${input.hoaId}:${input.roleId}',
+      hoaId: input.hoaId,
+      afterJson: payload,
+    );
   }
 
   @override
   Future<void> removePlatformRole(UserPlatformRoleAssignment assignment) async {
+    final before = <String, dynamic>{
+      'user_id': assignment.userId,
+      'tenant_id': assignment.tenantId,
+      'role_id': assignment.roleId,
+      'role_code': assignment.roleCode,
+      'role_name': assignment.roleName,
+    };
     await _client
         .from('user_platform_roles')
         .delete()
         .eq('user_id', assignment.userId)
         .eq('tenant_id', assignment.tenantId)
         .eq('role_id', assignment.roleId);
+    await _audit.log(
+      action: 'role.tenant_removed',
+      entityType: 'user_platform_role',
+      entityId: '${assignment.userId}:${assignment.tenantId}:${assignment.roleId}',
+      tenantId: assignment.tenantId,
+      beforeJson: before,
+    );
   }
 
   @override
   Future<void> removeHoaRole(UserHoaRoleAssignment assignment) async {
+    final before = <String, dynamic>{
+      'user_id': assignment.userId,
+      'hoa_id': assignment.hoaId,
+      'role_id': assignment.roleId,
+      'role_code': assignment.roleCode,
+      'role_name': assignment.roleName,
+    };
     await _client
         .from('user_hoa_memberships')
         .update({'status': 'inactive'})
         .eq('user_id', assignment.userId)
         .eq('hoa_id', assignment.hoaId)
         .eq('role_id', assignment.roleId);
+    await _audit.log(
+      action: 'role.hoa_removed',
+      entityType: 'user_hoa_membership',
+      entityId: '${assignment.userId}:${assignment.hoaId}:${assignment.roleId}',
+      hoaId: assignment.hoaId,
+      beforeJson: before,
+      afterJson: {'status': 'inactive'},
+    );
   }
 
   bool _matchesUserFilter(AdminUser user, String? needle) {

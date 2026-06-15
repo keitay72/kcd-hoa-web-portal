@@ -9,11 +9,19 @@ class TenantSettingsDialog extends ConsumerStatefulWidget {
   const TenantSettingsDialog({
     required this.tenantId,
     this.settings,
+    this.canManageBranding = true,
+    this.canManageCustomDomain = true,
+    this.brandingLockReason,
+    this.customDomainLockReason,
     super.key,
   });
 
   final String tenantId;
   final TenantSettings? settings;
+  final bool canManageBranding;
+  final bool canManageCustomDomain;
+  final String? brandingLockReason;
+  final String? customDomainLockReason;
 
   @override
   ConsumerState<TenantSettingsDialog> createState() => _TenantSettingsDialogState();
@@ -74,14 +82,46 @@ class _TenantSettingsDialogState extends ConsumerState<TenantSettingsDialog> {
               spacing: 16,
               runSpacing: 16,
               children: [
+                if (!widget.canManageBranding)
+                  _lockedNotice(
+                    context,
+                    title: 'Branding fields locked',
+                    message: widget.brandingLockReason ?? 'Upgrade required',
+                  ),
+                if (!widget.canManageCustomDomain)
+                  _lockedNotice(
+                    context,
+                    title: 'Custom domain locked',
+                    message: widget.customDomainLockReason ?? 'Add-on not enabled',
+                  ),
                 _field(_supportEmail, 'Support email', validator: _optionalEmail),
                 _field(_supportPhone, 'Support phone'),
-                _field(_portalHostname, 'Portal hostname'),
-                _field(_logoUrl, 'Logo URL'),
+                _field(
+                  _portalHostname,
+                  'Portal hostname',
+                  enabled: widget.canManageCustomDomain,
+                ),
+                _field(
+                  _logoUrl,
+                  'Logo URL',
+                  enabled: widget.canManageBranding,
+                ),
                 _field(_emailFromName, 'Email from name'),
                 _field(_emailReplyTo, 'Reply-to email', validator: _optionalEmail),
-                _field(_primaryColor, 'Primary color', helper: '#1F7A4D', validator: _optionalHexColor),
-                _field(_secondaryColor, 'Secondary color', helper: '#F4B942', validator: _optionalHexColor),
+                _field(
+                  _primaryColor,
+                  'Primary color',
+                  helper: '#1F7A4D',
+                  validator: _optionalHexColor,
+                  enabled: widget.canManageBranding,
+                ),
+                _field(
+                  _secondaryColor,
+                  'Secondary color',
+                  helper: '#F4B942',
+                  validator: _optionalHexColor,
+                  enabled: widget.canManageBranding,
+                ),
                 _field(_timezone, 'Timezone'),
                 if (state.hasError)
                   SizedBox(
@@ -114,13 +154,44 @@ class _TenantSettingsDialogState extends ConsumerState<TenantSettingsDialog> {
     String label, {
     String? helper,
     String? Function(String?)? validator,
+    bool enabled = true,
   }) {
     return SizedBox(
       width: 312,
       child: TextFormField(
         controller: controller,
+        enabled: enabled,
         decoration: InputDecoration(labelText: label, helperText: helper),
         validator: validator,
+      ),
+    );
+  }
+
+  Widget _lockedNotice(
+    BuildContext context, {
+    required String title,
+    required String message,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return SizedBox(
+      width: 640,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          color: colorScheme.surfaceContainerHighest.withOpacity(0.55),
+          border: Border.all(color: colorScheme.outlineVariant),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.lock_outline),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text('$title: $message.'),
+            ),
+          ],
+        ),
       ),
     );
   }

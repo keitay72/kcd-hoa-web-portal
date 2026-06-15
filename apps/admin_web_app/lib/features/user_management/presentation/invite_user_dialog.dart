@@ -151,7 +151,7 @@ class _InviteUserDialogState extends ConsumerState<InviteUserDialog> {
                 roles.when(
                   data: (items) => _RoleSelect(
                     roles: _category == 'platform'
-                        ? items.where((role) => role.isPlatformRole).toList()
+                        ? items.where((role) => role.isTenantRole).toList()
                         : items.where((role) => role.isHoaRole).toList(),
                     value: _roleCode,
                     onChanged: widget.lockScope

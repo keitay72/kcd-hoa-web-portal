@@ -37,7 +37,7 @@ class _AssignPlatformRoleDialogState extends ConsumerState<AssignPlatformRoleDia
                 isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Role', border: OutlineInputBorder()),
                 items: items
-                    .where((role) => role.isPlatformRole)
+                    .where((role) => role.isTenantRole)
                     .map((role) => DropdownMenuItem(value: role.id, child: Text(role.name)))
                     .toList(),
                 onChanged: (value) => setState(() => _roleId = value),

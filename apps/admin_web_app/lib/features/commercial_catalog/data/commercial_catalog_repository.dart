@@ -40,7 +40,7 @@ class SupabaseCommercialCatalogRepository implements CommercialCatalogRepository
       pricesByPlan.putIfAbsent(price.planId, () => []).add(price);
     }
 
-    return planRows.map((row) {
+    final plans = planRows.map((row) {
       final id = row['id'] as String;
       return SubscriptionPlan(
         id: id,
@@ -53,6 +53,9 @@ class SupabaseCommercialCatalogRepository implements CommercialCatalogRepository
         prices: pricesByPlan[id] ?? const [],
       );
     }).toList();
+
+    plans.sort((a, b) => _planRank(a.code).compareTo(_planRank(b.code)));
+    return plans;
   }
 
   @override
@@ -131,6 +134,16 @@ class SupabaseCommercialCatalogRepository implements CommercialCatalogRepository
     } else {
       await _client.from('addon_catalog').update(payload).eq('id', addonId);
     }
+  }
+
+
+  int _planRank(String code) {
+    return switch (code) {
+      'starter' => 0,
+      'professional' => 1,
+      'enterprise' => 2,
+      _ => 99,
+    };
   }
 
   SubscriptionPlanPrice _priceFromRow(Map<String, dynamic> row) {

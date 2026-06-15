@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/subscriptions/tenant_entitlements.dart';
 import '../../hoa_management/presentation/hoa_form_dialog.dart';
 import '../../user_management/presentation/invite_user_dialog.dart';
 import '../domain/tenant_management_models.dart';
@@ -36,6 +37,299 @@ class TenantDetailPage extends ConsumerWidget {
   }
 }
 
+
+typedef _TenantDialogHelper = Future<void> Function(
+  BuildContext context,
+  WidgetRef ref,
+  Widget dialog,
+);
+
+Future<void> _openCreateHoaWithLimitGuard({
+  required BuildContext context,
+  required WidgetRef ref,
+  required TenantDetail detail,
+  required String title,
+  required _TenantDialogHelper useDialogHelper,
+}) async {
+  if (!await _confirmHoaOverageAllowsCreate(context, detail)) return;
+  await useDialogHelper(
+    context,
+    ref,
+    HoaFormDialog(
+      tenantId: detail.tenant.id,
+      title: title,
+    ),
+  );
+}
+
+TenantSubscriptionEntitlements _entitlementsForDetail(TenantDetail detail) {
+  final current = _currentSubscription(detail.subscriptions);
+  return TenantSubscriptionEntitlements(
+    planCode: current?.planCode,
+    enabledAddonCodes: detail.enabledAddons
+        .where((addon) => addon.status == 'enabled')
+        .map((addon) => addon.addonCode)
+        .toSet(),
+  );
+}
+
+TenantEntitlementResult _brandingEntitlementFor(
+  TenantSubscriptionEntitlements entitlements,
+) {
+  final customBranding = entitlements.entitlementFor(TenantFeature.customBranding);
+  if (customBranding.isEnabled) return customBranding;
+  return entitlements.entitlementFor(TenantFeature.whiteLabelBranding);
+}
+
+Future<bool> _confirmHoaOverageAllowsCreate(BuildContext context, TenantDetail detail) async {
+  if (!detail.isHoaLimitReached) return true;
+
+  final planName = detail.currentPlan?.name ?? 'the current plan';
+  final projectedOverage = detail.projectedHoaOverageAfterCreate;
+  final projectedMonthly = detail.projectedHoaOverageMonthlyCentsAfterCreate;
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: const Text('HOA overage may apply'),
+      content: Text(
+        '${detail.tenant.name} is using ${detail.hoaCount} of '
+        '${detail.hoaLimit} included HOA communities for $planName.\n\n'
+        'Adding one more HOA may add \$10/month to this tenant subscription. '
+        'Projected HOA overage: $projectedOverage HOA(s), estimated '
+        '${_formatRecurringMoneyCents(projectedMonthly)}.\n\n'
+        'Billing is not automated yet, but this keeps the tenant growth path open while making the cost clear.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('Continue'),
+        ),
+      ],
+    ),
+  );
+  return confirmed == true;
+}
+
+class _TenantUsageCard extends StatelessWidget {
+  const _TenantUsageCard({required this.detail});
+
+  final TenantDetail detail;
+
+  @override
+  Widget build(BuildContext context) {
+    final plan = detail.currentPlan;
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.speed_outlined),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Plan Usage', style: Theme.of(context).textTheme.titleLarge),
+                      const SizedBox(height: 4),
+                      Text(
+                        plan == null
+                            ? 'Assign a subscription plan to start tracking tenant limits.'
+                            : '${plan.name} limits are used to guide tenant onboarding.',
+                      ),
+                    ],
+                  ),
+                ),
+                if (plan != null) Chip(label: Text(plan.name)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth >= 760
+                    ? (constraints.maxWidth - 16) / 2
+                    : constraints.maxWidth;
+                return Wrap(
+                  spacing: 16,
+                  runSpacing: 16,
+                  children: [
+                    _UsageMeter(
+                      width: width,
+                      label: 'HOA Communities',
+                      current: detail.hoaCount,
+                      limit: detail.hoaLimit,
+                      ratio: detail.hoaUsageRatio,
+                      isWarning: detail.isHoaUsageWarning,
+                      isAtLimit: detail.isHoaLimitReached && !detail.isHoaOverLimit,
+                      isOverLimit: detail.isHoaOverLimit,
+                      overageCount: detail.hoaOverageCount,
+                      overageMonthlyCents: detail.hoaOverageMonthlyCents,
+                    ),
+                    _UsageMeter(
+                      width: width,
+                      label: 'Active Residents',
+                      current: detail.residentCount,
+                      limit: detail.residentLimit,
+                      ratio: detail.residentUsageRatio,
+                      isWarning: detail.isResidentUsageWarning,
+                      isAtLimit: detail.isResidentLimitReached && !detail.isResidentOverLimit,
+                      isOverLimit: detail.isResidentOverLimit,
+                      overageCount: detail.residentOverageCount,
+                      overageMonthlyCents: detail.residentOverageMonthlyCents,
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _UsageMeter extends StatelessWidget {
+  const _UsageMeter({
+    required this.width,
+    required this.label,
+    required this.current,
+    required this.limit,
+    required this.ratio,
+    required this.isWarning,
+    required this.isAtLimit,
+    required this.isOverLimit,
+    required this.overageCount,
+    required this.overageMonthlyCents,
+  });
+
+  final double width;
+  final String label;
+  final int current;
+  final int? limit;
+  final double? ratio;
+  final bool isWarning;
+  final bool isAtLimit;
+  final bool isOverLimit;
+  final int overageCount;
+  final int overageMonthlyCents;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final color = isOverLimit
+        ? colorScheme.error
+        : isWarning
+            ? Colors.orange.shade700
+            : colorScheme.primary;
+    final limitText = limit == null ? 'Unlimited' : _formatCount(limit!);
+    final valueText = limit == null
+        ? '${_formatCount(current)} / Unlimited'
+        : '${_formatCount(current)} / ${_formatCount(limit!)}';
+    final progress = ratio == null ? 0.0 : ratio!.clamp(0.0, 1.0).toDouble();
+
+    return SizedBox(
+      width: width,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isOverLimit || isWarning ? color.withOpacity(0.45) : colorScheme.outlineVariant,
+          ),
+          color: isOverLimit
+              ? colorScheme.errorContainer.withOpacity(0.25)
+              : isWarning
+                  ? Colors.orange.withOpacity(0.10)
+                  : colorScheme.surface,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
+                ),
+                if (isOverLimit)
+                  const Chip(label: Text('Over Included Limit'))
+                else if (isAtLimit)
+                  const Chip(label: Text('At Included Limit'))
+                else if (isWarning)
+                  const Chip(label: Text('Approaching Limit')),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(valueText, style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            if (limit == null)
+              Text('Plan limit: $limitText', style: Theme.of(context).textTheme.bodySmall)
+            else ...[
+              LinearProgressIndicator(
+                value: progress,
+                color: color,
+                backgroundColor: colorScheme.surfaceContainerHighest,
+              ),
+              const SizedBox(height: 6),
+              Text('Plan limit: $limitText', style: Theme.of(context).textTheme.bodySmall),
+              if (overageCount > 0) ...[
+                const SizedBox(height: 6),
+                Text(
+                  'Overage: ${_formatCount(overageCount)} · Estimated ' +
+                      _formatRecurringMoneyCents(overageMonthlyCents),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colorScheme.error,
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+              ],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _formatCount(int value) {
+  final text = value.toString();
+  final buffer = StringBuffer();
+  for (var i = 0; i < text.length; i++) {
+    final remaining = text.length - i;
+    buffer.write(text[i]);
+    if (remaining > 1 && remaining % 3 == 1) buffer.write(',');
+  }
+  return buffer.toString();
+}
+
+String _formatRecurringMoneyCents(int monthlyCents) {
+  final annualCents = monthlyCents * 12;
+  return '${_formatMoneyCents(monthlyCents)}/month '
+      '(${_formatMoneyCents(annualCents)}/year)';
+}
+
+String _formatMoneyCents(int cents) {
+  final amount = cents / 100;
+  final precision = cents % 100 == 0 ? 0 : 2;
+  return '\$${amount.toStringAsFixed(precision)}';
+}
+
+String _addonStatusLabel(String value) {
+  return value
+      .replaceAll('_', ' ')
+      .split(' ')
+      .where((part) => part.isNotEmpty)
+      .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+      .join(' ');
+}
+
 class _TenantDetailView extends ConsumerWidget {
   const _TenantDetailView({required this.detail});
 
@@ -50,41 +344,68 @@ class _TenantDetailView extends ConsumerWidget {
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
-            child: Row(
-              children: [
-                IconButton(
-                  tooltip: 'Back to tenants',
-                  onPressed: () => context.go('/admin/tenants'),
-                  icon: const Icon(Icons.arrow_back),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        tenant.name,
-                        style: Theme.of(context).textTheme.headlineMedium,
-                      ),
-                      const SizedBox(height: 4),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 680;
+                final titleBlock = Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    IconButton(
+                      tooltip: 'Back to tenants',
+                      onPressed: () => context.go('/admin/tenants'),
+                      icon: const Icon(Icons.arrow_back),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Chip(label: Text(tenant.code)),
-                          Chip(label: Text(tenant.statusLabel)),
-                          if (tenant.isPrimary) const Chip(label: Text('Primary tenant')),
+                          Text(
+                            tenant.name,
+                            style: Theme.of(context).textTheme.headlineMedium,
+                          ),
+                          const SizedBox(height: 4),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              Chip(label: Text(tenant.code)),
+                              Chip(label: Text(tenant.statusLabel)),
+                              if (tenant.isPrimary) const Chip(label: Text('Primary tenant')),
+                            ],
+                          ),
                         ],
                       ),
-                    ],
-                  ),
-                ),
-                FilledButton.icon(
+                    ),
+                  ],
+                );
+
+                final editButton = FilledButton.icon(
                   onPressed: () => _openTenantDialog(context, ref, tenant),
                   icon: const Icon(Icons.edit_outlined),
                   label: const Text('Edit Tenant'),
-                ),
-              ],
+                );
+
+                if (compact) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      titleBlock,
+                      const SizedBox(height: 12),
+                      Align(alignment: Alignment.centerRight, child: editButton),
+                    ],
+                  );
+                }
+
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: titleBlock),
+                    const SizedBox(width: 16),
+                    editButton,
+                  ],
+                );
+              },
             ),
           ),
         ),
@@ -93,6 +414,12 @@ class _TenantDetailView extends ConsumerWidget {
           sliver: SliverList.list(
             children: [
               _OnboardingCard(detail: detail),
+              const SizedBox(height: 16),
+              _LaunchReadinessCard(detail: detail),
+              const SizedBox(height: 16),
+              _BetaTenantPlaybookCard(detail: detail),
+              const SizedBox(height: 16),
+              _TenantUsageCard(detail: detail),
               const SizedBox(height: 16),
               _TenantStaffCard(detail: detail),
               const SizedBox(height: 16),
@@ -133,6 +460,683 @@ class _TenantDetailView extends ConsumerWidget {
       context: context,
       barrierDismissible: false,
       builder: (_) => TenantFormDialog(tenant: tenant),
+    );
+  }
+}
+
+
+class _LaunchReadinessCard extends ConsumerWidget {
+  const _LaunchReadinessCard({required this.detail});
+
+  final TenantDetail detail;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentSubscription = _currentSubscription(detail.subscriptions);
+    final billingReady = detail.billingContacts.isNotEmpty;
+    final emailReady = detail.emailSettings == null ||
+        detail.emailSettings!.provider == 'platform_managed' ||
+        detail.emailSettings!.verificationStatus == 'verified';
+    final tenantAdminReady = detail.tenantAdminCount > 0;
+    final hoaReady = detail.hoaCount > 0;
+    final launchReady = detail.onboardingStatus?.status == 'ready_to_launch' ||
+        detail.onboardingStatus?.status == 'launched' ||
+        detail.onboardingStatus?.launchReadyAt != null;
+    final incompleteCount = [
+      currentSubscription?.planId != null &&
+          (currentSubscription?.priceId != null || currentSubscription?.isFreeBeta == true),
+      billingReady,
+      emailReady,
+      tenantAdminReady,
+      hoaReady,
+      launchReady,
+    ].where((ready) => !ready).length;
+
+    final colorScheme = Theme.of(context).colorScheme;
+    final readyForLaunch = incompleteCount == 0;
+
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  readyForLaunch ? Icons.verified_outlined : Icons.task_alt_outlined,
+                  color: readyForLaunch ? colorScheme.primary : null,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Launch Readiness',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        readyForLaunch
+                            ? 'This tenant has the core SaaS setup required for launch.'
+                            : '$incompleteCount launch item(s) still need attention.',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ],
+                  ),
+                ),
+                _StatusPill(
+                  label: readyForLaunch ? 'Ready' : 'Needs Setup',
+                  isPositive: readyForLaunch,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final tileWidth = constraints.maxWidth >= 1040
+                    ? (constraints.maxWidth - 30) / 3
+                    : constraints.maxWidth >= 680
+                        ? (constraints.maxWidth - 15) / 2
+                        : constraints.maxWidth;
+                return Wrap(
+                  spacing: 15,
+                  runSpacing: 12,
+                  children: [
+                    _ReadinessTile(
+                      width: tileWidth,
+                      label: 'Subscription',
+                      value: currentSubscription?.planName ?? 'No plan assigned',
+                      isReady: currentSubscription?.planId != null &&
+                          (currentSubscription?.priceId != null || currentSubscription?.isFreeBeta == true),
+                      actionLabel: currentSubscription == null ? 'Assign Plan' : 'Review Plan',
+                      onPressed: () => _openSubscription(context, ref, currentSubscription),
+                    ),
+                    _ReadinessTile(
+                      width: tileWidth,
+                      label: 'Billing Contact',
+                      value: billingReady ? detail.billingContacts.first.email : 'Missing billing contact',
+                      isReady: billingReady,
+                      actionLabel: billingReady ? 'Review Contact' : 'Add Contact',
+                      onPressed: () => _openBillingContact(context, ref),
+                    ),
+                    _ReadinessTile(
+                      width: tileWidth,
+                      label: 'Email Sender',
+                      value: detail.emailSettings?.providerLabel ?? 'Platform Managed',
+                      isReady: emailReady,
+                      actionLabel: 'Configure Email',
+                      onPressed: () => _openEmailSettings(context, ref),
+                    ),
+                    _ReadinessTile(
+                      width: tileWidth,
+                      label: 'Tenant Staff',
+                      value: tenantAdminReady
+                          ? '${detail.tenantAdminCount} admin/manager role(s)'
+                          : 'No tenant admin assigned',
+                      isReady: tenantAdminReady,
+                      actionLabel: tenantAdminReady ? 'Manage Staff' : 'Invite Admin',
+                      onPressed: () => _openTenantStaff(context, ref),
+                    ),
+                    _ReadinessTile(
+                      width: tileWidth,
+                      label: 'HOA Setup',
+                      value: hoaReady ? '${detail.hoaCount} HOA community record(s)' : 'No HOA created',
+                      isReady: hoaReady,
+                      actionLabel: hoaReady ? 'View HOAs' : 'Create HOA',
+                      onPressed: () => _openHoaSetup(context, ref),
+                    ),
+                    _ReadinessTile(
+                      width: tileWidth,
+                      label: 'Launch Status',
+                      value: detail.onboardingStatus?.statusLabel ?? 'Not Started',
+                      isReady: launchReady,
+                      actionLabel: launchReady ? 'Review Status' : 'Mark Ready',
+                      onPressed: () => _openOnboardingStatus(context, ref),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openSubscription(
+    BuildContext context,
+    WidgetRef ref,
+    TenantSubscriptionSummary? currentSubscription,
+  ) async {
+    await _showAndRefresh(
+      context,
+      ref,
+      TenantSubscriptionDialog(
+        tenantId: detail.tenant.id,
+        availablePlans: detail.availablePlans,
+        subscription: currentSubscription,
+      ),
+    );
+  }
+
+  Future<void> _openBillingContact(BuildContext context, WidgetRef ref) async {
+    await _showAndRefresh(
+      context,
+      ref,
+      BillingContactDialog(
+        tenantId: detail.tenant.id,
+        contact: detail.billingContacts.isEmpty ? null : detail.billingContacts.first,
+      ),
+    );
+  }
+
+  Future<void> _openEmailSettings(BuildContext context, WidgetRef ref) async {
+    await _showAndRefresh(
+      context,
+      ref,
+      TenantEmailSettingsDialog(
+        tenantId: detail.tenant.id,
+        settings: detail.emailSettings,
+      ),
+    );
+  }
+
+  Future<void> _openTenantStaff(BuildContext context, WidgetRef ref) async {
+    if (detail.tenantAdminCount > 0) {
+      await _showAndRefresh(
+        context,
+        ref,
+        TenantStaffAssignmentDialog(detail: detail),
+      );
+      return;
+    }
+
+    await _showAndRefresh(
+      context,
+      ref,
+      InviteUserDialog(
+        title: 'Invite Tenant Admin',
+        initialCategory: 'platform',
+        initialRoleCode: 'tenant_admin',
+        initialTenantId: detail.tenant.id,
+        lockScope: true,
+      ),
+    );
+  }
+
+  Future<void> _openHoaSetup(BuildContext context, WidgetRef ref) async {
+    if (detail.hoaCount > 0) {
+      context.go('/admin/hoas');
+      return;
+    }
+
+    await _openCreateHoaWithLimitGuard(
+      context: context,
+      ref: ref,
+      detail: detail,
+      title: 'Create First HOA for ${detail.tenant.name}',
+      useDialogHelper: _showAndRefresh,
+    );
+  }
+
+  Future<void> _openOnboardingStatus(BuildContext context, WidgetRef ref) async {
+    await _showAndRefresh(
+      context,
+      ref,
+      TenantOnboardingDialog(
+        tenantId: detail.tenant.id,
+        detail: detail,
+        status: detail.onboardingStatus,
+      ),
+    );
+  }
+
+  Future<void> _showAndRefresh(
+    BuildContext context,
+    WidgetRef ref,
+    Widget dialog,
+  ) async {
+    await showDialog<Object?>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => dialog,
+    );
+    ref.invalidate(tenantDetailProvider(detail.tenant.id));
+    ref.invalidate(tenantListProvider);
+  }
+}
+
+
+class _BetaTenantPlaybookCard extends ConsumerWidget {
+  const _BetaTenantPlaybookCard({required this.detail});
+
+  final TenantDetail detail;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final subscription = detail.currentSubscription;
+    final plan = detail.currentPlan;
+    final betaReady = subscription?.isFreeBeta == true && plan != null;
+    final staffReady = detail.tenantAdminCount > 0;
+    final hoaReady = detail.hoaCount > 0;
+    final supportReady = detail.settings?.supportEmail != null ||
+        detail.settings?.supportPhone != null;
+    final emailReady = detail.emailSettings == null ||
+        detail.emailSettings!.provider == 'platform_managed' ||
+        detail.emailSettings!.verificationStatus == 'verified';
+    final billingContactReady = detail.billingContacts.isNotEmpty;
+    final usageIsUsefulForBeta = detail.hasHoaLimit || detail.hasResidentLimit;
+    final launchSafeCount = [
+      betaReady || subscription?.planId != null,
+      staffReady,
+      hoaReady,
+      supportReady,
+      emailReady,
+    ].where((value) => value).length;
+
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.rocket_launch_outlined),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Beta Launch Playbook',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '$launchSafeCount of 5 launch basics are ready. Use this to keep beta tenants free while still testing real plan limits and feature access.',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ],
+                  ),
+                ),
+                _StatusPill(
+                  label: betaReady ? 'Free Beta' : 'Setup Needed',
+                  isPositive: betaReady,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final tileWidth = constraints.maxWidth >= 1040
+                    ? (constraints.maxWidth - 30) / 3
+                    : constraints.maxWidth >= 680
+                        ? (constraints.maxWidth - 15) / 2
+                        : constraints.maxWidth;
+                return Wrap(
+                  spacing: 15,
+                  runSpacing: 12,
+                  children: [
+                    _BetaPlaybookTile(
+                      width: tileWidth,
+                      label: 'Beta plan',
+                      value: betaReady
+                          ? '${plan!.name} · ${subscription!.billingModeLabel}'
+                          : plan == null
+                              ? 'Assign Starter, Professional, or Enterprise.'
+                              : 'Switch billing mode to Free beta if this tenant is testing at no cost.',
+                      isReady: betaReady,
+                      icon: Icons.science_outlined,
+                      actionLabel: 'Review subscription',
+                      onPressed: () => _openSubscription(context, ref),
+                    ),
+                    _BetaPlaybookTile(
+                      width: tileWidth,
+                      label: 'Limit testing',
+                      value: usageIsUsefulForBeta
+                          ? 'HOAs ${_usageText(detail.hoaCount, detail.hoaLimit)} · Residents ${_usageText(detail.residentCount, detail.residentLimit)}'
+                          : 'Enterprise/unlimited plan. Use Starter for MHD if we want to test overage behavior.',
+                      isReady: usageIsUsefulForBeta,
+                      icon: Icons.speed_outlined,
+                    ),
+                    _BetaPlaybookTile(
+                      width: tileWidth,
+                      label: 'Tenant staff',
+                      value: staffReady
+                          ? '${detail.tenantAdminCount} tenant admin/manager role(s) assigned.'
+                          : 'Invite at least one tenant admin before handoff.',
+                      isReady: staffReady,
+                      icon: Icons.admin_panel_settings_outlined,
+                      actionLabel: staffReady ? 'Manage staff' : 'Invite admin',
+                      onPressed: () => _openTenantStaff(context, ref),
+                    ),
+                    _BetaPlaybookTile(
+                      width: tileWidth,
+                      label: 'First HOA',
+                      value: hoaReady
+                          ? '${detail.hoaCount} HOA community record(s) ready.'
+                          : 'Create the first HOA before inviting HOA users or residents.',
+                      isReady: hoaReady,
+                      icon: Icons.home_work_outlined,
+                      actionLabel: hoaReady ? 'View HOAs' : 'Create HOA',
+                      onPressed: () => _openHoaSetup(context, ref),
+                    ),
+                    _BetaPlaybookTile(
+                      width: tileWidth,
+                      label: 'Support and email',
+                      value: supportReady && emailReady
+                          ? 'Support contact and email sender are ready enough for beta.'
+                          : 'Set support contact and confirm email sender behavior before external users rely on it.',
+                      isReady: supportReady && emailReady,
+                      icon: Icons.contact_mail_outlined,
+                      actionLabel: supportReady ? 'Review email' : 'Edit support',
+                      onPressed: supportReady
+                          ? () => _openEmailSettings(context, ref)
+                          : () => _openSettings(context, ref),
+                    ),
+                    _BetaPlaybookTile(
+                      width: tileWidth,
+                      label: 'Billing contact',
+                      value: billingContactReady
+                          ? detail.billingContacts.first.email
+                          : 'Optional during free beta, but useful before conversion to paid.',
+                      isReady: billingContactReady,
+                      icon: Icons.receipt_long_outlined,
+                      actionLabel: billingContactReady ? 'Review contact' : 'Add contact',
+                      onPressed: () => _openBillingContact(context, ref),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openSubscription(BuildContext context, WidgetRef ref) async {
+    await _showAndRefresh(
+      context,
+      ref,
+      TenantSubscriptionDialog(
+        tenantId: detail.tenant.id,
+        availablePlans: detail.availablePlans,
+        subscription: detail.currentSubscription,
+      ),
+    );
+  }
+
+  Future<void> _openTenantStaff(BuildContext context, WidgetRef ref) async {
+    if (detail.tenantAdminCount > 0) {
+      await _showAndRefresh(context, ref, TenantStaffAssignmentDialog(detail: detail));
+      return;
+    }
+
+    await _showAndRefresh(
+      context,
+      ref,
+      InviteUserDialog(
+        title: 'Invite Tenant Admin',
+        initialCategory: 'platform',
+        initialRoleCode: 'tenant_admin',
+        initialTenantId: detail.tenant.id,
+        lockScope: true,
+      ),
+    );
+  }
+
+  Future<void> _openHoaSetup(BuildContext context, WidgetRef ref) async {
+    if (detail.hoaCount > 0) {
+      context.go('/admin/hoas');
+      return;
+    }
+
+    await _openCreateHoaWithLimitGuard(
+      context: context,
+      ref: ref,
+      detail: detail,
+      title: 'Create First HOA for ${detail.tenant.name}',
+      useDialogHelper: _showAndRefresh,
+    );
+  }
+
+  Future<void> _openSettings(BuildContext context, WidgetRef ref) async {
+    final entitlements = _entitlementsForDetail(detail);
+    final branding = _brandingEntitlementFor(entitlements);
+    final customDomain = entitlements.entitlementFor(TenantFeature.customDomain);
+    await _showAndRefresh(
+      context,
+      ref,
+      TenantSettingsDialog(
+        tenantId: detail.tenant.id,
+        settings: detail.settings,
+        canManageBranding: branding.isEnabled,
+        canManageCustomDomain: customDomain.isEnabled,
+        brandingLockReason: branding.reason,
+        customDomainLockReason: customDomain.reason,
+      ),
+    );
+  }
+
+  Future<void> _openEmailSettings(BuildContext context, WidgetRef ref) async {
+    await _showAndRefresh(
+      context,
+      ref,
+      TenantEmailSettingsDialog(
+        tenantId: detail.tenant.id,
+        settings: detail.emailSettings,
+      ),
+    );
+  }
+
+  Future<void> _openBillingContact(BuildContext context, WidgetRef ref) async {
+    await _showAndRefresh(
+      context,
+      ref,
+      BillingContactDialog(
+        tenantId: detail.tenant.id,
+        contact: detail.billingContacts.isEmpty ? null : detail.billingContacts.first,
+      ),
+    );
+  }
+
+  Future<void> _showAndRefresh(
+    BuildContext context,
+    WidgetRef ref,
+    Widget dialog,
+  ) async {
+    await showDialog<Object?>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => dialog,
+    );
+    ref.invalidate(tenantDetailProvider(detail.tenant.id));
+    ref.invalidate(tenantListProvider);
+  }
+}
+
+class _BetaPlaybookTile extends StatelessWidget {
+  const _BetaPlaybookTile({
+    required this.width,
+    required this.label,
+    required this.value,
+    required this.isReady,
+    required this.icon,
+    this.actionLabel,
+    this.onPressed,
+  });
+
+  final double width;
+  final String label;
+  final String value;
+  final bool isReady;
+  final IconData icon;
+  final String? actionLabel;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return SizedBox(
+      width: width,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isReady
+                ? colorScheme.primary.withOpacity(0.35)
+                : colorScheme.outlineVariant,
+          ),
+          color: isReady
+              ? colorScheme.primaryContainer.withOpacity(0.18)
+              : colorScheme.surface,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(icon, size: 20, color: isReady ? colorScheme.primary : colorScheme.outline),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(value, style: Theme.of(context).textTheme.bodySmall),
+            if (actionLabel != null && onPressed != null) ...[
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  onPressed: onPressed,
+                  child: Text(actionLabel!),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReadinessTile extends StatelessWidget {
+  const _ReadinessTile({
+    required this.width,
+    required this.label,
+    required this.value,
+    required this.isReady,
+    this.actionLabel,
+    this.onPressed,
+  });
+
+  final double width;
+  final String label;
+  final String value;
+  final bool isReady;
+  final String? actionLabel;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return SizedBox(
+      width: width,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isReady ? colorScheme.primary.withOpacity(0.35) : colorScheme.outlineVariant,
+          ),
+          color: isReady
+              ? colorScheme.primaryContainer.withOpacity(0.20)
+              : colorScheme.surface,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              isReady ? Icons.check_circle_outline : Icons.radio_button_unchecked,
+              color: isReady ? colorScheme.primary : colorScheme.outline,
+              size: 20,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 4),
+                  Tooltip(
+                    message: value,
+                    waitDuration: const Duration(milliseconds: 400),
+                    child: Text(
+                      value,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                  if (actionLabel != null && onPressed != null) ...[
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton(
+                        onPressed: onPressed,
+                        child: Text(actionLabel!),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.label, required this.isPositive});
+
+  final String label;
+  final bool isPositive;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(999),
+        color: isPositive
+            ? colorScheme.primaryContainer.withOpacity(0.35)
+            : colorScheme.surfaceContainerHighest,
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontWeight: FontWeight.w700,
+          color: isPositive ? colorScheme.primary : colorScheme.onSurfaceVariant,
+        ),
+      ),
     );
   }
 }
@@ -268,12 +1272,19 @@ class _OnboardingCard extends ConsumerWidget {
         );
         return;
       case 'settings':
+        final entitlements = _entitlementsForDetail(detail);
+        final branding = _brandingEntitlementFor(entitlements);
+        final customDomain = entitlements.entitlementFor(TenantFeature.customDomain);
         await _showAndRefresh(
           context,
           ref,
           TenantSettingsDialog(
             tenantId: detail.tenant.id,
             settings: detail.settings,
+            canManageBranding: branding.isEnabled,
+            canManageCustomDomain: customDomain.isEnabled,
+            brandingLockReason: branding.sourceLabel,
+            customDomainLockReason: customDomain.sourceLabel,
           ),
         );
         return;
@@ -288,6 +1299,13 @@ class _OnboardingCard extends ConsumerWidget {
         );
         return;
       case 'sms_settings':
+        final smsEntitlement = _entitlementsForDetail(detail).entitlementFor(
+          TenantFeature.smsNotifications,
+        );
+        if (!smsEntitlement.isEnabled) {
+          _showFeatureLockedSnackBar(context, smsEntitlement);
+          return;
+        }
         await _showAndRefresh(
           context,
           ref,
@@ -323,13 +1341,12 @@ class _OnboardingCard extends ConsumerWidget {
           context.go('/admin/hoas');
           return;
         }
-        await _showAndRefresh(
-          context,
-          ref,
-          HoaFormDialog(
-            tenantId: detail.tenant.id,
-            title: 'Create First HOA',
-          ),
+        await _openCreateHoaWithLimitGuard(
+          context: context,
+          ref: ref,
+          detail: detail,
+          title: 'Create First HOA',
+          useDialogHelper: _showAndRefresh,
         );
         return;
       case 'onboarding_status':
@@ -502,16 +1519,27 @@ class _SettingsCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = detail.settings;
+    final entitlements = _entitlementsForDetail(detail);
+    final branding = _brandingEntitlementFor(entitlements);
+    final customDomain = entitlements.entitlementFor(TenantFeature.customDomain);
     return _TenantCard(
       title: 'Branding & Support',
       icon: Icons.tune_outlined,
       width: width,
       action: TextButton.icon(
-        onPressed: () => _open(context),
+        onPressed: () => _open(context, branding: branding, customDomain: customDomain),
         icon: const Icon(Icons.edit_outlined),
         label: const Text('Edit'),
       ),
       children: [
+        if (!branding.isEnabled) ...[
+          _FeatureLockBanner(result: branding),
+          const SizedBox(height: 10),
+        ],
+        if (!customDomain.isEnabled) ...[
+          _FeatureLockBanner(result: customDomain),
+          const SizedBox(height: 10),
+        ],
         _InfoLine(label: 'Support email', value: settings?.supportEmail ?? 'Not set'),
         _InfoLine(label: 'Support phone', value: settings?.supportPhone ?? 'Not set'),
         _InfoLine(label: 'Portal hostname', value: settings?.portalHostname ?? 'Not set'),
@@ -522,13 +1550,21 @@ class _SettingsCard extends ConsumerWidget {
     );
   }
 
-  Future<void> _open(BuildContext context) {
+  Future<void> _open(
+    BuildContext context, {
+    required TenantEntitlementResult branding,
+    required TenantEntitlementResult customDomain,
+  }) {
     return showDialog<Object?>(
       context: context,
       barrierDismissible: false,
       builder: (_) => TenantSettingsDialog(
         tenantId: detail.tenant.id,
         settings: detail.settings,
+        canManageBranding: branding.isEnabled,
+        canManageCustomDomain: customDomain.isEnabled,
+        brandingLockReason: branding.sourceLabel,
+        customDomainLockReason: customDomain.sourceLabel,
       ),
     );
   }
@@ -628,24 +1664,33 @@ class _SmsSettingsCard extends StatelessWidget {
     final hasPhone = _hasText(settings?.sendingPhoneNumber);
     final hasMessagingService = _hasText(settings?.twilioMessagingServiceSid);
     final canSend = status == 'active' && hasPhone && hasMessagingService;
+    final smsEntitlement = _entitlementsForDetail(detail).entitlementFor(
+      TenantFeature.smsNotifications,
+    );
 
     return _TenantCard(
       title: 'SMS Add-On',
       icon: Icons.sms_outlined,
       width: width,
       action: TextButton.icon(
-        onPressed: () => showDialog<Object?>(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => TenantSmsSettingsDialog(
-            tenantId: detail.tenant.id,
-            settings: settings,
-          ),
-        ),
+        onPressed: smsEntitlement.isEnabled
+            ? () => showDialog<Object?>(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (_) => TenantSmsSettingsDialog(
+                    tenantId: detail.tenant.id,
+                    settings: settings,
+                  ),
+                )
+            : null,
         icon: const Icon(Icons.edit_outlined),
         label: const Text('Configure'),
       ),
       children: [
+        if (!smsEntitlement.isEnabled) ...[
+          _FeatureLockBanner(result: smsEntitlement),
+          const SizedBox(height: 10),
+        ],
         _SmsStatusBanner(
           status: status,
           canSend: canSend,
@@ -765,6 +1810,328 @@ class _MiniChecklistRow extends StatelessWidget {
   }
 }
 
+
+class _SubscriptionSetupBanner extends StatelessWidget {
+  const _SubscriptionSetupBanner({
+    required this.icon,
+    required this.title,
+    required this.message,
+    this.isWarning = false,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+  final bool isWarning;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final color = isWarning ? colorScheme.error : colorScheme.primary;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withOpacity(0.35)),
+        color: isWarning
+            ? colorScheme.errorContainer.withOpacity(0.25)
+            : colorScheme.primaryContainer.withOpacity(0.25),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+                const SizedBox(height: 2),
+                Text(message),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TenantAddonOverview extends StatelessWidget {
+  const _TenantAddonOverview({
+    required this.addons,
+    required this.enabledAddons,
+    required this.enterpriseIncluded,
+  });
+
+  final List<AddonCatalogEntry> addons;
+  final List<TenantAddonSummary> enabledAddons;
+  final bool enterpriseIncluded;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Add-Ons', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        ...addons.where((addon) => addon.isActive).map(
+              (addon) => _AddonLine(
+                addon: addon,
+                enabledAddon: _enabledAddon(addon),
+                enterpriseIncluded: enterpriseIncluded && addon.code == 'api_access',
+              ),
+            ),
+      ],
+    );
+  }
+
+  TenantAddonSummary? _enabledAddon(AddonCatalogEntry addon) {
+    for (final enabled in enabledAddons) {
+      if (enabled.addonId == addon.id || enabled.addonCode == addon.code) return enabled;
+    }
+    return null;
+  }
+}
+
+class _AddonLine extends StatelessWidget {
+  const _AddonLine({
+    required this.addon,
+    required this.enterpriseIncluded,
+    this.enabledAddon,
+  });
+
+  final AddonCatalogEntry addon;
+  final TenantAddonSummary? enabledAddon;
+  final bool enterpriseIncluded;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final enabled = enabledAddon != null || enterpriseIncluded;
+    final status = enterpriseIncluded ? 'Included' : enabledAddon?.statusLabel ?? 'Available';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            enabled ? Icons.check_circle_outline : Icons.add_circle_outline,
+            size: 18,
+            color: enabled ? colorScheme.primary : colorScheme.outline,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(addon.name, style: const TextStyle(fontWeight: FontWeight.w700)),
+                if (addon.description != null)
+                  Text(
+                    addon.description!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Chip(
+            label: Text(status),
+            visualDensity: VisualDensity.compact,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+class _TenantBillingSummary extends StatelessWidget {
+  const _TenantBillingSummary({
+    required this.detail,
+    required this.subscription,
+    required this.plan,
+  });
+
+  final TenantDetail detail;
+  final TenantSubscriptionSummary subscription;
+  final SubscriptionPlanSummary? plan;
+
+  @override
+  Widget build(BuildContext context) {
+    final estimate = _BillingEstimate.from(detail, subscription, plan);
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colorScheme.outlineVariant),
+        color: colorScheme.surfaceContainerHighest.withOpacity(0.30),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.receipt_long_outlined),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Billing Estimate',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              Chip(label: Text(estimate.billingModeLabel)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _InfoLine(label: 'Base plan', value: estimate.basePlanLabel),
+          _InfoLine(label: 'Add-ons', value: estimate.addonLabel),
+          _InfoLine(label: 'HOA overage', value: estimate.hoaOverageLabel),
+          _InfoLine(label: 'Resident overage', value: estimate.residentOverageLabel),
+          const Divider(height: 20),
+          _InfoLine(
+            label: 'Estimated monthly',
+            value: _formatMoneyCents(estimate.monthlyTotalCents),
+          ),
+          _InfoLine(
+            label: 'Estimated annualized',
+            value: _formatMoneyCents(estimate.annualizedTotalCents),
+          ),
+          Text(
+            'Estimate only. Stripe overage and add-on billing automation is not connected yet.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BillingEstimate {
+  const _BillingEstimate({
+    required this.billingModeLabel,
+    required this.basePlanLabel,
+    required this.addonLabel,
+    required this.hoaOverageLabel,
+    required this.residentOverageLabel,
+    required this.monthlyTotalCents,
+    required this.annualizedTotalCents,
+  });
+
+  final String billingModeLabel;
+  final String basePlanLabel;
+  final String addonLabel;
+  final String hoaOverageLabel;
+  final String residentOverageLabel;
+  final int monthlyTotalCents;
+  final int annualizedTotalCents;
+
+  factory _BillingEstimate.from(
+    TenantDetail detail,
+    TenantSubscriptionSummary subscription,
+    SubscriptionPlanSummary? plan,
+  ) {
+    final baseCents = subscription.unitAmountCents ?? 0;
+    final interval = subscription.billingInterval ?? 'monthly';
+    final monthlyBaseCents = interval == 'annual' ? (baseCents / 12).round() : baseCents;
+    final annualBaseCents = interval == 'annual' ? baseCents : baseCents * 12;
+    final addonMonthlyCents = _enabledAddonMonthlyCents(detail, plan);
+    final overageMonthlyCents =
+        detail.hoaOverageMonthlyCents + detail.residentOverageMonthlyCents;
+    final monthlyTotalCents =
+        monthlyBaseCents + addonMonthlyCents + overageMonthlyCents;
+    final annualizedTotalCents =
+        annualBaseCents + ((addonMonthlyCents + overageMonthlyCents) * 12);
+
+    return _BillingEstimate(
+      billingModeLabel: interval == 'annual' ? 'Annual billing' : 'Monthly billing',
+      basePlanLabel: _basePlanLabel(subscription, monthlyBaseCents),
+      addonLabel: _addonLabel(detail, plan, addonMonthlyCents),
+      hoaOverageLabel: detail.hoaOverageCount == 0
+          ? 'None'
+          : '${_formatCount(detail.hoaOverageCount)} x \$10 = '
+              '${_formatMoneyCents(detail.hoaOverageMonthlyCents)}/month',
+      residentOverageLabel: detail.residentOverageCount == 0
+          ? 'None'
+          : '${_formatCount(detail.residentOverageCount)} x \$0.05 = '
+              '${_formatMoneyCents(detail.residentOverageMonthlyCents)}/month',
+      monthlyTotalCents: monthlyTotalCents,
+      annualizedTotalCents: annualizedTotalCents,
+    );
+  }
+
+  static String _basePlanLabel(
+    TenantSubscriptionSummary subscription,
+    int monthlyBaseCents,
+  ) {
+    if (subscription.unitAmountCents == null || subscription.billingInterval == null) {
+      return 'No price assigned';
+    }
+    if (subscription.billingInterval == 'annual') {
+      return '${subscription.priceLabel} '
+          '(${_formatMoneyCents(monthlyBaseCents)}/month equivalent)';
+    }
+    return subscription.priceLabel;
+  }
+
+  static String _addonLabel(
+    TenantDetail detail,
+    SubscriptionPlanSummary? plan,
+    int addonMonthlyCents,
+  ) {
+    final enabled = detail.enabledAddons.where(
+      (addon) => _isBillableAddonStatus(addon.status),
+    );
+    if (enabled.isEmpty) {
+      return plan?.code == 'enterprise' ? 'API Access included' : 'None';
+    }
+
+    final parts = enabled.map((addon) {
+      final cents = _addonMonthlyPriceCents(addon.addonCode, plan?.code);
+      if (cents == 0) return '${addon.addonName}: Included';
+      return '${addon.addonName}: ${_formatMoneyCents(cents)}/month';
+    }).join(', ');
+    return addonMonthlyCents == 0
+        ? parts
+        : '$parts (${_formatMoneyCents(addonMonthlyCents)}/month)';
+  }
+}
+
+int _enabledAddonMonthlyCents(TenantDetail detail, SubscriptionPlanSummary? plan) {
+  return detail.enabledAddons
+      .where((addon) => _isBillableAddonStatus(addon.status))
+      .fold<int>(
+        0,
+        (total, addon) =>
+            total + _addonMonthlyPriceCents(addon.addonCode, plan?.code),
+      );
+}
+
+bool _isBillableAddonStatus(String status) {
+  return const {'requested', 'enabled'}.contains(status);
+}
+
+int _addonMonthlyPriceCents(String code, String? planCode) {
+  if (code == 'api_access' && planCode == 'enterprise') return 0;
+  return switch (code) {
+    'sms_notifications' => 4900,
+    'white_label_branding' => 29900,
+    'custom_domain' => 9900,
+    'advertising_platform' => 9900,
+    'api_access' => 0,
+    _ => 0,
+  };
+}
+
 class _SubscriptionCard extends ConsumerWidget {
   const _SubscriptionCard({required this.detail, required this.width});
 
@@ -774,6 +2141,12 @@ class _SubscriptionCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final current = _currentSubscription(detail.subscriptions);
+    final selectedPlan = _planForSubscription(current);
+    final selectedPrice = _priceForSubscription(selectedPlan, current);
+    final isFreeBeta = current?.isFreeBeta ?? false;
+    final stripeReady = selectedPrice?.hasStripePrice ?? false;
+    final canCheckout = current != null && !isFreeBeta && stripeReady;
+
     return _TenantCard(
       title: 'Subscription',
       icon: Icons.credit_card_outlined,
@@ -782,27 +2155,17 @@ class _SubscriptionCard extends ConsumerWidget {
         spacing: 8,
         children: [
           TextButton.icon(
-            onPressed: () => showDialog<Object?>(
-              context: context,
-              barrierDismissible: false,
-              builder: (_) => TenantSubscriptionDialog(
-                tenantId: detail.tenant.id,
-                availablePlans: detail.availablePlans,
-                subscription: current,
-              ),
-            ),
+            onPressed: () => _openSubscriptionDialog(context, ref, current),
             icon: const Icon(Icons.edit_outlined),
             label: Text(current == null ? 'Assign' : 'Change'),
           ),
           TextButton.icon(
-            onPressed: current == null
-                ? null
-                : () => _startCheckout(context, ref, current),
+            onPressed: canCheckout ? () => _startCheckout(context, ref, current) : null,
             icon: const Icon(Icons.open_in_new_outlined),
             label: const Text('Checkout'),
           ),
           TextButton.icon(
-            onPressed: current == null
+            onPressed: current == null || isFreeBeta
                 ? null
                 : () => _syncStripe(context, ref, current),
             icon: const Icon(Icons.sync_outlined),
@@ -811,12 +2174,117 @@ class _SubscriptionCard extends ConsumerWidget {
         ],
       ),
       children: [
-        _InfoLine(label: 'Plan', value: current?.planName ?? 'No active plan'),
-        _InfoLine(label: 'Status', value: current?.statusLabel ?? 'Not subscribed'),
-        _InfoLine(label: 'Price', value: current?.priceLabel ?? 'Not set'),
-        _InfoLine(label: 'Current period ends', value: _formatDate(current?.currentPeriodEnd)),
-        _InfoLine(label: 'Trial ends', value: _formatDate(current?.trialEndsAt)),
+        if (current == null) ...[
+          _SubscriptionSetupBanner(
+            icon: Icons.credit_card_off_outlined,
+            title: 'Billing Setup Required',
+            message: 'Assign Starter, Professional, or Enterprise before this tenant can move into beta or paid onboarding.',
+            isWarning: true,
+          ),
+          const SizedBox(height: 12),
+          _EmptyActionPanel(
+            icon: Icons.workspace_premium_outlined,
+            title: 'No subscription assigned',
+            message: 'Choose a plan and billing mode. Free beta can remain active while Stripe is still being configured.',
+            actionLabel: 'Assign Plan',
+            onPressed: () => _openSubscriptionDialog(context, ref, null),
+          ),
+        ] else ...[
+          if (isFreeBeta) ...[
+            _SubscriptionSetupBanner(
+              icon: Icons.science_outlined,
+              title: 'Free Beta Active',
+              message: 'This tenant is not being charged. Plan limits, feature gates, and overage warnings still apply.',
+            ),
+            const SizedBox(height: 12),
+          ] else if (!stripeReady) ...[
+            _SubscriptionSetupBanner(
+              icon: Icons.credit_card_off_outlined,
+              title: 'Stripe Checkout Pending',
+              message: 'The plan is assigned, but checkout stays disabled until this rate has a Stripe price ID.',
+              isWarning: true,
+            ),
+            const SizedBox(height: 12),
+          ],
+          _InfoLine(label: 'Plan', value: current.planDisplayName),
+          _InfoLine(label: 'Limits', value: selectedPlan?.limitLabel ?? 'Plan limits unavailable'),
+          _InfoLine(label: 'Status', value: current.statusLabel),
+          _InfoLine(label: 'Price', value: current.priceLabel),
+          _InfoLine(label: 'Billing mode', value: current.billingModeLabel),
+          if (current.isFreeBeta)
+            _InfoLine(label: 'Free beta ends', value: _formatDate(current.freeBetaEndsAt)),
+          if (current.billingNotes != null)
+            _InfoLine(label: 'Billing notes', value: current.billingNotes!),
+          _InfoLine(label: 'Current period ends', value: _formatDate(current.currentPeriodEnd)),
+          _InfoLine(label: 'Trial ends', value: _formatDate(current.trialEndsAt)),
+          const SizedBox(height: 12),
+          _TenantBillingSummary(
+            detail: detail,
+            subscription: current,
+            plan: selectedPlan,
+          ),
+          const Divider(height: 28),
+          _FeatureAccessSummary(
+            entitlements: _entitlementsForDetail(detail),
+          ),
+        ],
+        if (detail.availableAddons.isNotEmpty) ...[
+          const Divider(height: 28),
+          _TenantAddonOverview(
+            addons: detail.availableAddons,
+            enabledAddons: detail.enabledAddons,
+            enterpriseIncluded: selectedPlan?.code == 'enterprise',
+          ),
+        ],
       ],
+    );
+  }
+
+  SubscriptionPlanSummary? _planForSubscription(TenantSubscriptionSummary? subscription) {
+    if (subscription?.planId == null) return null;
+    for (final plan in detail.availablePlans) {
+      if (plan.id == subscription!.planId) return plan;
+    }
+    return null;
+  }
+
+  SubscriptionPriceSummary? _priceForSubscription(
+    SubscriptionPlanSummary? plan,
+    TenantSubscriptionSummary? subscription,
+  ) {
+    if (plan == null || subscription?.priceId == null) return null;
+    for (final price in plan.prices) {
+      if (price.id == subscription!.priceId) return price;
+    }
+    return null;
+  }
+
+  Future<void> _openSubscriptionDialog(
+    BuildContext context,
+    WidgetRef ref,
+    TenantSubscriptionSummary? subscription,
+  ) async {
+    final saved = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => TenantSubscriptionDialog(
+        tenantId: detail.tenant.id,
+        availablePlans: detail.availablePlans,
+        subscription: subscription,
+      ),
+    );
+    if (saved != true || !context.mounted) return;
+
+    ref.invalidate(tenantDetailProvider(detail.tenant.id));
+    ref.invalidate(tenantListProvider);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          subscription == null
+              ? 'Subscription plan assigned.'
+              : 'Subscription plan updated.',
+        ),
+      ),
     );
   }
 
@@ -857,6 +2325,152 @@ class _SubscriptionCard extends ConsumerWidget {
         );
     messenger.showSnackBar(
       SnackBar(content: Text(result?.message ?? 'Unable to sync Stripe status.')),
+    );
+  }
+}
+
+
+void _showFeatureLockedSnackBar(
+  BuildContext context,
+  TenantEntitlementResult result,
+) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(
+        '${result.feature.label} is not available yet: ${result.sourceLabel}.',
+      ),
+    ),
+  );
+}
+
+class _FeatureLockBanner extends StatelessWidget {
+  const _FeatureLockBanner({required this.result});
+
+  final TenantEntitlementResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colorScheme.outlineVariant),
+        color: colorScheme.surfaceContainerHighest.withOpacity(0.45),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.lock_outline, color: colorScheme.onSurfaceVariant),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '${result.feature.label} is locked for this tenant. ${result.sourceLabel}.',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FeatureAccessSummary extends StatelessWidget {
+  const _FeatureAccessSummary({required this.entitlements});
+
+  final TenantSubscriptionEntitlements entitlements;
+
+  @override
+  Widget build(BuildContext context) {
+    final features = [
+      ...TenantSubscriptionEntitlements.coreFeatures,
+      TenantFeature.dispatchDashboard,
+      TenantFeature.advancedTicketManagement,
+      TenantFeature.analyticsDashboard,
+      TenantFeature.roleManagement,
+      TenantFeature.customBranding,
+      ...TenantSubscriptionEntitlements.addonFeatures,
+    ];
+    final results = entitlements.resultsFor(features);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.fact_check_outlined, size: 20),
+            const SizedBox(width: 8),
+            Text('Feature Access', style: Theme.of(context).textTheme.titleMedium),
+          ],
+        ),
+        const SizedBox(height: 10),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final columns = constraints.maxWidth >= 520 ? 2 : 1;
+            final itemWidth = (constraints.maxWidth - ((columns - 1) * 8)) / columns;
+            return Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: results
+                  .map(
+                    (result) => SizedBox(
+                      width: itemWidth,
+                      child: _FeatureAccessChip(result: result),
+                    ),
+                  )
+                  .toList(),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _FeatureAccessChip extends StatelessWidget {
+  const _FeatureAccessChip({required this.result});
+
+  final TenantEntitlementResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = result.isEnabled ? Colors.green : theme.colorScheme.outline;
+
+    return Tooltip(
+      message: result.sourceLabel,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: result.isEnabled
+              ? Colors.green.withOpacity(0.08)
+              : theme.colorScheme.surfaceContainerHighest.withOpacity(0.45),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: color.withOpacity(result.isEnabled ? 0.35 : 0.2)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Row(
+            children: [
+              Icon(
+                result.isEnabled ? Icons.check_circle_outline : Icons.lock_outline,
+                size: 18,
+                color: color,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  result.feature.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: result.isEnabled ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -953,7 +2567,17 @@ class _BillingContactsCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             if (detail.billingContacts.isEmpty)
-              const Text('No billing contacts configured yet.')
+              _EmptyActionPanel(
+                icon: Icons.receipt_long_outlined,
+                title: 'No billing contact yet',
+                message: 'Add a billing contact before assigning paid subscription workflows.',
+                actionLabel: 'Add Billing Contact',
+                onPressed: () => showDialog<Object?>(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (_) => BillingContactDialog(tenantId: detail.tenant.id),
+                ),
+              )
             else
               ...detail.billingContacts.map(
                 (contact) => ListTile(
@@ -1000,6 +2624,7 @@ class _AddonsCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final mutation = ref.watch(tenantMutationControllerProvider);
+    final plan = detail.currentPlan;
     return Card(
       margin: EdgeInsets.zero,
       child: Padding(
@@ -1008,57 +2633,245 @@ class _AddonsCard extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Icon(Icons.extension_outlined),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(
-                    'Add-On Management',
-                    style: Theme.of(context).textTheme.titleLarge,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Add-On Management',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Request, enable, suspend, or disable tenant add-ons. Pricing is shown before billable add-ons are activated.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
             if (detail.availableAddons.isEmpty)
-              const Text('No add-ons are configured in the platform catalog yet.')
+              const _EmptyActionPanel(
+                icon: Icons.extension_off_outlined,
+                title: 'No add-ons in the catalog',
+                message: 'Add-on catalog setup can wait until Stripe products and tenant add-ons are finalized.',
+              )
             else
-              ...detail.availableAddons.map((addon) {
-                final enabled = detail.addonFor(addon.id);
-                final status = enabled?.status ?? 'disabled';
-                return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.add_circle_outline),
-                  title: Text(addon.name),
-                  subtitle: Text(addon.description ?? addon.code),
-                  trailing: SizedBox(
-                    width: 180,
-                    child: DropdownButtonFormField<String>(
-                      value: status,
-                      decoration: const InputDecoration(labelText: 'Status'),
-                      items: const [
-                        DropdownMenuItem(value: 'requested', child: Text('Requested')),
-                        DropdownMenuItem(value: 'enabled', child: Text('Enabled')),
-                        DropdownMenuItem(value: 'disabled', child: Text('Disabled')),
-                        DropdownMenuItem(value: 'suspended', child: Text('Suspended')),
-                      ],
-                      onChanged: mutation.isLoading
-                          ? null
-                          : (value) {
-                              if (value == null) return;
-                              ref.read(tenantMutationControllerProvider.notifier).setAddonStatus(
-                                    tenantId: detail.tenant.id,
-                                    addonId: addon.id,
-                                    status: value,
-                                  );
-                            },
-                    ),
-                  ),
-                );
-              }),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact = constraints.maxWidth < 720;
+                  return Column(
+                    children: detail.availableAddons.map((addon) {
+                      final enabled = detail.addonFor(addon.id);
+                      final status = enabled?.status ?? 'disabled';
+                      final monthlyCents = _addonMonthlyPriceCents(addon.code, plan?.code);
+                      final priceLabel = monthlyCents == 0
+                          ? addon.code == 'api_access' && plan?.code == 'enterprise'
+                              ? 'Included with Enterprise'
+                              : 'No monthly charge configured'
+                          : '${_formatMoneyCents(monthlyCents)}/month';
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _AddonManagementTile(
+                          addon: addon,
+                          status: status,
+                          priceLabel: priceLabel,
+                          compact: compact,
+                          isLoading: mutation.isLoading,
+                          onStatusChanged: (value) => _updateAddonStatus(
+                            context: context,
+                            ref: ref,
+                            addon: addon,
+                            currentStatus: status,
+                            newStatus: value,
+                            monthlyCents: monthlyCents,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  );
+                },
+              ),
+            if (mutation.hasError) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Unable to update add-on: ${mutation.error}',
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ],
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _updateAddonStatus({
+    required BuildContext context,
+    required WidgetRef ref,
+    required AddonCatalogEntry addon,
+    required String currentStatus,
+    required String newStatus,
+    required int monthlyCents,
+  }) async {
+    if (newStatus == currentStatus) return;
+
+    final isBillable = monthlyCents > 0 && const {'requested', 'enabled'}.contains(newStatus);
+    if (isBillable) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text('Confirm ${addon.name} add-on'),
+          content: Text(
+            'Changing ${addon.name} to ${_addonStatusLabel(newStatus)} may add '
+            '${_formatMoneyCents(monthlyCents)}/month to ${detail.tenant.name}. '
+            'Billing automation is still pending, but this records the approved add-on state.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Continue'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !context.mounted) return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+    final saved = await ref.read(tenantMutationControllerProvider.notifier).setAddonStatus(
+          tenantId: detail.tenant.id,
+          addonId: addon.id,
+          status: newStatus,
+        );
+    if (!context.mounted) return;
+
+    if (saved) {
+      ref.invalidate(tenantDetailProvider(detail.tenant.id));
+      ref.invalidate(tenantListProvider);
+      messenger.showSnackBar(
+        SnackBar(content: Text('${addon.name} set to ${_addonStatusLabel(newStatus)}.')),
+      );
+    } else {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Unable to update ${addon.name}.')),
+      );
+    }
+  }
+}
+
+class _AddonManagementTile extends StatelessWidget {
+  const _AddonManagementTile({
+    required this.addon,
+    required this.status,
+    required this.priceLabel,
+    required this.compact,
+    required this.isLoading,
+    required this.onStatusChanged,
+  });
+
+  final AddonCatalogEntry addon;
+  final String status;
+  final String priceLabel;
+  final bool compact;
+  final bool isLoading;
+  final ValueChanged<String> onStatusChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final statusField = SizedBox(
+      width: compact ? double.infinity : 210,
+      child: DropdownButtonFormField<String>(
+        value: status,
+        decoration: const InputDecoration(labelText: 'Status'),
+        items: const [
+          DropdownMenuItem(value: 'requested', child: Text('Requested')),
+          DropdownMenuItem(value: 'enabled', child: Text('Enabled')),
+          DropdownMenuItem(value: 'disabled', child: Text('Disabled')),
+          DropdownMenuItem(value: 'suspended', child: Text('Suspended')),
+        ],
+        onChanged: isLoading
+            ? null
+            : (value) {
+                if (value == null) return;
+                onStatusChanged(value);
+              },
+      ),
+    );
+
+    final details = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                addon.name,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+            Chip(
+              label: Text(_addonStatusLabel(status)),
+              visualDensity: VisualDensity.compact,
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(addon.description ?? addon.code),
+        const SizedBox(height: 6),
+        Text(
+          priceLabel,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
+              ),
+        ),
+      ],
+    );
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colorScheme.outlineVariant),
+        color: colorScheme.surface,
+      ),
+      child: compact
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.add_circle_outline),
+                    const SizedBox(width: 12),
+                    Expanded(child: details),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                statusField,
+              ],
+            )
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.add_circle_outline),
+                const SizedBox(width: 12),
+                Expanded(child: details),
+                const SizedBox(width: 16),
+                statusField,
+              ],
+            ),
     );
   }
 }
@@ -1105,7 +2918,13 @@ class _TenantHoasCard extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
             if (detail.tenantHoas.isEmpty)
-              const Text('No HOA communities have been created for this tenant yet.')
+              _EmptyActionPanel(
+                icon: Icons.home_work_outlined,
+                title: 'No HOA communities yet',
+                message: 'Create the first HOA community so this tenant can start onboarding addresses and residents.',
+                actionLabel: 'Create First HOA',
+                onPressed: () => _openCreateHoa(context, ref),
+              )
             else
               ...detail.tenantHoas.map(
                 (hoa) => ListTile(
@@ -1126,6 +2945,7 @@ class _TenantHoasCard extends ConsumerWidget {
   }
 
   Future<void> _openCreateHoa(BuildContext context, WidgetRef ref) async {
+    if (!await _confirmHoaOverageAllowsCreate(context, detail)) return;
     final created = await showDialog<Object?>(
       context: context,
       barrierDismissible: false,
@@ -1197,7 +3017,13 @@ class _TenantStaffCard extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
             if (detail.tenantStaff.isEmpty)
-              const Text('No tenant staff assigned yet. Assign a tenant admin before launch.')
+              _EmptyActionPanel(
+                icon: Icons.admin_panel_settings_outlined,
+                title: 'No tenant staff assigned',
+                message: 'Invite or assign a tenant admin before launch so the customer has an owner.',
+                actionLabel: 'Invite Tenant Admin',
+                onPressed: () => _openInviteTenantAdmin(context, ref),
+              )
             else
               ...detail.tenantStaff.map(
                 (staff) => ListTile(
@@ -1287,6 +3113,65 @@ class _TenantStaffCard extends ConsumerWidget {
   }
 }
 
+
+class _EmptyActionPanel extends StatelessWidget {
+  const _EmptyActionPanel({
+    required this.icon,
+    required this.title,
+    required this.message,
+    this.actionLabel,
+    this.onPressed,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+  final String? actionLabel;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colorScheme.outlineVariant),
+        color: colorScheme.surfaceContainerHighest.withOpacity(0.35),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: colorScheme.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+                const SizedBox(height: 4),
+                Text(message),
+                if (actionLabel != null && onPressed != null) ...[
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: FilledButton.tonalIcon(
+                      onPressed: onPressed,
+                      icon: const Icon(Icons.arrow_forward_outlined),
+                      label: Text(actionLabel!),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _TenantCard extends StatelessWidget {
   const _TenantCard({
     required this.title,
@@ -1313,18 +3198,43 @@ class _TenantCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Icon(icon),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                  ),
-                  if (action != null) action!,
-                ],
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final titleRow = Row(
+                    children: [
+                      Icon(icon),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                      ),
+                    ],
+                  );
+
+                  final actionWidget = action;
+                  if (actionWidget == null) return titleRow;
+                  if (constraints.maxWidth < 360) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        titleRow,
+                        const SizedBox(height: 8),
+                        Align(alignment: Alignment.centerRight, child: actionWidget),
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: titleRow),
+                      const SizedBox(width: 8),
+                      Flexible(child: Align(alignment: Alignment.centerRight, child: actionWidget)),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 12),
               ...children,

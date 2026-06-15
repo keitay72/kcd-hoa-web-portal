@@ -42,14 +42,7 @@ async function callerCanManageBilling(supabase: SupabaseClient, userId: string) 
   if (error) throw error;
   if (Array.isArray(data) && data.length > 0) return true;
 
-  const { data: legacy, error: legacyError } = await supabase
-    .from('user_platform_roles')
-    .select('roles!inner(code)')
-    .eq('user_id', userId)
-    .in('roles.code', ['sys_admin', 'mgmt'])
-    .limit(1);
-  if (legacyError) throw legacyError;
-  return Array.isArray(legacy) && legacy.length > 0;
+  return false;
 }
 
 async function fetchStripeSubscription(stripeSecretKey: string, stripeSubscriptionId: string) {

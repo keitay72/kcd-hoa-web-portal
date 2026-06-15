@@ -33,9 +33,6 @@ class RoleCatalogEntry {
     return const {'tenant_admin', 'tenant_manager', 'tenant_csr', 'tenant_dispatch'}.contains(code);
   }
 
-  // Compatibility alias for screens that still assign tenant-scoped staff roles.
-  bool get isPlatformRole => isTenantRole;
-
   bool get isHoaRole {
     if (roleScope != null) return roleScope == 'hoa' && isActive;
     return const {'hoa_manager', 'hoa_board'}.contains(code);

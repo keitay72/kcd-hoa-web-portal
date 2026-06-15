@@ -312,8 +312,8 @@ class TicketAssigneeOption {
   final String label;
   final Set<String> roleCodes;
 
-  bool get canDispatch => roleCodes.contains('tenant_dispatch') || roleCodes.contains('sys_admin');
-  bool get canCsr => roleCodes.contains('tenant_csr') || roleCodes.contains('sys_admin');
+  bool get canDispatch => roleCodes.contains('tenant_dispatch') || roleCodes.contains('tenant_admin');
+  bool get canCsr => roleCodes.contains('tenant_csr') || roleCodes.contains('tenant_admin');
 }
 
 class TicketMetrics {

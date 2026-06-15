@@ -135,7 +135,7 @@ class SupabaseTicketRepository implements TicketRepository {
 
     for (final row in rows) {
       final roleCode = roleCodes[row['role_id'] as int];
-      if (!{'tenant_csr', 'tenant_dispatch', 'tenant_admin', 'sys_admin'}.contains(roleCode)) {
+      if (!{'tenant_csr', 'tenant_dispatch', 'tenant_admin', 'tenant_manager'}.contains(roleCode)) {
         continue;
       }
 

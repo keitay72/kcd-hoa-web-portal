@@ -85,6 +85,9 @@ class TenantSubscriptionInput {
     required this.status,
     this.planId,
     this.priceId,
+    this.billingMode = 'manual',
+    this.freeBetaEndsAt,
+    this.billingNotes,
     this.currentPeriodStart,
     this.currentPeriodEnd,
     this.trialEndsAt,
@@ -93,6 +96,9 @@ class TenantSubscriptionInput {
   final String status;
   final String? planId;
   final String? priceId;
+  final String billingMode;
+  final DateTime? freeBetaEndsAt;
+  final String? billingNotes;
   final DateTime? currentPeriodStart;
   final DateTime? currentPeriodEnd;
   final DateTime? trialEndsAt;

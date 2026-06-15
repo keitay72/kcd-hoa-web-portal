@@ -93,6 +93,15 @@ class _AnalyticsDashboardContent extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 28),
+              _SectionHeader(
+                title: 'Tenant Launch Readiness',
+                subtitle: 'Subscription, billing, staffing, and onboarding blockers across SaaS tenants.',
+              ),
+              const SizedBox(height: 12),
+              _TenantLaunchReadinessPanel(
+                metrics: snapshot.launchReadinessMetrics,
+              ),
+              const SizedBox(height: 28),
               LayoutBuilder(
                 builder: (context, constraints) {
                   final isWide = constraints.maxWidth >= 1080;
@@ -278,6 +287,212 @@ class _MetricCard extends StatelessWidget {
   }
 }
 
+
+class _TenantLaunchReadinessPanel extends StatelessWidget {
+  const _TenantLaunchReadinessPanel({required this.metrics});
+
+  final TenantLaunchReadinessMetrics metrics;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final progressPercent = (metrics.launchProgress * 100).round();
+    final blockers = [
+      _ReadinessCounterData(
+        label: 'Missing Plan',
+        value: metrics.missingSubscription,
+        icon: Icons.credit_card_off_outlined,
+        color: Colors.orange,
+      ),
+      _ReadinessCounterData(
+        label: 'Missing Billing Contact',
+        value: metrics.missingBillingContact,
+        icon: Icons.contact_mail_outlined,
+        color: Colors.deepOrange,
+      ),
+      _ReadinessCounterData(
+        label: 'Missing Tenant Admin',
+        value: metrics.missingTenantAdmin,
+        icon: Icons.admin_panel_settings_outlined,
+        color: Colors.indigo,
+      ),
+      _ReadinessCounterData(
+        label: 'Missing HOA',
+        value: metrics.missingHoa,
+        icon: Icons.domain_disabled_outlined,
+        color: Colors.blueGrey,
+      ),
+      _ReadinessCounterData(
+        label: 'Stripe Pending',
+        value: metrics.stripePending,
+        icon: Icons.sync_problem_outlined,
+        color: Colors.purple,
+      ),
+      _ReadinessCounterData(
+        label: 'Over Included Limits',
+        value: metrics.overIncludedLimits,
+        icon: Icons.trending_up_outlined,
+        color: Colors.red,
+      ),
+      _ReadinessCounterData(
+        label: 'Blocked',
+        value: metrics.blocked,
+        icon: Icons.block_outlined,
+        color: Colors.redAccent,
+      ),
+    ];
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () => context.go('/admin/tenants'),
+      child: Card(
+        margin: EdgeInsets.zero,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 16,
+                runSpacing: 12,
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircleAvatar(
+                        backgroundColor: Colors.green.withOpacity(0.12),
+                        foregroundColor: Colors.green.shade700,
+                        child: const Icon(Icons.rocket_launch_outlined),
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '$progressPercent% launch ready',
+                            style: theme.textTheme.titleLarge,
+                          ),
+                          Text(
+                            '${metrics.readyToLaunch} ready, ${metrics.launched} launched, ${metrics.totalTenants} total tenants',
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  Chip(
+                    avatar: Icon(
+                      metrics.setupAttentionTotal == 0
+                          ? Icons.check_circle_outline
+                          : Icons.warning_amber_outlined,
+                      size: 18,
+                    ),
+                    label: Text(
+                      metrics.setupAttentionTotal == 0
+                          ? 'No launch blockers'
+                          : '${metrics.setupAttentionTotal} setup item(s) need attention',
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  value: metrics.launchProgress,
+                  minHeight: 10,
+                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                ),
+              ),
+              const SizedBox(height: 18),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final width = constraints.maxWidth;
+                  final columns = width >= 1100
+                      ? 4
+                      : width >= 760
+                          ? 3
+                          : width >= 520
+                              ? 2
+                              : 1;
+                  final itemWidth = (width - ((columns - 1) * 10)) / columns;
+
+                  return Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: blockers
+                        .map(
+                          (item) => SizedBox(
+                            width: itemWidth,
+                            child: _ReadinessCounter(data: item),
+                          ),
+                        )
+                        .toList(),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ReadinessCounterData {
+  const _ReadinessCounterData({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  final String label;
+  final int value;
+  final IconData icon;
+  final Color color;
+}
+
+class _ReadinessCounter extends StatelessWidget {
+  const _ReadinessCounter({required this.data});
+
+  final _ReadinessCounterData data;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: data.color.withOpacity(data.value == 0 ? 0.06 : 0.11),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: data.color.withOpacity(data.value == 0 ? 0.12 : 0.28)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Icon(data.icon, color: data.color),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                data.label,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Text(
+              data.value.toString(),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _TicketMetricsPanel extends StatelessWidget {
   const _TicketMetricsPanel({required this.metrics});
 
@@ -341,7 +556,7 @@ class _OperationalMetricsPanel extends StatelessWidget {
             const SizedBox(height: 18),
             _CompactMetric(label: 'HOA Managers', value: metrics.hoaManagers, icon: Icons.supervisor_account_outlined),
             _CompactMetric(label: 'HOA Board Members', value: metrics.hoaBoardMembers, icon: Icons.groups_outlined),
-            _CompactMetric(label: 'Tenant Staff', value: metrics.kcStaff, icon: Icons.badge_outlined),
+            _CompactMetric(label: 'Tenant Staff', value: metrics.tenantStaff, icon: Icons.badge_outlined),
             _CompactMetric(label: 'Dispatch Users', value: metrics.dispatchUsers, icon: Icons.local_shipping_outlined),
             _CompactMetric(label: 'CSR Users', value: metrics.csrUsers, icon: Icons.support_agent_outlined),
           ],

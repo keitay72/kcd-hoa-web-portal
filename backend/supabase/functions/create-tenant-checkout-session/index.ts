@@ -50,14 +50,7 @@ async function callerCanManageBilling(supabase: SupabaseClient, userId: string) 
   if (globalError) throw globalError;
   if (Array.isArray(globalRoles) && globalRoles.length > 0) return true;
 
-  const { data: legacyRoles, error: legacyError } = await supabase
-    .from('user_platform_roles')
-    .select('roles!inner(code)')
-    .eq('user_id', userId)
-    .in('roles.code', ['sys_admin', 'mgmt'])
-    .limit(1);
-  if (legacyError) throw legacyError;
-  return Array.isArray(legacyRoles) && legacyRoles.length > 0;
+  return false;
 }
 
 async function tenantSubscription(supabase: SupabaseClient, tenantId: string, subscriptionId: string) {

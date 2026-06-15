@@ -95,11 +95,10 @@ class ResidentVerificationDetailPage extends ConsumerWidget {
     WidgetRef ref,
     ResidentVerification item,
   ) async {
-    final confirmed = await _confirm(
+    final confirmed = await _confirmApprovalWithOverageCheck(
       context: context,
-      title: 'Approve Verification',
-      message: 'Approve this resident verification and mark all factors verified?',
-      actionLabel: 'Approve',
+      ref: ref,
+      item: item,
     );
 
     if (!confirmed) {
@@ -109,6 +108,46 @@ class ResidentVerificationDetailPage extends ConsumerWidget {
     await ref
         .read(residentVerificationCommandProvider.notifier)
         .approveVerification(item.id);
+  }
+
+  Future<bool> _confirmApprovalWithOverageCheck({
+    required BuildContext context,
+    required WidgetRef ref,
+    required ResidentVerification item,
+  }) async {
+    ResidentApprovalImpact impact;
+    try {
+      impact = await ref
+          .read(residentVerificationRepositoryProvider)
+          .approvalImpact(item.id);
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Unable to calculate resident overage impact: $error'),
+          ),
+        );
+      }
+      return false;
+    }
+
+    if (!context.mounted) return false;
+
+    if (impact.shouldWarn) {
+      return _confirm(
+        context: context,
+        title: 'Resident overage may apply',
+        message: _residentOverageMessage(impact),
+        actionLabel: 'Approve Anyway',
+      );
+    }
+
+    return _confirm(
+      context: context,
+      title: 'Approve Verification',
+      message: 'Approve this resident verification and mark all factors verified?',
+      actionLabel: 'Approve',
+    );
   }
 
   Future<void> _reset(
@@ -206,6 +245,40 @@ class ResidentVerificationDetailPage extends ConsumerWidget {
       ),
     );
   }
+}
+
+String _residentOverageMessage(ResidentApprovalImpact impact) {
+  final limit = impact.residentLimit;
+  final projectedMonthly = impact.projectedMonthlyOverageCents;
+  final projectedAnnual = projectedMonthly * 12;
+
+  return '${impact.tenantName} is using ${_formatCount(impact.currentResidentCount)} '
+      'of ${_formatCount(limit ?? 0)} included residents for '
+      '${impact.planName}.\n\n'
+      'Approving this resident may add \$0.05/month to this tenant '
+      'subscription. Projected resident overage: '
+      '${_formatCount(impact.projectedOverageCount)} resident(s), estimated '
+      '${_formatMoneyCents(projectedMonthly)}/month '
+      '(${_formatMoneyCents(projectedAnnual)}/year).\n\n'
+      'Billing is not automated yet, but this keeps approvals moving while '
+      'making the cost clear.';
+}
+
+String _formatCount(int value) {
+  final text = value.toString();
+  final buffer = StringBuffer();
+  for (var i = 0; i < text.length; i++) {
+    final remaining = text.length - i;
+    buffer.write(text[i]);
+    if (remaining > 1 && remaining % 3 == 1) buffer.write(',');
+  }
+  return buffer.toString();
+}
+
+String _formatMoneyCents(int cents) {
+  final amount = cents / 100;
+  final precision = cents % 100 == 0 ? 0 : 2;
+  return '\$${amount.toStringAsFixed(precision)}';
 }
 
 class _VerificationDetailsCard extends StatelessWidget {

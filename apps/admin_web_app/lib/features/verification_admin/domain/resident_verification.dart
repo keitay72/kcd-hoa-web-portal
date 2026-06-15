@@ -128,6 +128,36 @@ class ResidentVerification {
   }
 }
 
+class ResidentApprovalImpact {
+  const ResidentApprovalImpact({
+    required this.tenantName,
+    required this.planName,
+    required this.currentResidentCount,
+    required this.projectedResidentCount,
+    required this.willIncreaseResidentCount,
+    this.residentLimit,
+  });
+
+  final String tenantName;
+  final String planName;
+  final int currentResidentCount;
+  final int projectedResidentCount;
+  final bool willIncreaseResidentCount;
+  final int? residentLimit;
+
+  bool get hasResidentLimit => residentLimit != null;
+  bool get isAtOrOverIncludedLimit =>
+      hasResidentLimit && currentResidentCount >= residentLimit!;
+  bool get shouldWarn => willIncreaseResidentCount && isAtOrOverIncludedLimit;
+
+  int get projectedOverageCount {
+    if (residentLimit == null || projectedResidentCount <= residentLimit!) return 0;
+    return projectedResidentCount - residentLimit!;
+  }
+
+  int get projectedMonthlyOverageCents => projectedOverageCount * 5;
+}
+
 class ResidentAddressMembershipHistory {
   const ResidentAddressMembershipHistory({
     required this.id,

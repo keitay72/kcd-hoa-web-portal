@@ -11,6 +11,16 @@ class PlatformTenant {
     this.onboardingBlockedReason,
     this.onboardingLaunchReadyAt,
     this.onboardingLaunchedAt,
+    this.subscriptionStatus,
+    this.subscriptionPlanName,
+    this.subscriptionBillingMode,
+    this.subscriptionHasStripePrice = false,
+    this.hoaCount = 0,
+    this.residentCount = 0,
+    this.tenantAdminCount = 0,
+    this.billingContactCount = 0,
+    this.includedHoaCount,
+    this.includedResidentCount,
   });
 
   final String id;
@@ -24,8 +34,51 @@ class PlatformTenant {
   final String? onboardingBlockedReason;
   final DateTime? onboardingLaunchReadyAt;
   final DateTime? onboardingLaunchedAt;
+  final String? subscriptionStatus;
+  final String? subscriptionPlanName;
+  final String? subscriptionBillingMode;
+  final bool subscriptionHasStripePrice;
+  final int hoaCount;
+  final int residentCount;
+  final int tenantAdminCount;
+  final int billingContactCount;
+  final int? includedHoaCount;
+  final int? includedResidentCount;
 
   String get onboardingStatusLabel => _titleCase((onboardingStatus ?? 'not_started').replaceAll('_', ' '));
+  String get subscriptionStatusLabel => _titleCase((subscriptionStatus ?? 'not_assigned').replaceAll('_', ' '));
+  bool get hasSubscription => subscriptionStatus != null && subscriptionStatus != 'cancelled';
+  bool get hasTenantAdmin => tenantAdminCount > 0;
+  bool get hasBillingContact => billingContactCount > 0;
+  bool get hasHoas => hoaCount > 0;
+  bool get hasHoaLimit => includedHoaCount != null;
+  bool get hasResidentLimit => includedResidentCount != null;
+  bool get isFreeBeta => subscriptionBillingMode == 'free_beta';
+  bool get hasStripePending => hasSubscription && !isFreeBeta && !subscriptionHasStripePrice;
+  bool get isHoaOverIncluded => hasHoaLimit && hoaCount > includedHoaCount!;
+  bool get isResidentOverIncluded =>
+      hasResidentLimit && residentCount > includedResidentCount!;
+  bool get isOverIncludedLimits => isHoaOverIncluded || isResidentOverIncluded;
+  bool get isHoaApproachingLimit =>
+      hasHoaLimit && hoaCount >= includedHoaCount! * 0.8 && !isHoaOverIncluded;
+  bool get isResidentApproachingLimit =>
+      hasResidentLimit &&
+      residentCount >= includedResidentCount! * 0.8 &&
+      !isResidentOverIncluded;
+  bool get isApproachingLimits => isHoaApproachingLimit || isResidentApproachingLimit;
+  int get hoaOverageCount => _positiveOverage(hoaCount, includedHoaCount);
+  int get residentOverageCount =>
+      _positiveOverage(residentCount, includedResidentCount);
+  String get subscriptionHealthLabel {
+    if (!hasSubscription) return 'No subscription';
+    if (isOverIncludedLimits) return 'Over limits';
+    if (isApproachingLimits) return 'Approaching limits';
+    if (hasStripePending) return 'Stripe pending';
+    if (isFreeBeta) return 'Free beta';
+    return 'Healthy';
+  }
+
+  bool get needsSetup => !isLaunchReady && !isLaunched && !isOnboardingBlocked;
   bool get isOnboardingBlocked => onboardingStatus == 'blocked';
   bool get isLaunchReady => onboardingStatus == 'ready_to_launch' || onboardingLaunchReadyAt != null;
   bool get isLaunched => onboardingStatus == 'launched' || onboardingLaunchedAt != null;
@@ -35,6 +88,16 @@ class PlatformTenant {
     String? onboardingBlockedReason,
     DateTime? onboardingLaunchReadyAt,
     DateTime? onboardingLaunchedAt,
+    String? subscriptionStatus,
+    String? subscriptionPlanName,
+    String? subscriptionBillingMode,
+    bool? subscriptionHasStripePrice,
+    int? hoaCount,
+    int? residentCount,
+    int? tenantAdminCount,
+    int? billingContactCount,
+    int? includedHoaCount,
+    int? includedResidentCount,
   }) {
     return PlatformTenant(
       id: id,
@@ -48,6 +111,18 @@ class PlatformTenant {
       onboardingBlockedReason: onboardingBlockedReason ?? this.onboardingBlockedReason,
       onboardingLaunchReadyAt: onboardingLaunchReadyAt ?? this.onboardingLaunchReadyAt,
       onboardingLaunchedAt: onboardingLaunchedAt ?? this.onboardingLaunchedAt,
+      subscriptionStatus: subscriptionStatus ?? this.subscriptionStatus,
+      subscriptionPlanName: subscriptionPlanName ?? this.subscriptionPlanName,
+      subscriptionBillingMode:
+          subscriptionBillingMode ?? this.subscriptionBillingMode,
+      subscriptionHasStripePrice:
+          subscriptionHasStripePrice ?? this.subscriptionHasStripePrice,
+      hoaCount: hoaCount ?? this.hoaCount,
+      residentCount: residentCount ?? this.residentCount,
+      tenantAdminCount: tenantAdminCount ?? this.tenantAdminCount,
+      billingContactCount: billingContactCount ?? this.billingContactCount,
+      includedHoaCount: includedHoaCount ?? this.includedHoaCount,
+      includedResidentCount: includedResidentCount ?? this.includedResidentCount,
     );
   }
 
@@ -245,6 +320,20 @@ class SubscriptionPlanSummary {
   final String? description;
   final int? includedHoaCount;
   final int? includedResidentCount;
+
+  bool get isActive => status == 'active';
+
+  String get statusLabel => _titleCase(status.replaceAll('_', ' '));
+
+  String get hoaLimitLabel => includedHoaCount == null ? 'Unlimited HOAs' : '$includedHoaCount HOAs';
+
+  String get residentLimitLabel =>
+      includedResidentCount == null ? 'Unlimited residents' : '$includedResidentCount residents';
+
+  String get limitLabel => '$hoaLimitLabel / $residentLimitLabel';
+
+  List<SubscriptionPriceSummary> get activePrices =>
+      prices.where((price) => price.isActive).toList(growable: false);
 }
 
 class SubscriptionPriceSummary {
@@ -270,6 +359,10 @@ class SubscriptionPriceSummary {
     final amount = (unitAmountCents / 100).toStringAsFixed(2);
     return '\$$amount/$billingInterval';
   }
+
+  bool get isActive => status == 'active';
+  bool get hasStripePrice => stripePriceId != null && stripePriceId!.trim().isNotEmpty;
+  String get statusLabel => _titleCase(status.replaceAll('_', ' '));
 }
 
 class TenantSubscriptionSummary {
@@ -284,6 +377,9 @@ class TenantSubscriptionSummary {
     this.billingInterval,
     this.currency,
     this.unitAmountCents,
+    this.billingMode = 'manual',
+    this.freeBetaEndsAt,
+    this.billingNotes,
     this.currentPeriodStart,
     this.currentPeriodEnd,
     this.trialEndsAt,
@@ -299,13 +395,28 @@ class TenantSubscriptionSummary {
   final String? billingInterval;
   final String? currency;
   final int? unitAmountCents;
+  final String billingMode;
+  final DateTime? freeBetaEndsAt;
+  final String? billingNotes;
   final DateTime? currentPeriodStart;
   final DateTime? currentPeriodEnd;
   final DateTime? trialEndsAt;
 
   String get statusLabel => _titleCase(status.replaceAll('_', ' '));
 
+  bool get isFreeBeta => billingMode == 'free_beta';
+  bool get isStripeBilling => billingMode == 'stripe';
+  bool get isManualBilling => billingMode == 'manual';
+  bool get hasPrice => priceId != null;
+
+  String get billingModeLabel => _titleCase(billingMode.replaceAll('_', ' '));
+
+  String get planDisplayName => planName ?? 'No active plan';
+
   String get priceLabel {
+    if (isFreeBeta && (unitAmountCents == null || billingInterval == null)) {
+      return 'Free beta / no charge';
+    }
     if (unitAmountCents == null || billingInterval == null) return 'No price assigned';
     final amount = (unitAmountCents! / 100).toStringAsFixed(2);
     return '\$$amount/$billingInterval';
@@ -326,6 +437,9 @@ class AddonCatalogEntry {
   final String name;
   final String status;
   final String? description;
+
+  bool get isActive => status == 'active';
+  String get statusLabel => _titleCase(status.replaceAll('_', ' '));
 }
 
 class TenantAddonSummary {
@@ -411,6 +525,7 @@ class TenantDetail {
     required this.tenantHoas,
     required this.tenantAdminCount,
     required this.hoaCount,
+    required this.residentCount,
   });
 
   final PlatformTenant tenant;
@@ -428,17 +543,64 @@ class TenantDetail {
   final List<TenantHoaSummary> tenantHoas;
   final int tenantAdminCount;
   final int hoaCount;
+  final int residentCount;
 
-  List<OnboardingChecklistItem> get onboardingChecklist {
-    TenantSubscriptionSummary? currentSubscription;
+  TenantSubscriptionSummary? get currentSubscription {
     for (final subscription in subscriptions) {
       if (const {'trialing', 'active', 'past_due', 'paused', 'incomplete'}
           .contains(subscription.status)) {
-        currentSubscription = subscription;
-        break;
+        return subscription;
       }
     }
-    currentSubscription ??= subscriptions.isEmpty ? null : subscriptions.first;
+    return subscriptions.isEmpty ? null : subscriptions.first;
+  }
+
+  SubscriptionPlanSummary? get currentPlan {
+    final planId = currentSubscription?.planId;
+    if (planId == null) return null;
+    for (final plan in availablePlans) {
+      if (plan.id == planId) return plan;
+    }
+    return null;
+  }
+
+  int? get hoaLimit => currentPlan?.includedHoaCount;
+  int? get residentLimit => currentPlan?.includedResidentCount;
+
+  bool get hasHoaLimit => hoaLimit != null;
+  bool get hasResidentLimit => residentLimit != null;
+
+  bool get isHoaLimitReached => hasHoaLimit && hoaCount >= hoaLimit!;
+  bool get isResidentLimitReached => hasResidentLimit && residentCount >= residentLimit!;
+
+  bool get isHoaOverLimit => hasHoaLimit && hoaCount > hoaLimit!;
+  bool get isResidentOverLimit => hasResidentLimit && residentCount > residentLimit!;
+
+  int get hoaOverageCount => _positiveOverage(hoaCount, hoaLimit);
+  int get projectedHoaOverageAfterCreate => _positiveOverage(hoaCount + 1, hoaLimit);
+  int get residentOverageCount => _positiveOverage(residentCount, residentLimit);
+
+  int get hoaOverageMonthlyCents => hoaOverageCount * 1000;
+  int get projectedHoaOverageMonthlyCentsAfterCreate =>
+      projectedHoaOverageAfterCreate * 1000;
+  int get residentOverageMonthlyCents => residentOverageCount * 5;
+
+  double? get hoaUsageRatio => hasHoaLimit && hoaLimit! > 0 ? hoaCount / hoaLimit! : null;
+  double? get residentUsageRatio =>
+      hasResidentLimit && residentLimit! > 0 ? residentCount / residentLimit! : null;
+
+  bool get isHoaUsageWarning {
+    final ratio = hoaUsageRatio;
+    return ratio != null && ratio >= 0.8 && !isHoaLimitReached;
+  }
+
+  bool get isResidentUsageWarning {
+    final ratio = residentUsageRatio;
+    return ratio != null && ratio >= 0.8 && !isResidentLimitReached;
+  }
+
+  List<OnboardingChecklistItem> get onboardingChecklist {
+    final currentSubscription = this.currentSubscription;
 
     TenantAddonSummary? smsAddon;
     for (final addon in enabledAddons) {
@@ -459,8 +621,10 @@ class TenantDetail {
       ),
       OnboardingChecklistItem(
         label: 'Subscription assigned',
-        isComplete: currentSubscription?.planId != null && currentSubscription?.priceId != null,
-        description: currentSubscription?.planName ?? 'Assign a plan and rate.',
+        isComplete: currentSubscription?.planId != null &&
+            (currentSubscription?.priceId != null ||
+                currentSubscription?.isFreeBeta == true),
+        description: currentSubscription?.planName ?? 'Assign a plan and billing mode.',
         action: 'subscription',
         actionLabel: currentSubscription == null ? 'Assign plan' : 'Review plan',
       ),
@@ -562,17 +726,37 @@ class TenantListFilters {
   const TenantListFilters({
     this.search = '',
     this.status,
+    this.readiness,
+    this.subscriptionHealth,
+    this.billingReadiness,
   });
 
   final String search;
   final String? status;
+  final String? readiness;
+  final String? subscriptionHealth;
+  final String? billingReadiness;
 
-  TenantListFilters copyWith({String? search, String? status}) {
+  TenantListFilters copyWith({
+    String? search,
+    String? status,
+    String? readiness,
+    String? subscriptionHealth,
+    String? billingReadiness,
+  }) {
     return TenantListFilters(
       search: search ?? this.search,
       status: status,
+      readiness: readiness,
+      subscriptionHealth: subscriptionHealth,
+      billingReadiness: billingReadiness,
     );
   }
+}
+
+int _positiveOverage(int current, int? includedLimit) {
+  if (includedLimit == null || current <= includedLimit) return 0;
+  return current - includedLimit;
 }
 
 String _titleCase(String value) {

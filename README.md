@@ -65,10 +65,9 @@ Implemented or in progress:
 - Stripe checkout/webhook placeholder functions
 - Tenant onboarding workflow
 - Tenant launch-readiness guardrails
+- Audit Log Viewer UI
 
 Reserved or planned:
-
-- Audit Log Viewer UI
 - Production Stripe activation after account credentials are available
 - Tenant email provider configuration workflow
 - Tenant SMS/Twilio add-on workflow
@@ -115,6 +114,7 @@ Important app folders:
 - `lib/features/ticket_operations`: Ticket operations, dispatch, queues, assignment, notes, priority, and metrics.
 - `lib/features/user_management`: User invitation, profile, role, HOA scope, tenant scope, and invite lifecycle management.
 - `lib/features/analytics_dashboard`: Platform and operational metrics dashboard.
+- `lib/features/audit_logs`: Admin audit log viewer with actor, HOA, action, entity, and JSON change details. Tenant and user-management workflows write audit events for profile changes, role assignment/removal, tenant settings, onboarding, billing contacts, subscriptions, add-ons, and Stripe action requests.
 - `lib/features/tenant_management`: SaaS tenant management, commercial settings, subscription assignment, and onboarding workflow.
 - `lib/features/commercial_catalog`: Subscription/add-on catalog management foundations.
 
@@ -180,7 +180,7 @@ Resident role:
 
 - `hoa_resident`: Verified HOA resident.
 
-Deprecated compatibility roles may still exist while the app and database are migrated:
+Deprecated compatibility roles may still exist in historical data and compatibility migrations:
 
 - `sys_admin`
 - `mgmt`
@@ -188,7 +188,7 @@ Deprecated compatibility roles may still exist while the app and database are mi
 - `dispatch`
 - `resident`
 
-These should not be used for new role assignments once canonical SaaS role handling is complete.
+These should not be used for new role assignments. Active Admin Web App flows and Edge Function authorization should use the canonical SaaS roles above.
 
 ## RBAC Behavior
 
@@ -569,12 +569,12 @@ Current focus:
 Recommended next steps:
 
 1. Continue tenant management polish for settings, email, SMS, billing contacts, add-ons, and onboarding edge cases.
-2. Finalize canonical role migration in remaining app UI and repositories.
-3. Add platform audit visibility for tenant onboarding, billing changes, invite lifecycle events, and role assignments.
-4. Configure Stripe once the owner creates the Stripe account.
-5. Deploy and verify Stripe webhooks in test mode.
-6. Build production tenant email configuration workflow.
-7. Build Twilio/SMS add-on configuration workflow.
-8. Harden private ticket notes before resident ticket visibility ships.
-9. Add user-facing tenant launch checklist reports for platform sales/support handoff.
+2. Add platform audit visibility for tenant onboarding, billing changes, invite lifecycle events, and role assignments.
+3. Configure Stripe once the owner creates the Stripe account.
+4. Deploy and verify Stripe webhooks in test mode.
+5. Build production tenant email configuration workflow.
+6. Build Twilio/SMS add-on configuration workflow.
+7. Harden private ticket notes before resident ticket visibility ships.
+8. Add user-facing tenant launch checklist reports for platform sales/support handoff.
+9. Continue replacing internal compatibility names, such as `platformRoles` wrappers around tenant-scoped staff assignments, when it is safe to do a larger naming migration.
 10. Resume resident portal/mobile development only after the admin SaaS foundation is stable.
