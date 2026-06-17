@@ -203,9 +203,14 @@ class _TenantHeader extends StatelessWidget {
         _MiniStatusPill(label: tenant.statusLabel),
         if (tenant.isPrimary) const _MiniStatusPill(label: 'Primary'),
         if (tenant.isFreeBeta)
-          const _MiniStatusPill(
-            label: 'Free beta',
+          _MiniStatusPill(
+            label: tenant.betaStatus == 'active_beta' ? 'Active Beta' : 'Free Beta',
             icon: Icons.science_outlined,
+          ),
+        if (tenant.readyForHoaOnboarding)
+          const _MiniStatusPill(
+            label: 'HOA Ready',
+            icon: Icons.check_circle_outline,
           ),
       ],
     );
@@ -222,7 +227,9 @@ class _TenantSubtitle extends StatelessWidget {
     final details = [
       tenant.code,
       'Onboarding: ${tenant.onboardingStatusLabel}',
+      if (tenant.isFreeBeta) 'Beta: ${tenant.betaStatusLabel}',
       'Plan: ${tenant.subscriptionPlanName ?? tenant.subscriptionStatusLabel}',
+      if (tenant.isFreeBeta) 'HOA data: ${tenant.hoaDataStatusLabel}',
     ];
     if (tenant.onboardingBlockedReason != null) {
       details.add('Blocked: ${tenant.onboardingBlockedReason}');
@@ -255,6 +262,25 @@ class _TenantMetricsWrap extends StatelessWidget {
       runSpacing: 8,
       children: [
         _ReadinessChip(tenant: tenant),
+        if (tenant.isFreeBeta)
+          _CompactInfoChip(
+            icon: tenant.readyForHoaOnboarding
+                ? Icons.check_circle_outline
+                : Icons.science_outlined,
+            label: tenant.readyForHoaOnboarding
+                ? 'HOA onboarding ready'
+                : 'Beta ${tenant.betaStatusLabel}',
+            isReady: tenant.readyForHoaOnboarding || tenant.betaStatus == 'active_beta',
+            warning: tenant.betaStatus == 'configuring' || tenant.betaStatus == 'tenant_review',
+          ),
+        if (tenant.isFreeBeta)
+          _CompactInfoChip(
+            icon: Icons.table_chart_outlined,
+            label: 'Data ${tenant.hoaDataStatusLabel}',
+            isReady: tenant.hoaDataStatus == 'imported',
+            warning: tenant.hoaDataStatus == 'requested' || tenant.hoaDataStatus == 'received' || tenant.hoaDataStatus == 'importing',
+            isError: tenant.hoaDataStatus == 'needs_cleanup',
+          ),
         _CompactInfoChip(
           icon: Icons.credit_card_outlined,
           label: tenant.subscriptionPlanName ?? tenant.subscriptionStatusLabel,

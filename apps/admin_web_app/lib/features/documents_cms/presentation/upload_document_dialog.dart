@@ -12,7 +12,14 @@ import '../domain/hoa_document_inputs.dart';
 import 'document_providers.dart';
 
 class UploadDocumentDialog extends ConsumerStatefulWidget {
-  const UploadDocumentDialog({super.key});
+  const UploadDocumentDialog({
+    this.initialHoaId,
+    this.lockHoaSelection = false,
+    super.key,
+  });
+
+  final String? initialHoaId;
+  final bool lockHoaSelection;
 
   @override
   ConsumerState<UploadDocumentDialog> createState() => _UploadDocumentDialogState();
@@ -23,12 +30,18 @@ class _UploadDocumentDialogState extends ConsumerState<UploadDocumentDialog> {
   final _titleController = TextEditingController();
   final _categoryController = TextEditingController(text: 'General');
 
-  String? _hoaId;
+  late String? _hoaId;
   HoaDocumentVisibilityScope _visibilityScope = HoaDocumentVisibilityScope.resident;
   String? _fileName;
   String? _mimeType;
   Uint8List? _bytes;
   String? _fileError;
+
+  @override
+  void initState() {
+    super.initState();
+    _hoaId = widget.initialHoaId;
+  }
 
   @override
   void dispose() {
@@ -57,6 +70,7 @@ class _UploadDocumentDialogState extends ConsumerState<UploadDocumentDialog> {
                   data: (items) => _HoaSelect(
                     hoas: items,
                     selectedHoaId: _hoaId,
+                    lockSelection: widget.lockHoaSelection,
                     onChanged: (value) => setState(() => _hoaId = value),
                   ),
                   loading: () => const LinearProgressIndicator(),
@@ -279,11 +293,13 @@ class _HoaSelect extends StatelessWidget {
     required this.hoas,
     required this.selectedHoaId,
     required this.onChanged,
+    this.lockSelection = false,
   });
 
   final List<HoaCommunity> hoas;
   final String? selectedHoaId;
   final ValueChanged<String?> onChanged;
+  final bool lockSelection;
 
   @override
   Widget build(BuildContext context) {
@@ -301,7 +317,7 @@ class _HoaSelect extends StatelessWidget {
             ),
           )
           .toList(),
-      onChanged: onChanged,
+      onChanged: lockSelection ? null : onChanged,
       validator: (value) => value == null ? 'Choose an HOA' : null,
     );
   }

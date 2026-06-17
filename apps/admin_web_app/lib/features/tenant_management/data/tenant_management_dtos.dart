@@ -41,6 +41,9 @@ class PlatformTenantDto {
       onboardingBlockedReason: _onboardingText(json['tenant_onboarding_status'], 'blocked_reason'),
       onboardingLaunchReadyAt: _date(_onboardingValue(json['tenant_onboarding_status'], 'launch_ready_at')),
       onboardingLaunchedAt: _date(_onboardingValue(json['tenant_onboarding_status'], 'launched_at')),
+      betaStatus: _onboardingText(json['tenant_onboarding_status'], 'beta_status'),
+      hoaDataStatus: _onboardingText(json['tenant_onboarding_status'], 'hoa_data_status'),
+      readyForHoaOnboarding: _onboardingValue(json['tenant_onboarding_status'], 'ready_for_hoa_onboarding') as bool? ?? false,
       subscriptionStatus: _text(json['subscription_status']),
       subscriptionPlanName: _text(json['subscription_plan_name']),
       subscriptionBillingMode: _text(json['subscription_billing_mode']),
@@ -211,6 +214,13 @@ class TenantOnboardingStatusDto {
       launchedAt: _date(json['launched_at']),
       blockedReason: _text(json['blocked_reason']),
       notes: _text(json['notes']),
+      betaStatus: json['beta_status'] as String? ?? 'not_started',
+      betaContactName: _text(json['beta_contact_name']),
+      betaContactEmail: _text(json['beta_contact_email']),
+      betaTargetLaunchDate: _date(json['beta_target_launch_date']),
+      hoaDataStatus: json['hoa_data_status'] as String? ?? 'not_requested',
+      knownIssues: _text(json['known_issues']),
+      readyForHoaOnboarding: json['ready_for_hoa_onboarding'] as bool? ?? false,
       updatedBy: _text(json['updated_by']),
     );
   }

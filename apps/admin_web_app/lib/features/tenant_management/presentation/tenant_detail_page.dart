@@ -114,6 +114,228 @@ Future<bool> _confirmHoaOverageAllowsCreate(BuildContext context, TenantDetail d
   return confirmed == true;
 }
 
+
+class _BetaTrackingCard extends ConsumerWidget {
+  const _BetaTrackingCard({required this.detail});
+
+  final TenantDetail detail;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final status = detail.onboardingStatus;
+    final colorScheme = Theme.of(context).colorScheme;
+    final knownIssues = _fallbackText(status?.knownIssues, 'No known beta issues recorded.');
+    final notes = _fallbackText(status?.notes, 'No internal onboarding notes recorded.');
+
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.assignment_outlined),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Beta Notes / Internal Status',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Track no-cost beta coordination, data readiness, and handoff notes for this tenant.',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ],
+                  ),
+                ),
+                _StatusPill(
+                  label: status?.betaStatusLabel ?? 'Not Started',
+                  isPositive: status?.betaStatus == 'active_beta' || status?.betaStatus == 'completed',
+                ),
+                const SizedBox(width: 8),
+                TextButton.icon(
+                  onPressed: () => _openOnboardingStatus(context, ref),
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('Update Notes'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final cardWidth = constraints.maxWidth >= 900
+                    ? (constraints.maxWidth - 24) / 3
+                    : constraints.maxWidth >= 620
+                        ? (constraints.maxWidth - 12) / 2
+                        : constraints.maxWidth;
+                return Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    _BetaStatusTile(
+                      width: cardWidth,
+                      label: 'Beta status',
+                      value: status?.betaStatusLabel ?? 'Not Started',
+                      icon: Icons.science_outlined,
+                    ),
+                    _BetaStatusTile(
+                      width: cardWidth,
+                      label: 'HOA data status',
+                      value: status?.hoaDataStatusLabel ?? 'Not Requested',
+                      icon: Icons.table_chart_outlined,
+                    ),
+                    _BetaStatusTile(
+                      width: cardWidth,
+                      label: 'Target launch',
+                      value: _formatDate(status?.betaTargetLaunchDate),
+                      icon: Icons.event_outlined,
+                    ),
+                    _BetaStatusTile(
+                      width: cardWidth,
+                      label: 'Beta contact',
+                      value: _contactText(status),
+                      icon: Icons.contact_mail_outlined,
+                    ),
+                    _BetaStatusTile(
+                      width: cardWidth,
+                      label: 'HOA onboarding',
+                      value: status?.readyForHoaOnboarding == true ? 'Ready' : 'Not ready yet',
+                      icon: status?.readyForHoaOnboarding == true
+                          ? Icons.check_circle_outline
+                          : Icons.pending_actions_outlined,
+                    ),
+                    _BetaStatusTile(
+                      width: cardWidth,
+                      label: 'Tenant phase',
+                      value: detail.tenant.statusLabel,
+                      icon: Icons.flag_outlined,
+                    ),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                color: colorScheme.surfaceContainerHighest.withOpacity(0.45),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Known beta issues', style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 6),
+                  Text(knownIssues),
+                  const SizedBox(height: 14),
+                  Text('Internal notes', style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 6),
+                  Text(notes),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openOnboardingStatus(BuildContext context, WidgetRef ref) async {
+    await showDialog<Object?>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => TenantOnboardingDialog(
+        tenantId: detail.tenant.id,
+        detail: detail,
+        status: detail.onboardingStatus,
+      ),
+    );
+    ref.invalidate(tenantDetailProvider(detail.tenant.id));
+    ref.invalidate(tenantListProvider);
+  }
+}
+
+class _BetaStatusTile extends StatelessWidget {
+  const _BetaStatusTile({
+    required this.width,
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  final double width;
+  final String label;
+  final String value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return SizedBox(
+      width: width,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: colorScheme.outlineVariant),
+          color: colorScheme.surface,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 20, color: colorScheme.primary),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: Theme.of(context).textTheme.bodySmall),
+                  const SizedBox(height: 4),
+                  Tooltip(
+                    message: value,
+                    waitDuration: const Duration(milliseconds: 400),
+                    child: Text(
+                      value,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _contactText(TenantOnboardingStatus? status) {
+  final name = status?.betaContactName?.trim();
+  final email = status?.betaContactEmail?.trim();
+  if ((name == null || name.isEmpty) && (email == null || email.isEmpty)) {
+    return 'Not set';
+  }
+  if (name == null || name.isEmpty) return email!;
+  if (email == null || email.isEmpty) return name;
+  return '$name · $email';
+}
+
+String _fallbackText(String? value, String fallback) {
+  final text = value?.trim();
+  if (text == null || text.isEmpty) return fallback;
+  return text;
+}
+
 class _TenantUsageCard extends StatelessWidget {
   const _TenantUsageCard({required this.detail});
 
@@ -419,6 +641,8 @@ class _TenantDetailView extends ConsumerWidget {
               const SizedBox(height: 16),
               _BetaTenantPlaybookCard(detail: detail),
               const SizedBox(height: 16),
+              _BetaTrackingCard(detail: detail),
+              const SizedBox(height: 16),
               _TenantUsageCard(detail: detail),
               const SizedBox(height: 16),
               _TenantStaffCard(detail: detail),
@@ -711,6 +935,12 @@ class _LaunchReadinessCard extends ConsumerWidget {
 }
 
 
+
+String _betaUsageText(int current, int? limit) {
+  if (limit == null) return '${_formatCount(current)} / Unlimited';
+  return '${_formatCount(current)} / ${_formatCount(limit)}';
+}
+
 class _BetaTenantPlaybookCard extends ConsumerWidget {
   const _BetaTenantPlaybookCard({required this.detail});
 
@@ -801,7 +1031,7 @@ class _BetaTenantPlaybookCard extends ConsumerWidget {
                       width: tileWidth,
                       label: 'Limit testing',
                       value: usageIsUsefulForBeta
-                          ? 'HOAs ${_usageText(detail.hoaCount, detail.hoaLimit)} · Residents ${_usageText(detail.residentCount, detail.residentLimit)}'
+                          ? 'HOAs ${_betaUsageText(detail.hoaCount, detail.hoaLimit)} · Residents ${_betaUsageText(detail.residentCount, detail.residentLimit)}'
                           : 'Enterprise/unlimited plan. Use Starter for MHD if we want to test overage behavior.',
                       isReady: usageIsUsefulForBeta,
                       icon: Icons.speed_outlined,
@@ -920,8 +1150,8 @@ class _BetaTenantPlaybookCard extends ConsumerWidget {
         settings: detail.settings,
         canManageBranding: branding.isEnabled,
         canManageCustomDomain: customDomain.isEnabled,
-        brandingLockReason: branding.reason,
-        customDomainLockReason: customDomain.reason,
+        brandingLockReason: branding.sourceLabel,
+        customDomainLockReason: customDomain.sourceLabel,
       ),
     );
   }

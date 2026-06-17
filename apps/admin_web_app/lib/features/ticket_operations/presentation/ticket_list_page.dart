@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/rbac/rbac_providers.dart';
+import '../../../core/subscriptions/subscription_providers.dart';
+import '../../../core/subscriptions/tenant_entitlements.dart';
 import '../../hoa_management/domain/hoa_community.dart';
 import '../../hoa_management/presentation/hoa_providers.dart';
 import '../domain/ticket.dart';
@@ -39,6 +42,22 @@ class _TicketListPageState extends ConsumerState<TicketListPage> {
   Widget build(BuildContext context) {
     final tickets = ref.watch(ticketListProvider(_filter));
     final hoas = ref.watch(hoaListProvider);
+    final access = ref.watch(adminAccessProvider);
+    final csrEntitlement = ref.watch(adminFeatureEntitlementProvider(TenantFeature.advancedTicketManagement));
+    final dispatchEntitlement = ref.watch(adminFeatureEntitlementProvider(TenantFeature.dispatchDashboard));
+
+    final canManageTickets = access.maybeWhen(
+      data: (value) => value.can('tickets.update'),
+      orElse: () => false,
+    );
+    final canOpenCsrDashboard = canManageTickets && csrEntitlement.maybeWhen(
+      data: (result) => result.isEnabled,
+      orElse: () => false,
+    );
+    final canOpenDispatchDashboard = canManageTickets && dispatchEntitlement.maybeWhen(
+      data: (result) => result.isEnabled,
+      orElse: () => false,
+    );
 
     return Padding(
       padding: const EdgeInsets.all(24),
@@ -52,22 +71,25 @@ class _TicketListPageState extends ConsumerState<TicketListPage> {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Text('Tickets', style: Theme.of(context).textTheme.headlineMedium),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: () => context.go('/admin/tickets/csr'),
-                    icon: const Icon(Icons.support_agent),
-                    label: const Text('CSR Dashboard'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: () => context.go('/admin/tickets/dispatch'),
-                    icon: const Icon(Icons.local_shipping_outlined),
-                    label: const Text('Dispatch Dashboard'),
-                  ),
-                ],
-              ),
+              if (canOpenCsrDashboard || canOpenDispatchDashboard)
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    if (canOpenCsrDashboard)
+                      OutlinedButton.icon(
+                        onPressed: () => context.go('/admin/tickets/csr'),
+                        icon: const Icon(Icons.support_agent),
+                        label: const Text('CSR Dashboard'),
+                      ),
+                    if (canOpenDispatchDashboard)
+                      OutlinedButton.icon(
+                        onPressed: () => context.go('/admin/tickets/dispatch'),
+                        icon: const Icon(Icons.local_shipping_outlined),
+                        label: const Text('Dispatch Dashboard'),
+                      ),
+                  ],
+                ),
             ],
           ),
           const SizedBox(height: 16),

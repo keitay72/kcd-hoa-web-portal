@@ -84,7 +84,7 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
   Future<List<PlatformTenant>> listTenants(TenantListFilters filters) async {
     var query = _client
         .from('platform_tenants')
-        .select('*, tenant_onboarding_status(status, blocked_reason, launch_ready_at, launched_at)');
+        .select('*, tenant_onboarding_status(*)');
     if (filters.status != null && filters.status!.isNotEmpty) {
       query = query.eq('status', filters.status!);
     }
@@ -854,6 +854,13 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
       'status': input.status,
       'blocked_reason': _blankToNull(input.blockedReason),
       'notes': _blankToNull(input.notes),
+      'beta_status': input.betaStatus,
+      'beta_contact_name': _blankToNull(input.betaContactName),
+      'beta_contact_email': _blankToNull(input.betaContactEmail),
+      'beta_target_launch_date': _dateOnly(input.betaTargetLaunchDate),
+      'hoa_data_status': input.hoaDataStatus,
+      'known_issues': _blankToNull(input.knownIssues),
+      'ready_for_hoa_onboarding': input.readyForHoaOnboarding,
       'kickoff_completed_at': input.kickoffCompletedAt?.toIso8601String(),
       'launch_ready_at': input.launchReadyAt?.toIso8601String(),
       'launched_at': input.launchedAt?.toIso8601String(),
@@ -1077,6 +1084,15 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
   String? _blankToNull(String? value) {
     final trimmed = value?.trim();
     return trimmed == null || trimmed.isEmpty ? null : trimmed;
+  }
+
+  String? _dateOnly(DateTime? value) {
+    if (value == null) return null;
+    final local = value.toLocal();
+    final year = local.year.toString().padLeft(4, '0');
+    final month = local.month.toString().padLeft(2, '0');
+    final day = local.day.toString().padLeft(2, '0');
+    return '$year-$month-$day';
   }
 }
 

@@ -109,6 +109,13 @@ class TenantOnboardingInput {
     required this.status,
     this.blockedReason,
     this.notes,
+    this.betaStatus = 'not_started',
+    this.betaContactName,
+    this.betaContactEmail,
+    this.betaTargetLaunchDate,
+    this.hoaDataStatus = 'not_requested',
+    this.knownIssues,
+    this.readyForHoaOnboarding = false,
     this.kickoffCompletedAt,
     this.launchReadyAt,
     this.launchedAt,
@@ -117,6 +124,13 @@ class TenantOnboardingInput {
   final String status;
   final String? blockedReason;
   final String? notes;
+  final String betaStatus;
+  final String? betaContactName;
+  final String? betaContactEmail;
+  final DateTime? betaTargetLaunchDate;
+  final String hoaDataStatus;
+  final String? knownIssues;
+  final bool readyForHoaOnboarding;
   final DateTime? kickoffCompletedAt;
   final DateTime? launchReadyAt;
   final DateTime? launchedAt;

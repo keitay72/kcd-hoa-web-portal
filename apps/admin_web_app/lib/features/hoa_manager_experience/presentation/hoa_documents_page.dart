@@ -41,7 +41,7 @@ class HoaDocumentsPage extends ConsumerWidget {
                     ),
                   ),
                   FilledButton.icon(
-                    onPressed: () => _openUploadDialog(context, ref),
+                    onPressed: () => _openUploadDialog(context, ref, hoaId),
                     icon: const Icon(Icons.upload_file_outlined),
                     label: const Text('Upload Document'),
                   ),
@@ -64,11 +64,14 @@ class HoaDocumentsPage extends ConsumerWidget {
     );
   }
 
-  Future<void> _openUploadDialog(BuildContext context, WidgetRef ref) async {
+  Future<void> _openUploadDialog(BuildContext context, WidgetRef ref, String hoaId) async {
     final result = await showDialog<Object?>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => const UploadDocumentDialog(),
+      builder: (_) => UploadDocumentDialog(
+        initialHoaId: hoaId,
+        lockHoaSelection: true,
+      ),
     );
 
     if (result != null) ref.invalidate(documentListProvider);

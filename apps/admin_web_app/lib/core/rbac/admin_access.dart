@@ -60,6 +60,7 @@ class AdminAccess {
   bool get hasGlobalRoleAssignment => globalRoles.isNotEmpty;
   bool get hasTenantRoleAssignment => tenantRoles.isNotEmpty;
   bool get hasPlatformRole => hasGlobalRoleAssignment || hasTenantRoleAssignment;
+  bool get isTenantScopedOnly => hasTenantRoleAssignment && !hasGlobalRoleAssignment;
   bool get isHoaScopedOnly => !hasPlatformRole && hoaRoles.isNotEmpty;
 
   List<AdminRoleAssignment> get allRoles => [

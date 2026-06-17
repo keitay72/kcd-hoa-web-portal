@@ -567,6 +567,83 @@ class _AdminSidebar extends ConsumerWidget {
   ];
 
 
+  static const _tenantItems = [
+    _AdminNavItem(
+      label: 'Dashboard',
+      permissionRule: AdminPermissions.dashboard,
+      path: '/admin',
+      icon: Icons.dashboard_outlined,
+      activePrefixes: ['/admin'],
+      exact: true,
+      feature: TenantFeature.analyticsDashboard,
+    ),
+    _AdminNavItem(
+      label: 'HOA Management',
+      permissionRule: AdminPermissions.hoaRead,
+      path: '/admin/hoas',
+      icon: Icons.domain_outlined,
+      activePrefixes: ['/admin/hoas'],
+    ),
+    _AdminNavItem(
+      label: 'Address Registry',
+      permissionRule: AdminPermissions.addressRead,
+      path: '/admin/addresses',
+      icon: Icons.location_on_outlined,
+      activePrefixes: ['/admin/addresses'],
+    ),
+    _AdminNavItem(
+      label: 'Activation Codes',
+      permissionRule: AdminPermissions.activationCodes,
+      path: '/admin/activation-codes',
+      icon: Icons.password_outlined,
+      activePrefixes: ['/admin/activation-codes'],
+    ),
+    _AdminNavItem(
+      label: 'Resident Verification',
+      permissionRule: AdminPermissions.verificationRead,
+      path: '/admin/resident-verification',
+      icon: Icons.verified_user_outlined,
+      activePrefixes: ['/admin/resident-verification'],
+    ),
+    _AdminNavItem(
+      label: 'Announcements',
+      permissionRule: AdminPermissions.announcementsRead,
+      path: '/admin/announcements',
+      icon: Icons.campaign_outlined,
+      activePrefixes: ['/admin/announcements'],
+    ),
+    _AdminNavItem(
+      label: 'Documents',
+      permissionRule: AdminPermissions.documentsRead,
+      path: '/admin/documents',
+      icon: Icons.description_outlined,
+      activePrefixes: ['/admin/documents'],
+    ),
+    _AdminNavItem(
+      label: 'Service Schedules',
+      permissionRule: AdminPermissions.schedulesRead,
+      path: '/admin/service-schedules',
+      icon: Icons.event_repeat_outlined,
+      activePrefixes: ['/admin/service-schedules'],
+    ),
+    _AdminNavItem(
+      label: 'Tickets',
+      permissionRule: AdminPermissions.ticketsRead,
+      path: '/admin/tickets',
+      icon: Icons.confirmation_number_outlined,
+      activePrefixes: ['/admin/tickets'],
+    ),
+    _AdminNavItem(
+      label: 'Users & Roles',
+      permissionRule: AdminPermissions.rolesManage,
+      path: '/admin/users',
+      icon: Icons.manage_accounts_outlined,
+      activePrefixes: ['/admin/users'],
+      feature: TenantFeature.roleManagement,
+    ),
+  ];
+
+
   static const _hoaItems = [
     _AdminNavItem(
       label: 'HOA Dashboard',
@@ -621,7 +698,11 @@ class _AdminSidebar extends ConsumerWidget {
     final access = ref.watch(adminAccessProvider);
     final visibleItems = access.maybeWhen(
       data: (value) {
-        final source = value.isHoaScopedOnly ? _hoaItems : _items;
+        final source = value.isHoaScopedOnly
+            ? _hoaItems
+            : value.isTenantScopedOnly
+                ? _tenantItems
+                : _items;
         return source.where((item) => item.canShow(value, ref)).toList();
       },
       orElse: () => [_items.first],

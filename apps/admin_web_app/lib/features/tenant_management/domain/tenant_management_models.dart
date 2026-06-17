@@ -11,6 +11,9 @@ class PlatformTenant {
     this.onboardingBlockedReason,
     this.onboardingLaunchReadyAt,
     this.onboardingLaunchedAt,
+    this.betaStatus,
+    this.hoaDataStatus,
+    this.readyForHoaOnboarding = false,
     this.subscriptionStatus,
     this.subscriptionPlanName,
     this.subscriptionBillingMode,
@@ -34,6 +37,9 @@ class PlatformTenant {
   final String? onboardingBlockedReason;
   final DateTime? onboardingLaunchReadyAt;
   final DateTime? onboardingLaunchedAt;
+  final String? betaStatus;
+  final String? hoaDataStatus;
+  final bool readyForHoaOnboarding;
   final String? subscriptionStatus;
   final String? subscriptionPlanName;
   final String? subscriptionBillingMode;
@@ -46,6 +52,8 @@ class PlatformTenant {
   final int? includedResidentCount;
 
   String get onboardingStatusLabel => _titleCase((onboardingStatus ?? 'not_started').replaceAll('_', ' '));
+  String get betaStatusLabel => _titleCase((betaStatus ?? 'not_started').replaceAll('_', ' '));
+  String get hoaDataStatusLabel => _titleCase((hoaDataStatus ?? 'not_requested').replaceAll('_', ' '));
   String get subscriptionStatusLabel => _titleCase((subscriptionStatus ?? 'not_assigned').replaceAll('_', ' '));
   bool get hasSubscription => subscriptionStatus != null && subscriptionStatus != 'cancelled';
   bool get hasTenantAdmin => tenantAdminCount > 0;
@@ -88,6 +96,9 @@ class PlatformTenant {
     String? onboardingBlockedReason,
     DateTime? onboardingLaunchReadyAt,
     DateTime? onboardingLaunchedAt,
+    String? betaStatus,
+    String? hoaDataStatus,
+    bool? readyForHoaOnboarding,
     String? subscriptionStatus,
     String? subscriptionPlanName,
     String? subscriptionBillingMode,
@@ -111,6 +122,9 @@ class PlatformTenant {
       onboardingBlockedReason: onboardingBlockedReason ?? this.onboardingBlockedReason,
       onboardingLaunchReadyAt: onboardingLaunchReadyAt ?? this.onboardingLaunchReadyAt,
       onboardingLaunchedAt: onboardingLaunchedAt ?? this.onboardingLaunchedAt,
+      betaStatus: betaStatus ?? this.betaStatus,
+      hoaDataStatus: hoaDataStatus ?? this.hoaDataStatus,
+      readyForHoaOnboarding: readyForHoaOnboarding ?? this.readyForHoaOnboarding,
       subscriptionStatus: subscriptionStatus ?? this.subscriptionStatus,
       subscriptionPlanName: subscriptionPlanName ?? this.subscriptionPlanName,
       subscriptionBillingMode:
@@ -476,6 +490,13 @@ class TenantOnboardingStatus {
     this.launchedAt,
     this.blockedReason,
     this.notes,
+    this.betaStatus = 'not_started',
+    this.betaContactName,
+    this.betaContactEmail,
+    this.betaTargetLaunchDate,
+    this.hoaDataStatus = 'not_requested',
+    this.knownIssues,
+    this.readyForHoaOnboarding = false,
     this.updatedBy,
   });
 
@@ -487,9 +508,18 @@ class TenantOnboardingStatus {
   final DateTime? launchedAt;
   final String? blockedReason;
   final String? notes;
+  final String betaStatus;
+  final String? betaContactName;
+  final String? betaContactEmail;
+  final DateTime? betaTargetLaunchDate;
+  final String hoaDataStatus;
+  final String? knownIssues;
+  final bool readyForHoaOnboarding;
   final String? updatedBy;
 
   String get statusLabel => _titleCase(status.replaceAll('_', ' '));
+  String get betaStatusLabel => _titleCase(betaStatus.replaceAll('_', ' '));
+  String get hoaDataStatusLabel => _titleCase(hoaDataStatus.replaceAll('_', ' '));
 }
 
 class OnboardingChecklistItem {

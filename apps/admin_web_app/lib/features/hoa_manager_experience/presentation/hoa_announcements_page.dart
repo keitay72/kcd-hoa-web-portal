@@ -35,7 +35,7 @@ class HoaAnnouncementsPage extends ConsumerWidget {
                     ),
                   ),
                   FilledButton.icon(
-                    onPressed: () => _openCreateDialog(context, ref),
+                    onPressed: () => _openCreateDialog(context, ref, hoaId),
                     icon: const Icon(Icons.campaign_outlined),
                     label: const Text('Create Announcement'),
                   ),
@@ -58,11 +58,14 @@ class HoaAnnouncementsPage extends ConsumerWidget {
     );
   }
 
-  Future<void> _openCreateDialog(BuildContext context, WidgetRef ref) async {
+  Future<void> _openCreateDialog(BuildContext context, WidgetRef ref, String hoaId) async {
     final result = await showDialog<Object?>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => const AnnouncementFormDialog(),
+      builder: (_) => AnnouncementFormDialog(
+        initialHoaId: hoaId,
+        lockHoaSelection: true,
+      ),
     );
 
     if (result != null) ref.invalidate(announcementListProvider);

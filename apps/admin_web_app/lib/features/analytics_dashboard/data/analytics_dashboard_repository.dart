@@ -206,9 +206,14 @@ class SupabaseAnalyticsDashboardRepository implements AnalyticsDashboardReposito
       final includedHoaCount = subscription?.includedHoaCount;
       final includedResidentCount = subscription?.includedResidentCount;
 
-      if (onboardingStatus == 'ready_to_launch' || hasLaunchReadyAt) readyToLaunch++;
-      if (onboardingStatus == 'launched' || hasLaunchedAt) launched++;
-      if (onboardingStatus == 'blocked') blocked++;
+      final isLaunched = onboardingStatus == 'launched' || hasLaunchedAt;
+      final isReadyToLaunch = !isLaunched && (onboardingStatus == 'ready_to_launch' || hasLaunchReadyAt);
+      final isBlocked = onboardingStatus == 'blocked';
+
+      if (isLaunched) launched++;
+      else if (isReadyToLaunch) readyToLaunch++;
+
+      if (isBlocked) blocked++;
       if (subscription == null || subscription.status == 'cancelled') missingSubscription++;
       if ((billingContactCounts[tenantId] ?? 0) == 0) missingBillingContact++;
       if ((tenantAdminCounts[tenantId] ?? 0) == 0) missingTenantAdmin++;

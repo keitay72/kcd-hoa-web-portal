@@ -10,10 +10,14 @@ import 'announcement_providers.dart';
 class AnnouncementFormDialog extends ConsumerStatefulWidget {
   const AnnouncementFormDialog({
     this.initialValue,
+    this.initialHoaId,
+    this.lockHoaSelection = false,
     super.key,
   });
 
   final Announcement? initialValue;
+  final String? initialHoaId;
+  final bool lockHoaSelection;
 
   @override
   ConsumerState<AnnouncementFormDialog> createState() => _AnnouncementFormDialogState();
@@ -36,7 +40,7 @@ class _AnnouncementFormDialogState extends ConsumerState<AnnouncementFormDialog>
     final initial = widget.initialValue;
     _titleController = TextEditingController(text: initial?.title ?? '');
     _bodyController = TextEditingController(text: initial?.body ?? '');
-    _hoaId = initial?.hoaId;
+    _hoaId = initial?.hoaId ?? widget.initialHoaId;
     _status = initial?.status ?? AnnouncementStatus.draft;
     _publishAt = initial?.publishAt.toLocal() ?? DateTime.now();
     _expireAt = initial?.expireAt?.toLocal();
@@ -69,6 +73,7 @@ class _AnnouncementFormDialogState extends ConsumerState<AnnouncementFormDialog>
                   data: (items) => _HoaSelect(
                     hoas: items,
                     selectedHoaId: _hoaId,
+                    lockSelection: widget.lockHoaSelection,
                     onChanged: (value) => setState(() => _hoaId = value),
                   ),
                   loading: () => const LinearProgressIndicator(),
@@ -245,11 +250,13 @@ class _HoaSelect extends StatelessWidget {
     required this.hoas,
     required this.selectedHoaId,
     required this.onChanged,
+    this.lockSelection = false,
   });
 
   final List<HoaCommunity> hoas;
   final String? selectedHoaId;
   final ValueChanged<String?> onChanged;
+  final bool lockSelection;
 
   @override
   Widget build(BuildContext context) {
@@ -271,7 +278,7 @@ class _HoaSelect extends StatelessWidget {
             ),
           )
           .toList(),
-      onChanged: onChanged,
+      onChanged: lockSelection ? null : onChanged,
       validator: (value) => value == null ? 'Choose an HOA' : null,
     );
   }

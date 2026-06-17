@@ -2,8 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/rbac/rbac_providers.dart';
 import '../domain/analytics_dashboard.dart';
 import 'analytics_dashboard_providers.dart';
+
+int _tenantVisibleAttentionCount(TenantLaunchReadinessMetrics metrics) {
+  final visibleCount = metrics.setupAttentionTotal - metrics.stripePending;
+  return visibleCount < 0 ? 0 : visibleCount;
+}
 
 class AnalyticsDashboardPage extends ConsumerWidget {
   const AnalyticsDashboardPage({super.key});
@@ -11,9 +17,21 @@ class AnalyticsDashboardPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dashboard = ref.watch(analyticsDashboardProvider);
+    final access = ref.watch(adminAccessProvider);
 
-    return dashboard.when(
-      data: (snapshot) => _AnalyticsDashboardContent(snapshot: snapshot),
+    return access.when(
+      data: (resolvedAccess) {
+        final isTenantScoped =
+            resolvedAccess.hasTenantRoleAssignment && !resolvedAccess.hasGlobalRoleAssignment;
+        return dashboard.when(
+          data: (snapshot) => _AnalyticsDashboardContent(
+            snapshot: snapshot,
+            isTenantScoped: isTenantScoped,
+          ),
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, _) => _DashboardError(error: error),
+        );
+      },
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) => _DashboardError(error: error),
     );
@@ -21,9 +39,13 @@ class AnalyticsDashboardPage extends ConsumerWidget {
 }
 
 class _AnalyticsDashboardContent extends ConsumerWidget {
-  const _AnalyticsDashboardContent({required this.snapshot});
+  const _AnalyticsDashboardContent({
+    required this.snapshot,
+    required this.isTenantScoped,
+  });
 
   final AnalyticsDashboardSnapshot snapshot;
+  final bool isTenantScoped;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -39,11 +61,16 @@ class _AnalyticsDashboardContent extends ConsumerWidget {
           return ListView(
             padding: EdgeInsets.all(pagePadding),
             children: [
-              _DashboardHeader(loadedAt: snapshot.loadedAt),
+              _DashboardHeader(
+                loadedAt: snapshot.loadedAt,
+                isTenantScoped: isTenantScoped,
+              ),
               const SizedBox(height: 20),
               _SectionHeader(
-                title: 'Platform Metrics',
-                subtitle: 'Current HOA platform health at a glance.',
+                title: isTenantScoped ? 'Tenant Metrics' : 'Platform Metrics',
+                subtitle: isTenantScoped
+                    ? 'Current HOA operations health for your organization.'
+                    : 'Current HOA platform health at a glance.',
               ),
               const SizedBox(height: 12),
               _MetricGrid(
@@ -93,15 +120,21 @@ class _AnalyticsDashboardContent extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 28),
-              _SectionHeader(
-                title: 'Tenant Launch Readiness',
-                subtitle: 'Subscription, billing, staffing, and onboarding blockers across SaaS tenants.',
-              ),
-              const SizedBox(height: 12),
-              _TenantLaunchReadinessPanel(
-                metrics: snapshot.launchReadinessMetrics,
-              ),
-              const SizedBox(height: 28),
+              if (!isTenantScoped ||
+                  _tenantVisibleAttentionCount(snapshot.launchReadinessMetrics) > 0) ...[
+                _SectionHeader(
+                  title: isTenantScoped ? 'Launch Readiness' : 'Tenant Launch Readiness',
+                  subtitle: isTenantScoped
+                      ? 'Subscription, billing, staffing, and onboarding status for your tenant.'
+                      : 'Subscription, billing, staffing, and onboarding blockers across SaaS tenants.',
+                ),
+                const SizedBox(height: 12),
+                _TenantLaunchReadinessPanel(
+                  metrics: snapshot.launchReadinessMetrics,
+                  isTenantScoped: isTenantScoped,
+                ),
+                const SizedBox(height: 28),
+              ],
               LayoutBuilder(
                 builder: (context, constraints) {
                   final isWide = constraints.maxWidth >= 1080;
@@ -135,7 +168,9 @@ class _AnalyticsDashboardContent extends ConsumerWidget {
               const SizedBox(height: 28),
               _SectionHeader(
                 title: 'Recent Activity',
-                subtitle: 'Latest operational events from the live Supabase data set.',
+                subtitle: isTenantScoped
+                    ? 'Latest operational events from your tenant data set.'
+                    : 'Latest operational events from the live Supabase data set.',
               ),
               const SizedBox(height: 12),
               _RecentActivityGrid(snapshot: snapshot),
@@ -148,9 +183,13 @@ class _AnalyticsDashboardContent extends ConsumerWidget {
 }
 
 class _DashboardHeader extends StatelessWidget {
-  const _DashboardHeader({required this.loadedAt});
+  const _DashboardHeader({
+    required this.loadedAt,
+    required this.isTenantScoped,
+  });
 
   final DateTime loadedAt;
+  final bool isTenantScoped;
 
   @override
   Widget build(BuildContext context) {
@@ -163,10 +202,15 @@ class _DashboardHeader extends StatelessWidget {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Analytics & Operations Dashboard', style: Theme.of(context).textTheme.headlineMedium),
+            Text(
+              isTenantScoped ? 'Tenant Operations Dashboard' : 'Analytics & Operations Dashboard',
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
             const SizedBox(height: 6),
             Text(
-              'Platform, ticket, staffing, and activity metrics across tenant HOA operations.',
+              isTenantScoped
+                  ? 'HOA, ticket, staffing, and activity metrics for your organization.'
+                  : 'Platform, ticket, staffing, and activity metrics across tenant HOA operations.',
               style: Theme.of(context).textTheme.bodyLarge,
             ),
           ],
@@ -289,9 +333,13 @@ class _MetricCard extends StatelessWidget {
 
 
 class _TenantLaunchReadinessPanel extends StatelessWidget {
-  const _TenantLaunchReadinessPanel({required this.metrics});
+  const _TenantLaunchReadinessPanel({
+    required this.metrics,
+    required this.isTenantScoped,
+  });
 
   final TenantLaunchReadinessMetrics metrics;
+  final bool isTenantScoped;
 
   @override
   Widget build(BuildContext context) {
@@ -322,12 +370,13 @@ class _TenantLaunchReadinessPanel extends StatelessWidget {
         icon: Icons.domain_disabled_outlined,
         color: Colors.blueGrey,
       ),
-      _ReadinessCounterData(
-        label: 'Stripe Pending',
-        value: metrics.stripePending,
-        icon: Icons.sync_problem_outlined,
-        color: Colors.purple,
-      ),
+      if (!isTenantScoped)
+        _ReadinessCounterData(
+          label: 'Stripe Pending',
+          value: metrics.stripePending,
+          icon: Icons.sync_problem_outlined,
+          color: Colors.purple,
+        ),
       _ReadinessCounterData(
         label: 'Over Included Limits',
         value: metrics.overIncludedLimits,
@@ -342,101 +391,144 @@ class _TenantLaunchReadinessPanel extends StatelessWidget {
       ),
     ];
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: () => context.go('/admin/tenants'),
-      child: Card(
-        margin: EdgeInsets.zero,
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Wrap(
-                spacing: 16,
-                runSpacing: 12,
-                alignment: WrapAlignment.spaceBetween,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CircleAvatar(
-                        backgroundColor: Colors.green.withOpacity(0.12),
-                        foregroundColor: Colors.green.shade700,
-                        child: const Icon(Icons.rocket_launch_outlined),
-                      ),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '$progressPercent% launch ready',
-                            style: theme.textTheme.titleLarge,
-                          ),
-                          Text(
-                            '${metrics.readyToLaunch} ready, ${metrics.launched} launched, ${metrics.totalTenants} total tenants',
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  Chip(
-                    avatar: Icon(
-                      metrics.setupAttentionTotal == 0
-                          ? Icons.check_circle_outline
-                          : Icons.warning_amber_outlined,
-                      size: 18,
-                    ),
-                    label: Text(
-                      metrics.setupAttentionTotal == 0
-                          ? 'No launch blockers'
-                          : '${metrics.setupAttentionTotal} setup item(s) need attention',
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(999),
-                child: LinearProgressIndicator(
-                  value: metrics.launchProgress,
-                  minHeight: 10,
-                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                ),
-              ),
-              const SizedBox(height: 18),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final width = constraints.maxWidth;
-                  final columns = width >= 1100
-                      ? 4
-                      : width >= 760
-                          ? 3
-                          : width >= 520
-                              ? 2
-                              : 1;
-                  final itemWidth = (width - ((columns - 1) * 10)) / columns;
+    final tenantVisibleAttentionCount = isTenantScoped
+        ? _tenantVisibleAttentionCount(metrics)
+        : metrics.setupAttentionTotal;
+    final readinessLabel = isTenantScoped
+        ? _tenantReadinessLabel(metrics)
+        : '$progressPercent% launch ready';
+    final readinessSubtitle = isTenantScoped
+        ? _tenantReadinessSubtitle(metrics, tenantVisibleAttentionCount)
+        : '${metrics.readyToLaunch} ready, ${metrics.launched} launched, ${metrics.totalTenants} total tenants';
 
-                  return Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: blockers
-                        .map(
-                          (item) => SizedBox(
-                            width: itemWidth,
-                            child: _ReadinessCounter(data: item),
-                          ),
-                        )
-                        .toList(),
-                  );
-                },
+    final card = Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: 16,
+              runSpacing: 12,
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: Colors.green.withOpacity(0.12),
+                      foregroundColor: Colors.green.shade700,
+                      child: const Icon(Icons.rocket_launch_outlined),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          readinessLabel,
+                          style: theme.textTheme.titleLarge,
+                        ),
+                        Text(readinessSubtitle),
+                      ],
+                    ),
+                  ],
+                ),
+                Chip(
+                  avatar: Icon(
+                    tenantVisibleAttentionCount == 0
+                        ? Icons.check_circle_outline
+                        : Icons.warning_amber_outlined,
+                    size: 18,
+                  ),
+                  label: Text(
+                    tenantVisibleAttentionCount == 0
+                        ? 'No launch blockers'
+                        : '$tenantVisibleAttentionCount setup item(s) need attention',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: metrics.launchProgress,
+                minHeight: 10,
+                backgroundColor: theme.colorScheme.surfaceContainerHighest,
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 18),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth;
+                final columns = width >= 1100
+                    ? 4
+                    : width >= 760
+                        ? 3
+                        : width >= 520
+                            ? 2
+                            : 1;
+                final itemWidth = (width - ((columns - 1) * 10)) / columns;
+
+                return Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: blockers
+                      .map(
+                        (item) => SizedBox(
+                          width: itemWidth,
+                          child: _ReadinessCounter(data: item),
+                        ),
+                      )
+                      .toList(),
+                );
+              },
+            ),
+          ],
         ),
       ),
     );
+
+    if (isTenantScoped) {
+      return card;
+    }
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () => context.go('/admin/tenants'),
+      child: card,
+    );
+  }
+
+  String _tenantReadinessLabel(TenantLaunchReadinessMetrics metrics) {
+    if (metrics.launched > 0) return 'Launched';
+    if (metrics.readyToLaunch > 0) return 'Ready to launch';
+    if (metrics.blocked > 0) return 'Launch blocked';
+    return 'Setup in progress';
+  }
+
+  String _tenantReadinessSubtitle(
+    TenantLaunchReadinessMetrics metrics,
+    int attentionCount,
+  ) {
+    if (metrics.totalTenants == 0) {
+      return 'No tenant record is available for this account.';
+    }
+    if (attentionCount == 0) {
+      return metrics.launched > 0
+          ? 'No visible operational blockers for this tenant.'
+          : 'No readiness blockers detected for this tenant.';
+    }
+    if (attentionCount == 1) {
+      return metrics.launched > 0
+          ? '1 operational item needs attention.'
+          : '1 setup item needs attention before launch.';
+    }
+    return metrics.launched > 0
+        ? '$attentionCount operational items need attention.'
+        : '$attentionCount setup items need attention before launch.';
   }
 }
 
