@@ -76,7 +76,17 @@ class _ResidentTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (residents.isEmpty) return const Center(child: Text('No residents found.'));
+    if (residents.isEmpty) {
+      return const Card(
+        margin: EdgeInsets.zero,
+        child: Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text('No residents matched this HOA search.'),
+          ),
+        ),
+      );
+    }
 
     return Card(
       margin: EdgeInsets.zero,
@@ -88,7 +98,7 @@ class _ResidentTable extends StatelessWidget {
           return ListTile(
             leading: const Icon(Icons.person_outline),
             title: Text(resident.displayName),
-            subtitle: Text('${resident.email} - ${resident.addressLabel}'),
+            subtitle: Text('${resident.email} • ${resident.addressLabel}'),
             trailing: Wrap(
               spacing: 8,
               crossAxisAlignment: WrapCrossAlignment.center,

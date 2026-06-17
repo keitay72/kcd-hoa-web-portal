@@ -46,15 +46,15 @@ class _TicketListPageState extends ConsumerState<TicketListPage> {
     final csrEntitlement = ref.watch(adminFeatureEntitlementProvider(TenantFeature.advancedTicketManagement));
     final dispatchEntitlement = ref.watch(adminFeatureEntitlementProvider(TenantFeature.dispatchDashboard));
 
-    final canManageTickets = access.maybeWhen(
-      data: (value) => value.can('tickets.update'),
+    final canReadTickets = access.maybeWhen(
+      data: (value) => value.can('tickets.read'),
       orElse: () => false,
     );
-    final canOpenCsrDashboard = canManageTickets && csrEntitlement.maybeWhen(
+    final canOpenCsrDashboard = canReadTickets && csrEntitlement.maybeWhen(
       data: (result) => result.isEnabled,
       orElse: () => false,
     );
-    final canOpenDispatchDashboard = canManageTickets && dispatchEntitlement.maybeWhen(
+    final canOpenDispatchDashboard = canReadTickets && dispatchEntitlement.maybeWhen(
       data: (result) => result.isEnabled,
       orElse: () => false,
     );

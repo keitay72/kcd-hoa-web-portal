@@ -11,11 +11,24 @@ import '../../documents_cms/presentation/upload_document_dialog.dart';
 import 'hoa_manager_providers.dart';
 import 'hoa_scope_header.dart';
 
-class HoaDocumentsPage extends ConsumerWidget {
+class HoaDocumentsPage extends ConsumerStatefulWidget {
   const HoaDocumentsPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HoaDocumentsPage> createState() => _HoaDocumentsPageState();
+}
+
+class _HoaDocumentsPageState extends ConsumerState<HoaDocumentsPage> {
+  final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final scope = ref.watch(activeHoaScopeProvider);
 
     return scope.when(
@@ -32,13 +45,15 @@ class HoaDocumentsPage extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  const Expanded(
-                    child: HoaScopeHeader(
-                      title: 'HOA Documents',
-                      subtitle: 'Manage documents visible to your HOA community.',
-                    ),
+                  const HoaScopeHeader(
+                    title: 'HOA Documents',
+                    subtitle: 'Manage documents visible to your HOA community.',
                   ),
                   FilledButton.icon(
                     onPressed: () => _openUploadDialog(context, ref, hoaId),
@@ -47,10 +62,20 @@ class HoaDocumentsPage extends ConsumerWidget {
                   ),
                 ],
               ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _searchController,
+                decoration: const InputDecoration(
+                  labelText: 'Search documents',
+                  prefixIcon: Icon(Icons.search),
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
               const SizedBox(height: 20),
               Expanded(
                 child: documents.when(
-                  data: (items) => _DocumentList(documents: items),
+                  data: (items) => _DocumentList(documents: _filter(items)),
                   loading: () => const Center(child: CircularProgressIndicator()),
                   error: (error, _) => Center(child: Text('Unable to load documents: $error')),
                 ),
@@ -62,6 +87,16 @@ class HoaDocumentsPage extends ConsumerWidget {
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) => Center(child: Text('Unable to load HOA scope: $error')),
     );
+  }
+
+  List<HoaDocument> _filter(List<HoaDocument> items) {
+    final search = _searchController.text.trim().toLowerCase();
+    if (search.isEmpty) return items;
+    return items.where((document) {
+      return document.title.toLowerCase().contains(search) ||
+          document.category.toLowerCase().contains(search) ||
+          document.visibilityLabel.toLowerCase().contains(search);
+    }).toList();
   }
 
   Future<void> _openUploadDialog(BuildContext context, WidgetRef ref, String hoaId) async {
@@ -85,7 +120,17 @@ class _DocumentList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (documents.isEmpty) return const Center(child: Text('No active documents found.'));
+    if (documents.isEmpty) {
+      return const Card(
+        margin: EdgeInsets.zero,
+        child: Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text('No active documents matched this HOA search.'),
+          ),
+        ),
+      );
+    }
 
     return Card(
       margin: EdgeInsets.zero,
@@ -97,7 +142,7 @@ class _DocumentList extends ConsumerWidget {
           return ListTile(
             leading: const Icon(Icons.description_outlined),
             title: Text(document.title),
-            subtitle: Text('${document.category} - ${document.visibilityLabel} - ${document.fileSizeLabel}'),
+            subtitle: Text('${document.category} • ${document.visibilityLabel} • ${document.fileSizeLabel}'),
             trailing: Wrap(
               spacing: 8,
               children: [

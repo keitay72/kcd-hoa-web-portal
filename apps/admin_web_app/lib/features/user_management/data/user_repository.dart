@@ -7,6 +7,7 @@ import 'admin_user_dto.dart';
 
 abstract interface class UserRepository {
   Future<List<AdminUser>> list({String? search, String? status});
+  Future<List<AdminUser>> listByHoa(String hoaId);
   Future<AdminUser> getById(String id);
   Future<void> invite(InviteAdminUserInput input);
   Future<void> resendInvite(InviteLifecycleActionInput input);
@@ -101,6 +102,55 @@ class SupabaseUserRepository implements UserRepository {
         if (_matchesUserFilter(user, needle)) users.add(user);
       }
     }
+
+    return users;
+  }
+
+  @override
+  Future<List<AdminUser>> listByHoa(String hoaId) async {
+    final membershipRows = await _client
+        .from('user_hoa_memberships')
+        .select('user_id')
+        .eq('hoa_id', hoaId)
+        .eq('status', 'active')
+        .order('created_at', ascending: false);
+
+    final seenIds = <String>{};
+    final users = <AdminUser>[];
+
+    for (final row in membershipRows) {
+      final userId = row['user_id'] as String?;
+      if (userId == null || !seenIds.add(userId)) continue;
+      final profileRow = await _client
+          .from('profiles')
+          .select(_profileSelect)
+          .eq('id', userId)
+          .maybeSingle();
+      if (profileRow == null) continue;
+      final user = await _hydrate(AdminUserDto.fromJson(profileRow));
+      if (user.hoaRoles.any((role) => role.hoaId == hoaId && role.status == 'active')) {
+        users.add(user);
+      }
+    }
+
+    final inviteRows = await _client
+        .from('admin_user_invites')
+        .select(_inviteSelect)
+        .eq('hoa_id', hoaId)
+        .neq('status', 'accepted')
+        .order('invited_at', ascending: false);
+
+    for (final row in inviteRows) {
+      final invite = AdminUserInviteDto.fromJson(row).toDomain();
+      users.add(_inviteOnlyUser(invite));
+    }
+
+    users.sort((a, b) {
+      final aPending = a.isPendingInvite ? 0 : 1;
+      final bPending = b.isPendingInvite ? 0 : 1;
+      if (aPending != bPending) return aPending.compareTo(bPending);
+      return a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase());
+    });
 
     return users;
   }
@@ -396,7 +446,24 @@ class SupabaseUserRepository implements UserRepository {
   }
 
   Future<void> _syncInviteAcceptances() async {
-    await _client.rpc('sync_admin_invite_acceptances');
+    try {
+      await _client.rpc('sync_admin_invite_acceptances');
+    } on PostgrestException catch (error) {
+      final message = error.message.toLowerCase();
+      final isExpectedPermissionFailure = error.code == 'P0001' &&
+          (message.contains('only platform administrators may sync admin invite acceptances') ||
+              message.contains('only platform owners or platform admins may sync admin invite acceptances') ||
+              message.contains('only platform admins or tenant admins/managers may manage invitations for this tenant') ||
+              message.contains('do not have permission to manage invitations for this scope') ||
+              message.contains('only platform owners') ||
+              message.contains('permission denied'));
+
+      if (isExpectedPermissionFailure) {
+        return;
+      }
+
+      rethrow;
+    }
   }
 
   Future<AdminUser> _hydrate(AdminUserDto dto) async {

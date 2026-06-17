@@ -13,6 +13,7 @@ class InviteUserDialog extends ConsumerStatefulWidget {
     this.initialRoleCode,
     this.initialTenantId,
     this.initialHoaId,
+    this.allowedRoleCodes,
     this.lockScope = false,
     super.key,
   });
@@ -22,6 +23,7 @@ class InviteUserDialog extends ConsumerStatefulWidget {
   final String? initialRoleCode;
   final String? initialTenantId;
   final String? initialHoaId;
+  final Set<String>? allowedRoleCodes;
   final bool lockScope;
 
   @override
@@ -49,6 +51,10 @@ class _InviteUserDialogState extends ConsumerState<InviteUserDialog> {
     _roleCode = widget.initialRoleCode;
     _tenantId = widget.initialTenantId;
     _hoaId = widget.initialHoaId;
+    final allowedRoleCodes = widget.allowedRoleCodes;
+    if (allowedRoleCodes != null && allowedRoleCodes.length == 1) {
+      _roleCode = allowedRoleCodes.first;
+    }
     for (final controller in [
       _emailController,
       _firstNameController,
@@ -129,38 +135,55 @@ class _InviteUserDialogState extends ConsumerState<InviteUserDialog> {
                   validator: UserFormValidators.phone,
                 ),
                 const SizedBox(height: 16),
-                SegmentedButton<String>(
-                  segments: const [
-                    ButtonSegment(value: 'platform', label: Text('Tenant Staff')),
-                    ButtonSegment(value: 'hoa', label: Text('HOA User')),
-                  ],
-                  selected: {_category},
-                  onSelectionChanged: widget.lockScope
-                      ? null
-                      : (value) {
-                          setState(() {
-                            _category = value.first;
-                            _roleCode = null;
-                            _tenantId = null;
-                            _hoaId = null;
-                          });
-                          _refreshFormState();
-                        },
-                ),
-                const SizedBox(height: 16),
-                roles.when(
-                  data: (items) => _RoleSelect(
-                    roles: _category == 'platform'
-                        ? items.where((role) => role.isTenantRole).toList()
-                        : items.where((role) => role.isHoaRole).toList(),
-                    value: _roleCode,
-                    onChanged: widget.lockScope
-                        ? null
-                        : (value) {
-                            setState(() => _roleCode = value);
-                            _refreshFormState();
-                          },
+                if (!widget.lockScope) ...[
+                  SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(value: 'platform', label: Text('Tenant Staff')),
+                      ButtonSegment(value: 'hoa', label: Text('HOA User')),
+                    ],
+                    selected: {_category},
+                    onSelectionChanged: (value) {
+                      setState(() {
+                        _category = value.first;
+                        _roleCode = null;
+                        _tenantId = null;
+                        _hoaId = null;
+                      });
+                      _refreshFormState();
+                    },
                   ),
+                  const SizedBox(height: 16),
+                ],
+                roles.when(
+                  data: (items) {
+                    final availableRoles = (_category == 'platform'
+                            ? items.where((role) => role.isTenantRole)
+                            : items.where((role) => role.isHoaRole))
+                        .where((role) => widget.allowedRoleCodes == null || widget.allowedRoleCodes!.contains(role.code))
+                        .toList();
+
+                    if (_roleCode != null &&
+                        availableRoles.every((role) => role.code != _roleCode)) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (!mounted) return;
+                        setState(() => _roleCode = availableRoles.length == 1 ? availableRoles.first.code : null);
+                        _refreshFormState();
+                      });
+                    }
+
+                    if (availableRoles.length == 1) {
+                      return _LockedRoleField(role: availableRoles.first);
+                    }
+
+                    return _RoleSelect(
+                      roles: availableRoles,
+                      value: _roleCode,
+                      onChanged: (value) {
+                        setState(() => _roleCode = value);
+                        _refreshFormState();
+                      },
+                    );
+                  },
                   loading: () => const LinearProgressIndicator(),
                   error: (error, _) => Text('Unable to load roles: $error'),
                 ),
@@ -180,17 +203,15 @@ class _InviteUserDialogState extends ConsumerState<InviteUserDialog> {
                     loading: () => const LinearProgressIndicator(),
                     error: (error, _) => Text('Unable to load tenants: $error'),
                   )
-                else
+                else if (!widget.lockScope)
                   hoas.when(
                     data: (items) => _HoaSelect(
                       hoas: items,
                       value: _hoaId,
-                      onChanged: widget.lockScope
-                          ? null
-                          : (value) {
-                              setState(() => _hoaId = value);
-                              _refreshFormState();
-                            },
+                      onChanged: (value) {
+                        setState(() => _hoaId = value);
+                        _refreshFormState();
+                      },
                     ),
                     loading: () => const LinearProgressIndicator(),
                     error: (error, _) => Text('Unable to load HOAs: $error'),
@@ -333,6 +354,24 @@ class _RoleSelect extends StatelessWidget {
       items: roles.map((role) => DropdownMenuItem(value: role.code, child: Text(role.name))).toList(),
       onChanged: onChanged,
       validator: (value) => value == null ? 'Select a role.' : null,
+    );
+  }
+}
+
+class _LockedRoleField extends StatelessWidget {
+  const _LockedRoleField({required this.role});
+
+  final RoleCatalogEntry role;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextFormField(
+      initialValue: role.name,
+      readOnly: true,
+      decoration: const InputDecoration(
+        labelText: 'Role',
+        border: OutlineInputBorder(),
+      ),
     );
   }
 }

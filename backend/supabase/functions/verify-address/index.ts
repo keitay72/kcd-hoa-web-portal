@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 
 type VerifyAddressRequest = {
+  tenantCode?: string;
   line1?: string;
   line2?: string;
   city?: string;
@@ -15,6 +16,7 @@ function jsonResponse(body: unknown, status = 200) {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
     },
   });
 }
@@ -57,7 +59,12 @@ Deno.serve(async (request) => {
   }
 
   const payload = (await request.json()) as VerifyAddressRequest;
+  const tenantCode = payload.tenantCode?.trim().toUpperCase();
   const normalizedKey = normalizeAddress(payload);
+
+  if (!tenantCode) {
+    return jsonResponse({ error: 'Tenant code is required' }, 400);
+  }
 
   if (!normalizedKey) {
     return jsonResponse({ error: 'Address is required' }, 400);
@@ -67,11 +74,26 @@ Deno.serve(async (request) => {
     auth: { persistSession: false },
   });
 
+  const { data: tenant, error: tenantError } = await supabase
+    .from('platform_tenants')
+    .select('id, code, name')
+    .eq('code', tenantCode)
+    .maybeSingle();
+
+  if (tenantError) {
+    return jsonResponse({ error: tenantError.message }, 500);
+  }
+
+  if (!tenant) {
+    return jsonResponse({ verified: false }, 200);
+  }
+
   const { data, error } = await supabase
     .from('hoa_addresses')
-    .select('id, hoa_id, line1, line2, city, state, postal_code, is_active, hoa_communities(name, code)')
+    .select('id, hoa_id, line1, line2, city, state, postal_code, is_active, hoa_communities!inner(name, code, tenant_id)')
     .eq('normalized_key', normalizedKey)
     .eq('is_active', true)
+    .eq('hoa_communities.tenant_id', tenant.id)
     .limit(1)
     .maybeSingle();
 
@@ -95,6 +117,8 @@ Deno.serve(async (request) => {
       postalCode: data.postal_code,
       hoaName: data.hoa_communities?.name ?? null,
       hoaCode: data.hoa_communities?.code ?? null,
+      tenantName: tenant.name,
+      tenantCode: tenant.code,
     },
   });
 });

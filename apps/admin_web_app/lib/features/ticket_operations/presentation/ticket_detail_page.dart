@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/rbac/rbac_providers.dart';
 import '../domain/ticket.dart';
 import 'ticket_assignment_dialog.dart';
 import 'ticket_internal_note_dialog.dart';
@@ -112,6 +113,11 @@ class _TicketHeader extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final canManageTicket = ref.watch(adminAccessProvider).maybeWhen(
+          data: (value) => value.can('tickets.update'),
+          orElse: () => false,
+        );
+
     return Wrap(
       spacing: 12,
       runSpacing: 12,
@@ -143,37 +149,38 @@ class _TicketHeader extends ConsumerWidget {
             ],
           ),
         ),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            OutlinedButton.icon(
-              onPressed: () => _openAssignDialog(context, ticket),
-              icon: const Icon(Icons.assignment_ind_outlined),
-              label: const Text('Assign'),
-            ),
-            OutlinedButton.icon(
-              onPressed: () => _openPriorityDialog(context, ticket),
-              icon: const Icon(Icons.priority_high),
-              label: const Text('Priority'),
-            ),
-            OutlinedButton.icon(
-              onPressed: () => _openInternalNoteDialog(context, ticket),
-              icon: const Icon(Icons.sticky_note_2_outlined),
-              label: const Text('Internal Note'),
-            ),
-            OutlinedButton.icon(
-              onPressed: () => _runAutomation(context, ref, ticket),
-              icon: const Icon(Icons.auto_fix_high),
-              label: const Text('Run Automation'),
-            ),
-            FilledButton.icon(
-              onPressed: () => _openStatusDialog(context, ticket),
-              icon: const Icon(Icons.rule_outlined),
-              label: const Text('Update Status'),
-            ),
-          ],
-        ),
+        if (canManageTicket)
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () => _openAssignDialog(context, ticket),
+                icon: const Icon(Icons.assignment_ind_outlined),
+                label: const Text('Assign'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => _openPriorityDialog(context, ticket),
+                icon: const Icon(Icons.priority_high),
+                label: const Text('Priority'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => _openInternalNoteDialog(context, ticket),
+                icon: const Icon(Icons.sticky_note_2_outlined),
+                label: const Text('Internal Note'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => _runAutomation(context, ref, ticket),
+                icon: const Icon(Icons.auto_fix_high),
+                label: const Text('Run Automation'),
+              ),
+              FilledButton.icon(
+                onPressed: () => _openStatusDialog(context, ticket),
+                icon: const Icon(Icons.rule_outlined),
+                label: const Text('Update Status'),
+              ),
+            ],
+          ),
       ],
     );
   }

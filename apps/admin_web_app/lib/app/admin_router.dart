@@ -31,9 +31,15 @@ import '../features/hoa_manager_experience/presentation/hoa_documents_page.dart'
 import '../features/hoa_manager_experience/presentation/hoa_manager_dashboard_page.dart';
 import '../features/hoa_manager_experience/presentation/hoa_resident_list_page.dart';
 import '../features/hoa_manager_experience/presentation/hoa_service_schedules_page.dart';
+import '../features/hoa_manager_experience/presentation/hoa_staff_page.dart';
 import '../features/hoa_manager_experience/presentation/hoa_tickets_page.dart';
 import '../features/schedules_admin/presentation/service_schedule_detail_page.dart';
 import '../features/schedules_admin/presentation/service_schedule_list_page.dart';
+import '../features/resident_portal_auth/presentation/activation_code_verification_page.dart';
+import '../features/resident_portal_auth/presentation/email_verification_pending_page.dart';
+import '../features/resident_portal_auth/presentation/registration_success_page.dart';
+import '../features/resident_portal_auth/presentation/resident_registration_page.dart';
+import '../features/resident_portal_auth/presentation/resident_sign_in_page.dart';
 import '../features/ticket_operations/domain/ticket.dart';
 import '../features/ticket_operations/presentation/ticket_dashboard_page.dart';
 import '../features/ticket_operations/presentation/ticket_detail_page.dart';
@@ -49,6 +55,22 @@ final currentAdminRoleProvider = currentAdminRoleSummaryProvider;
 
 final adminRouterProvider = Provider<GoRouter>((ref) {
   ref.watch(authStateProvider);
+  ref.watch(adminAccessProvider);
+
+  String resolveHomeRoute() {
+    final accessState = ref.read(adminAccessProvider);
+    final access = accessState.asData?.value;
+
+    if (access == null) {
+      return '/admin';
+    }
+
+    if (access.isHoaScopedOnly) {
+      return '/admin/hoa';
+    }
+
+    return '/admin';
+  }
 
   return GoRouter(
     initialLocation: '/admin',
@@ -57,6 +79,7 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
       final path = state.uri.path;
       final isSignIn = path == '/sign-in';
       final isAcceptInvite = path == '/accept-invite' || path.startsWith('/accept-invite/');
+      final isResidentPortal = path == '/portal' || path.startsWith('/portal/');
 
       if (isAcceptInvite) {
         if (path != '/accept-invite') {
@@ -65,12 +88,42 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
         return null;
       }
 
+      if (isResidentPortal) {
+        final segments = state.uri.pathSegments;
+        if (segments.length == 2) {
+          final tenantCode = segments[1];
+          return '/portal/$tenantCode/register';
+        }
+
+        if (segments.length >= 3) {
+          final tenantCode = segments[1];
+          final leaf = segments[2];
+
+          if (user == null && leaf == 'activation-code') {
+            return '/portal/$tenantCode/sign-in';
+          }
+
+          if (user != null && leaf == 'sign-in') {
+            return '/portal/$tenantCode/activation-code';
+          }
+        }
+
+        return null;
+      }
+
       if (user == null) {
         return isSignIn ? null : '/sign-in';
       }
 
       if (isSignIn) {
-        return '/admin';
+        return resolveHomeRoute();
+      }
+
+      if (path == '/admin') {
+        final resolvedHome = resolveHomeRoute();
+        if (resolvedHome != '/admin') {
+          return resolvedHome;
+        }
       }
 
       return null;
@@ -85,6 +138,47 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
         path: '/accept-invite',
         name: 'acceptInvite',
         builder: (context, state) => const AcceptInvitePage(),
+      ),
+      GoRoute(
+        path: '/portal/:tenantCode',
+        name: 'residentPortalHome',
+        redirect: (context, state) =>
+            '/portal/${state.pathParameters['tenantCode']!}/register',
+      ),
+      GoRoute(
+        path: '/portal/:tenantCode/register',
+        name: 'residentPortalRegister',
+        builder: (context, state) => ResidentRegistrationPage(
+          tenantCode: state.pathParameters['tenantCode']!,
+        ),
+      ),
+      GoRoute(
+        path: '/portal/:tenantCode/sign-in',
+        name: 'residentPortalSignIn',
+        builder: (context, state) => ResidentSignInPage(
+          tenantCode: state.pathParameters['tenantCode']!,
+        ),
+      ),
+      GoRoute(
+        path: '/portal/:tenantCode/email-verification-pending',
+        name: 'residentPortalEmailVerificationPending',
+        builder: (context, state) => EmailVerificationPendingPage(
+          tenantCode: state.pathParameters['tenantCode']!,
+        ),
+      ),
+      GoRoute(
+        path: '/portal/:tenantCode/activation-code',
+        name: 'residentPortalActivationCode',
+        builder: (context, state) => ActivationCodeVerificationPage(
+          tenantCode: state.pathParameters['tenantCode']!,
+        ),
+      ),
+      GoRoute(
+        path: '/portal/:tenantCode/success',
+        name: 'residentPortalSuccess',
+        builder: (context, state) => RegistrationSuccessPage(
+          tenantCode: state.pathParameters['tenantCode']!,
+        ),
       ),
       ShellRoute(
         builder: (context, state, child) {
@@ -110,6 +204,11 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
             path: '/admin/hoa/residents',
             name: 'hoaResidentList',
             builder: (context, state) => const HoaResidentListPage().protectedBy(AdminPermissions.hoaScoped),
+          ),
+          GoRoute(
+            path: '/admin/hoa/staff',
+            name: 'hoaStaff',
+            builder: (context, state) => const HoaStaffPage().protectedBy(AdminPermissions.hoaScoped),
           ),
           GoRoute(
             path: '/admin/hoa/documents',
@@ -244,7 +343,7 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
               queue: TicketQueue.csr,
             )
                 .protectedByFeature(TenantFeature.advancedTicketManagement)
-                .protectedBy(AdminPermissions.ticketsUpdate),
+                .protectedBy(AdminPermissions.ticketsRead),
           ),
           GoRoute(
             path: '/admin/tickets/dispatch',
@@ -253,7 +352,7 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
               queue: TicketQueue.dispatch,
             )
                 .protectedByFeature(TenantFeature.dispatchDashboard)
-                .protectedBy(AdminPermissions.ticketsUpdate),
+                .protectedBy(AdminPermissions.ticketsRead),
           ),
           GoRoute(
             path: '/admin/tickets/urgent',
@@ -262,7 +361,7 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
               queue: TicketQueue.urgent,
             )
                 .protectedByFeature(TenantFeature.advancedTicketManagement)
-                .protectedBy(AdminPermissions.ticketsUpdate),
+                .protectedBy(AdminPermissions.ticketsRead),
           ),
           GoRoute(
             path: '/admin/tickets/aging',
@@ -271,7 +370,7 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
               queue: TicketQueue.aging,
             )
                 .protectedByFeature(TenantFeature.advancedTicketManagement)
-                .protectedBy(AdminPermissions.ticketsUpdate),
+                .protectedBy(AdminPermissions.ticketsRead),
           ),
           GoRoute(
             path: '/admin/tickets/:ticketId',
@@ -659,6 +758,13 @@ class _AdminSidebar extends ConsumerWidget {
       path: '/admin/hoa/residents',
       icon: Icons.people_outline,
       activePrefixes: ['/admin/hoa/residents'],
+    ),
+    _AdminNavItem(
+      label: 'HOA Staff',
+      permissionRule: AdminPermissions.hoaScoped,
+      path: '/admin/hoa/staff',
+      icon: Icons.manage_accounts_outlined,
+      activePrefixes: ['/admin/hoa/staff'],
     ),
     _AdminNavItem(
       label: 'Documents',

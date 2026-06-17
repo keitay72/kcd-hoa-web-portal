@@ -91,7 +91,7 @@ function unauthorized(message = 'Unauthorized') {
   return jsonResponse({ success: false, message }, 401);
 }
 
-function forbidden(message = 'Only platform owners or platform admins may manage invitations') {
+function forbidden(message = 'You do not have permission to manage invitations for this scope') {
   return jsonResponse({ success: false, message }, 403);
 }
 
@@ -263,6 +263,147 @@ async function callerCanManageInvites(supabase: SupabaseClient, userId: string) 
   if (Array.isArray(globalRoles) && globalRoles.length > 0) return true;
 
   return false;
+}
+
+async function hoaTenantId(supabase: SupabaseClient, hoaId: string) {
+  const { data, error } = await supabase
+    .from('hoa_communities')
+    .select('tenant_id')
+    .eq('id', hoaId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data?.tenant_id as string | null;
+}
+
+async function callerCanManageTenantScopedInvites(
+  supabase: SupabaseClient,
+  userId: string,
+  tenantId: string,
+) {
+  if (await callerCanManageInvites(supabase, userId)) return true;
+
+  const { data, error } = await supabase
+    .from('user_tenant_roles')
+    .select('role_id, roles!inner(code)')
+    .eq('user_id', userId)
+    .eq('tenant_id', tenantId)
+    .in('roles.code', ['tenant_admin', 'tenant_manager', 'sys_admin', 'mgmt'])
+    .limit(1);
+
+  if (error) throw error;
+  return Array.isArray(data) && data.length > 0;
+}
+
+async function callerCanManageHoaScopedInvites(
+  supabase: SupabaseClient,
+  userId: string,
+  hoaId: string,
+  roleCode: string,
+) {
+  if (roleCode !== 'hoa_board') return false;
+
+  const { data, error } = await supabase
+    .from('user_hoa_memberships')
+    .select('role_id, roles!inner(code)')
+    .eq('user_id', userId)
+    .eq('hoa_id', hoaId)
+    .eq('status', 'active')
+    .in('roles.code', ['hoa_manager'])
+    .limit(1);
+
+  if (error) throw error;
+  return Array.isArray(data) && data.length > 0;
+}
+
+async function resolvedTenantScopeForInvite(
+  supabase: SupabaseClient,
+  input: ParsedInvite,
+  resolvedTenantId: string | null,
+) {
+  if (input.isGlobalPlatformRole) return null;
+  if (input.isTenantRole) return resolvedTenantId;
+  if (!input.hoaId) return null;
+  return await hoaTenantId(supabase, input.hoaId);
+}
+
+async function assertInvitePermissionForParsedInput(
+  supabase: SupabaseClient,
+  actorUserId: string,
+  input: ParsedInvite,
+  resolvedTenantId: string | null,
+) {
+  if (input.isGlobalPlatformRole) {
+    const canManageGlobal = await callerCanManageInvites(supabase, actorUserId);
+    if (!canManageGlobal) {
+      throw new Error('Only platform owners or platform admins may assign global platform roles');
+    }
+    return;
+  }
+
+  if (input.hoaId) {
+    const canManageHoaInvite = await callerCanManageHoaScopedInvites(
+      supabase,
+      actorUserId,
+      input.hoaId,
+      input.role,
+    );
+    if (canManageHoaInvite) return;
+  }
+
+  const tenantScopeId = await resolvedTenantScopeForInvite(supabase, input, resolvedTenantId);
+  if (!tenantScopeId) {
+    throw new Error('Unable to resolve tenant scope for this invitation');
+  }
+
+  const canManageScopedInvite = await callerCanManageTenantScopedInvites(
+    supabase,
+    actorUserId,
+    tenantScopeId,
+  );
+  if (!canManageScopedInvite) {
+    throw new Error('Only platform admins or tenant admins/managers may manage invitations for this tenant');
+  }
+}
+
+async function assertInvitePermissionForStoredInvite(
+  supabase: SupabaseClient,
+  actorUserId: string,
+  invite: InviteRow,
+) {
+  const roleCode = invite.role_code;
+
+  if (globalPlatformRoles.has(roleCode)) {
+    const canManageGlobal = await callerCanManageInvites(supabase, actorUserId);
+    if (!canManageGlobal) {
+      throw new Error('Only platform owners or platform admins may manage global platform invites');
+    }
+    return;
+  }
+
+  if (invite.hoa_id) {
+    const canManageHoaInvite = await callerCanManageHoaScopedInvites(
+      supabase,
+      actorUserId,
+      invite.hoa_id,
+      invite.role_code,
+    );
+    if (canManageHoaInvite) return;
+  }
+
+  const tenantScopeId = invite.tenant_id ?? (invite.hoa_id ? await hoaTenantId(supabase, invite.hoa_id) : null);
+  if (!tenantScopeId) {
+    throw new Error('Unable to resolve tenant scope for this invitation');
+  }
+
+  const canManageScopedInvite = await callerCanManageTenantScopedInvites(
+    supabase,
+    actorUserId,
+    tenantScopeId,
+  );
+  if (!canManageScopedInvite) {
+    throw new Error('Only platform admins or tenant admins/managers may manage invitations for this tenant');
+  }
 }
 
 async function primaryTenantId(supabase: SupabaseClient) {
@@ -552,6 +693,8 @@ async function handleInvite(
   if (resolvedTenantId && !(await ensureTenantExists(supabase, resolvedTenantId))) return badRequest('tenant_id does not exist');
   if (input.hoaId && !(await ensureHoaExists(supabase, input.hoaId))) return badRequest('hoa_id does not exist');
 
+  await assertInvitePermissionForParsedInput(supabase, actorUserId, input, resolvedTenantId);
+
   const pendingInvite = await pendingInviteByEmail(supabase, input.email);
   const existingUser = await findAuthUserByEmail(supabase, input.email);
   let authUser = existingUser;
@@ -658,6 +801,7 @@ async function handleResend(
   console.info('invite-admin-user resend requested', { inviteId });
   const invite = await inviteById(supabase, inviteId);
   if (!invite) return badRequest('Invite not found');
+  await assertInvitePermissionForStoredInvite(supabase, actorUserId, invite);
   if (invite.status !== 'pending' && invite.status !== 'expired' && invite.status !== 'failed') {
     return badRequest('Only pending, expired, or failed invites may be resent');
   }
@@ -742,6 +886,7 @@ async function handleCancel(
   console.info('invite-admin-user cancel requested', { inviteId });
   const invite = await inviteById(supabase, inviteId);
   if (!invite) return badRequest('Invite not found');
+  await assertInvitePermissionForStoredInvite(supabase, actorUserId, invite);
   if (invite.status !== 'pending' && invite.status !== 'expired' && invite.status !== 'failed') {
     return badRequest('Only pending, expired, or failed invites may be cancelled');
   }
@@ -809,9 +954,6 @@ Deno.serve(async (request) => {
   });
 
   try {
-    const canManageInvites = await callerCanManageInvites(supabase, caller.user.id);
-    if (!canManageInvites) return forbidden();
-
     const action = payload.action ?? 'invite';
     if (action === 'invite' || action === 'resend') {
       const redirectError = validateInviteRedirect(redirectTo);
@@ -834,6 +976,13 @@ Deno.serve(async (request) => {
     return badRequest('Unsupported invite action');
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unexpected invite failure';
+    if (
+      message.includes('Only platform owners or platform admins may assign global platform roles') ||
+      message.includes('Only platform owners or platform admins may manage global platform invites') ||
+      message.includes('Only platform admins or tenant admins/managers may manage invitations for this tenant')
+    ) {
+      return forbidden(message);
+    }
     console.error('invite-admin-user failed', { message });
     return serverError(message);
   }

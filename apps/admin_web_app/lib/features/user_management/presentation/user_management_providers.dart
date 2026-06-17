@@ -29,6 +29,10 @@ final userDetailProvider = FutureProvider.autoDispose.family<AdminUser, String>(
   return ref.watch(userRepositoryProvider).getById(id);
 });
 
+final hoaStaffProvider = FutureProvider.autoDispose.family<List<AdminUser>, String>((ref, hoaId) {
+  return ref.watch(userRepositoryProvider).listByHoa(hoaId);
+});
+
 final inviteMetricsProvider = FutureProvider.autoDispose<InviteMetrics>((ref) async {
   final users = await ref.watch(userRepositoryProvider).list();
   var pending = 0;

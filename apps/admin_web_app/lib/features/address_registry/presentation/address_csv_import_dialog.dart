@@ -3,6 +3,7 @@ import 'dart:html' as html;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 
 import '../domain/address_import_result.dart';
 
@@ -21,6 +22,13 @@ class AddressCsvImportDialog extends ConsumerStatefulWidget {
 
 class _AddressCsvImportDialogState
     extends ConsumerState<AddressCsvImportDialog> {
+  static const _sampleHeaderRow =
+      'hoa_code,line1,line2,city,state,postal_code,is_active';
+  static const _spreadsheetHeaderRow =
+      'hoa_code\tline1\tline2\tcity\tstate\tpostal_code\tis_active';
+  static const _sampleDataRow =
+      'HOA_LAKESIDE_ESTATES,101 Main St,,Kansas City,MO,64101,true';
+
   final _csvController = TextEditingController();
   String? _parseError;
 
@@ -82,8 +90,91 @@ class _AddressCsvImportDialogState
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Required headers: hoa_code or hoa_id, line1, city, state, postal_code. Optional: line2, is_active.',
+        Text(
+          'Upload a CSV of service addresses for one or more HOA communities.',
+          style: Theme.of(context).textTheme.bodyLarge,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Required columns: hoa_code or hoa_id, line1, city, state, postal_code',
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Optional columns: line2, is_active',
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Tip: using hoa_code is usually easier than hoa_id. Example: hoa_code,line1,city,state,postal_code',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: 12),
+        Card(
+          margin: EdgeInsets.zero,
+          color: Theme.of(context).colorScheme.surfaceContainerLowest,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Copy this header row into a blank spreadsheet:',
+                        style: Theme.of(context).textTheme.labelLarge,
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: () async {
+                        await Clipboard.setData(
+                          const ClipboardData(text: _spreadsheetHeaderRow),
+                        );
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Spreadsheet headers copied to clipboard.'),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.copy_outlined),
+                      label: const Text('Copy Headers'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                SelectableText(
+                  _sampleHeaderRow,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontFamily: 'monospace',
+                      ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'The button copies a spreadsheet-friendly version so each header pastes into its own column.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Example row:',
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+                const SizedBox(height: 8),
+                SelectableText(
+                  _sampleDataRow,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontFamily: 'monospace',
+                      ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Example meaning: this creates an active address at 101 Main St in Lakeside Estates.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
         ),
         const SizedBox(height: 12),
         Row(

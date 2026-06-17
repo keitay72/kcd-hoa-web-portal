@@ -6,11 +6,24 @@ import '../../schedules_admin/presentation/service_schedule_providers.dart';
 import 'hoa_manager_providers.dart';
 import 'hoa_scope_header.dart';
 
-class HoaServiceSchedulesPage extends ConsumerWidget {
+class HoaServiceSchedulesPage extends ConsumerStatefulWidget {
   const HoaServiceSchedulesPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HoaServiceSchedulesPage> createState() => _HoaServiceSchedulesPageState();
+}
+
+class _HoaServiceSchedulesPageState extends ConsumerState<HoaServiceSchedulesPage> {
+  final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final scope = ref.watch(activeHoaScopeProvider);
 
     return scope.when(
@@ -31,10 +44,20 @@ class HoaServiceSchedulesPage extends ConsumerWidget {
                 title: 'HOA Service Schedules',
                 subtitle: 'HOA-wide schedules and address overrides for your community.',
               ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _searchController,
+                decoration: const InputDecoration(
+                  labelText: 'Search schedules',
+                  prefixIcon: Icon(Icons.search),
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
               const SizedBox(height: 20),
               Expanded(
                 child: schedules.when(
-                  data: (items) => _ScheduleList(schedules: items),
+                  data: (items) => _ScheduleList(schedules: _filter(items)),
                   loading: () => const Center(child: CircularProgressIndicator()),
                   error: (error, _) => Center(child: Text('Unable to load schedules: $error')),
                 ),
@@ -47,6 +70,18 @@ class HoaServiceSchedulesPage extends ConsumerWidget {
       error: (error, _) => Center(child: Text('Unable to load HOA scope: $error')),
     );
   }
+
+  List<ServiceSchedule> _filter(List<ServiceSchedule> items) {
+    final search = _searchController.text.trim().toLowerCase();
+    if (search.isEmpty) return items;
+    return items.where((schedule) {
+      return schedule.serviceTypeLabel.toLowerCase().contains(search) ||
+          schedule.scheduleRule.toLowerCase().contains(search) ||
+          schedule.routeNameLabel.toLowerCase().contains(search) ||
+          schedule.addressLabel.toLowerCase().contains(search) ||
+          schedule.scheduleScopeLabel.toLowerCase().contains(search);
+    }).toList();
+  }
 }
 
 class _ScheduleList extends StatelessWidget {
@@ -56,7 +91,17 @@ class _ScheduleList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (schedules.isEmpty) return const Center(child: Text('No active schedules found.'));
+    if (schedules.isEmpty) {
+      return const Card(
+        margin: EdgeInsets.zero,
+        child: Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text('No active schedules matched this HOA search.'),
+          ),
+        ),
+      );
+    }
 
     return Card(
       margin: EdgeInsets.zero,
@@ -68,7 +113,7 @@ class _ScheduleList extends StatelessWidget {
           return ListTile(
             leading: const Icon(Icons.event_repeat_outlined),
             title: Text('${schedule.serviceTypeLabel}: ${schedule.scheduleRule}'),
-            subtitle: Text('${schedule.scheduleScopeLabel} - ${schedule.routeNameLabel} - ${schedule.addressLabel}'),
+            subtitle: Text('${schedule.scheduleScopeLabel} • ${schedule.routeNameLabel} • ${schedule.addressLabel}'),
             trailing: Chip(label: Text(schedule.statusLabel)),
           );
         },

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-class UnauthorizedPage extends StatelessWidget {
+import 'rbac_providers.dart';
+
+class UnauthorizedPage extends ConsumerWidget {
   const UnauthorizedPage({
     this.requiredPermissions = const {},
     this.message,
@@ -12,7 +15,12 @@ class UnauthorizedPage extends StatelessWidget {
   final String? message;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final homePath = ref.watch(adminAccessProvider).maybeWhen(
+          data: (access) => access.isHoaScopedOnly ? '/admin/hoa' : '/admin',
+          orElse: () => '/admin',
+        );
+
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Center(
@@ -58,7 +66,7 @@ class UnauthorizedPage extends StatelessWidget {
                   ],
                   const SizedBox(height: 24),
                   FilledButton.icon(
-                    onPressed: () => context.go('/admin'),
+                    onPressed: () => context.go(homePath),
                     icon: const Icon(Icons.dashboard_outlined),
                     label: const Text('Back to Dashboard'),
                   ),

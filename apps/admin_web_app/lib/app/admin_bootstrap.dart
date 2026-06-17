@@ -21,7 +21,7 @@ Future<void> bootstrapAdminApp() async {
     url: supabaseUrl,
     anonKey: supabaseAnonKey,
     authOptions: const FlutterAuthClientOptions(
-      authFlowType: AuthFlowType.pkce,
+      authFlowType: AuthFlowType.implicit,
     ),
   );
 
