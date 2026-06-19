@@ -1,12 +1,19 @@
+import 'dart:math';
+import 'dart:typed_data';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../address_registry/domain/hoa_address.dart';
+import '../../address_registry/data/hoa_address_dto.dart';
 import '../domain/ticket.dart';
 import '../domain/ticket_inputs.dart';
 import 'ticket_dtos.dart';
 
 abstract interface class TicketRepository {
+  Future<List<HoaAddress>> currentResidentAddresses();
   Future<List<ServiceTicket>> list(TicketListFilter filter);
   Future<ServiceTicket> getById(String id);
+  Future<ServiceTicket> createResidentTicket(ResidentTicketCreateInput input);
   Future<List<TicketEvent>> eventsForTicket(String ticketId);
   Future<List<TicketAttachment>> attachmentsForTicket(String ticketId);
   Future<List<TicketAssigneeOption>> assigneeOptions();
@@ -52,6 +59,21 @@ class SupabaseTicketRepository implements TicketRepository {
   final SupabaseClient _client;
 
   static const _bucket = 'ticket-attachments';
+  static const _addressSelect = '''
+    id,
+    hoa_id,
+    line1,
+    line2,
+    city,
+    state,
+    postal_code,
+    normalized_key,
+    is_active,
+    created_at,
+    updated_at,
+    hoa_communities(name, code),
+    activation_codes(id, status, expires_at, consumed_at, reset_count, created_at)
+  ''';
   static const _ticketSelect = '''
     id,
     hoa_id,
@@ -70,6 +92,25 @@ class SupabaseTicketRepository implements TicketRepository {
   ''';
 
   @override
+  Future<List<HoaAddress>> currentResidentAddresses() async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return const [];
+
+    final rows = await _client
+        .from('user_address_memberships')
+        .select('address:hoa_addresses($_addressSelect)')
+        .eq('user_id', userId)
+        .eq('is_current', true);
+
+    return rows
+        .map((row) => row['address'] as Map<String, dynamic>?)
+        .whereType<Map<String, dynamic>>()
+        .map((row) => HoaAddressDto.fromJson(row).toDomain())
+        .toList()
+      ..sort((a, b) => a.singleLine.compareTo(b.singleLine));
+  }
+
+  @override
   Future<List<ServiceTicket>> list(TicketListFilter filter) async {
     var query = _client.from('tickets').select(_ticketSelect);
 
@@ -84,7 +125,8 @@ class SupabaseTicketRepository implements TicketRepository {
     }
 
     final rows = await query.order('created_at', ascending: false);
-    final items = rows.map((row) => ServiceTicketDto.fromJson(row).toDomain()).toList();
+    final items =
+        rows.map((row) => ServiceTicketDto.fromJson(row).toDomain()).toList();
     return _applySearch(items, filter.search);
   }
 
@@ -100,10 +142,42 @@ class SupabaseTicketRepository implements TicketRepository {
   }
 
   @override
+  Future<ServiceTicket> createResidentTicket(
+    ResidentTicketCreateInput input,
+  ) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) {
+      throw StateError('Sign in before creating a service issue.');
+    }
+
+    final ticketId =
+        await _client.rpc<String>('submit_resident_service_issue', params: {
+      '_hoa_id': input.hoaId,
+      '_address_id': input.addressId,
+      '_type': input.type.databaseValue,
+      '_subject': input.subject.trim(),
+      '_description': input.description.trim(),
+    });
+
+    final attachment = input.attachment;
+    if (attachment != null) {
+      await _uploadAttachment(
+        ticketId: ticketId,
+        hoaId: input.hoaId,
+        uploadedBy: userId,
+        attachment: attachment,
+      );
+    }
+
+    return getById(ticketId);
+  }
+
+  @override
   Future<List<TicketEvent>> eventsForTicket(String ticketId) async {
     final rows = await _client
         .from('ticket_events')
-        .select('id, ticket_id, actor_user_id, old_status, new_status, note, created_at, profiles(full_name, email)')
+        .select(
+            'id, ticket_id, actor_user_id, old_status, new_status, note, created_at, profiles(full_name, email)')
         .eq('ticket_id', ticketId)
         .order('created_at', ascending: false);
 
@@ -114,18 +188,20 @@ class SupabaseTicketRepository implements TicketRepository {
   Future<List<TicketAttachment>> attachmentsForTicket(String ticketId) async {
     final rows = await _client
         .from('ticket_attachments')
-        .select('id, ticket_id, uploaded_by, storage_path, mime_type, file_size, scan_status, created_at, profiles(full_name, email)')
+        .select(
+            'id, ticket_id, uploaded_by, storage_path, mime_type, file_size, scan_status, created_at, profiles(full_name, email)')
         .eq('ticket_id', ticketId)
         .order('created_at', ascending: false);
 
-    return rows.map((row) => TicketAttachmentDto.fromJson(row).toDomain()).toList();
+    return rows
+        .map((row) => TicketAttachmentDto.fromJson(row).toDomain())
+        .toList();
   }
 
   @override
   Future<List<TicketAssigneeOption>> assigneeOptions() async {
-    final rows = await _client
-        .from('user_tenant_roles')
-        .select('user_id, role_id');
+    final rows =
+        await _client.from('user_tenant_roles').select('user_id, role_id');
 
     final roleCodes = await _roleCodesById(
       rows.map((row) => row['role_id'] as int),
@@ -135,7 +211,8 @@ class SupabaseTicketRepository implements TicketRepository {
 
     for (final row in rows) {
       final roleCode = roleCodes[row['role_id'] as int];
-      if (!{'tenant_csr', 'tenant_dispatch', 'tenant_admin', 'tenant_manager'}.contains(roleCode)) {
+      if (!{'tenant_csr', 'tenant_dispatch', 'tenant_admin', 'tenant_manager'}
+          .contains(roleCode)) {
         continue;
       }
 
@@ -171,7 +248,8 @@ class SupabaseTicketRepository implements TicketRepository {
     };
   }
 
-  Future<Map<String, String>> _profileLabelsById(Iterable<String> userIds) async {
+  Future<Map<String, String>> _profileLabelsById(
+      Iterable<String> userIds) async {
     final ids = userIds.toSet();
     if (ids.isEmpty) return const {};
 
@@ -237,7 +315,8 @@ class SupabaseTicketRepository implements TicketRepository {
       'actor_user_id': _client.auth.currentUser?.id,
       'old_status': oldStatus,
       'new_status': newStatus,
-      'note': _nullableText(input.note) ?? 'Status changed to ${input.status.label}',
+      'note': _nullableText(input.note) ??
+          'Status changed to ${input.status.label}',
     });
 
     return ServiceTicketDto.fromJson(row).toDomain();
@@ -259,7 +338,8 @@ class SupabaseTicketRepository implements TicketRepository {
       'actor_user_id': _client.auth.currentUser?.id,
       'old_status': oldStatus,
       'new_status': assignedStatus,
-      'note': '[ASSIGNMENT] ${_nullableText(input.note) ?? 'Assigned to ${input.assignee.label}'}',
+      'note':
+          '[ASSIGNMENT] ${_nullableText(input.note) ?? 'Assigned to ${input.assignee.label}'}',
     });
 
     return ServiceTicketDto.fromJson(row).toDomain();
@@ -348,13 +428,69 @@ class SupabaseTicketRepository implements TicketRepository {
           60 * 10,
         );
   }
+
+  Future<void> _uploadAttachment({
+    required String ticketId,
+    required String hoaId,
+    required String uploadedBy,
+    required TicketAttachmentUploadInput attachment,
+  }) async {
+    final attachmentId = _uuidV4();
+    final storagePath =
+        '$hoaId/$ticketId/${_safeFileName(attachment.fileName)}';
+
+    await _client.storage.from(_bucket).uploadBinary(
+          storagePath,
+          Uint8List.fromList(attachment.bytes),
+          fileOptions: FileOptions(
+            contentType: attachment.mimeType,
+            upsert: false,
+          ),
+        );
+
+    try {
+      await _client.from('ticket_attachments').insert({
+        'id': attachmentId,
+        'ticket_id': ticketId,
+        'uploaded_by': uploadedBy,
+        'storage_path': storagePath,
+        'mime_type': attachment.mimeType,
+        'file_size': attachment.fileSize,
+        'scan_status': 'pending',
+      });
+    } catch (_) {
+      await _client.storage.from(_bucket).remove([storagePath]);
+      rethrow;
+    }
+  }
+
+  String _safeFileName(String value) {
+    final sanitized = value
+        .trim()
+        .replaceAll(RegExp(r'[^A-Za-z0-9._-]+'), '_')
+        .replaceAll(RegExp(r'_+'), '_');
+    return sanitized.isEmpty ? 'ticket-photo' : sanitized;
+  }
+
+  String _uuidV4() {
+    final random = Random.secure();
+    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    final hex =
+        bytes.map((byte) => byte.toRadixString(16).padLeft(2, '0')).join();
+    return '${hex.substring(0, 8)}-'
+        '${hex.substring(8, 12)}-'
+        '${hex.substring(12, 16)}-'
+        '${hex.substring(16, 20)}-'
+        '${hex.substring(20)}';
+  }
 }
 
 String? _nullableText(String? value) {
   final trimmed = value?.trim();
   return trimmed == null || trimmed.isEmpty ? null : trimmed;
 }
-
 
 List<ServiceTicket> _applySearch(List<ServiceTicket> items, String? value) {
   final search = value?.trim().toLowerCase();

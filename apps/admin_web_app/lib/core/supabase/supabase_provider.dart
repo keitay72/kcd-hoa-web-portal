@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../dev/dev_security_bypass.dart';
+
 class CurrentAdminProfile {
   const CurrentAdminProfile({
     required this.id,
@@ -37,6 +39,15 @@ final currentUserProvider = Provider<User?>((ref) {
 
 final currentAdminProfileProvider =
     FutureProvider.autoDispose<CurrentAdminProfile?>((ref) async {
+  if (devSecurityBypassEnabled) {
+    return CurrentAdminProfile(
+      id: devUserId,
+      email: devUserEmail,
+      fullName: devUserName,
+      passwordSetAt: DateTime.utc(2026),
+    );
+  }
+
   final user = ref.watch(currentUserProvider);
   if (user == null) return null;
 

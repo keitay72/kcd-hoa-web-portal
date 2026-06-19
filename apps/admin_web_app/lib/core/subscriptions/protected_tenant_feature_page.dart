@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../dev/dev_security_bypass.dart';
 import '../rbac/unauthorized_page.dart';
 import 'subscription_providers.dart';
 import 'tenant_entitlements.dart';
@@ -17,12 +18,15 @@ class ProtectedTenantFeaturePage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (devSecurityBypassEnabled) return child;
+
     final entitlement = ref.watch(adminFeatureEntitlementProvider(feature));
     return entitlement.when(
       data: (result) {
         if (result.isEnabled) return child;
         return UnauthorizedPage(
-          message: '${feature.label} is not available for this tenant. ${result.sourceLabel}.',
+          message:
+              '${feature.label} is not available for this tenant. ${result.sourceLabel}.',
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),

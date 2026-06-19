@@ -1,11 +1,16 @@
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/dev/dev_security_bypass.dart';
 import '../core/rbac/admin_access.dart';
 import '../core/rbac/admin_context.dart';
 import '../core/rbac/permission_rules.dart';
 import '../core/rbac/protected_admin_page.dart';
+import '../core/rbac/rbac_providers.dart';
 import '../core/rbac/unauthorized_page.dart';
 import '../core/subscriptions/protected_tenant_feature_page.dart';
 import '../core/subscriptions/subscription_providers.dart';
@@ -45,6 +50,7 @@ import '../features/ticket_operations/domain/ticket.dart';
 import '../features/ticket_operations/presentation/ticket_dashboard_page.dart';
 import '../features/ticket_operations/presentation/ticket_detail_page.dart';
 import '../features/ticket_operations/presentation/ticket_list_page.dart';
+import '../features/ticket_operations/presentation/resident_service_issue_page.dart';
 import '../features/tenant_management/presentation/tenant_detail_page.dart';
 import '../features/tenant_management/presentation/tenant_list_page.dart';
 import '../features/user_management/presentation/user_detail_page.dart';
@@ -122,11 +128,30 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
             .toString();
       }
 
+      if (devSecurityBypassEnabled) {
+        final devHomeRoute = _devHomeRoute();
+        if (path == '/' || isSignIn) return devHomeRoute;
+        if (isAcceptInvite &&
+            !_routeContainsAuthPayload(state.uri.toString())) {
+          return devHomeRoute;
+        }
+        return null;
+      }
+
       if (path == '/') {
         return user == null ? '/sign-in' : resolveHomeRoute();
       }
 
       if (isAcceptInvite) {
+        if (!_routeContainsAuthPayload(state.uri.toString())) {
+          final storedContext =
+              html.window.localStorage['selected_admin_context_id'];
+          if (user == null) return '/sign-in';
+          if (storedContext?.startsWith('hoa:') == true) {
+            return '/admin/hoa/documents';
+          }
+          return resolveHomeRoute();
+        }
         if (path != '/accept-invite') {
           return state.uri.replace(path: '/accept-invite').toString();
         }
@@ -284,6 +309,12 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
             name: 'hoaTickets',
             builder: (context, state) =>
                 const HoaTicketsPage().protectedBy(AdminPermissions.hoaTickets),
+          ),
+          GoRoute(
+            path: '/admin/hoa/tickets/new',
+            name: 'residentServiceIssueNew',
+            builder: (context, state) => const ResidentServiceIssuePage()
+                .protectedBy(AdminPermissions.hoaTickets),
           ),
           GoRoute(
             path: '/admin/hoa/service-schedules',
@@ -511,6 +542,50 @@ bool _routeContainsAuthPayload(String route) {
       query.contains('error_description=');
 }
 
+String _devHomeRoute() {
+  final storedContext = html.window.localStorage['selected_admin_context_id'];
+  if (storedContext?.startsWith('hoa:') ?? false) {
+    return '/admin/hoa/documents';
+  }
+  return '/admin';
+}
+
+Future<void> forceAdminSignOut(WidgetRef ref) async {
+  if (devSecurityBypassEnabled) {
+    setSelectedAdminContextId(ref, null);
+    html.window.localStorage.remove('resident_email_callback_payload');
+    html.window.localStorage.remove('resident_pending_tenant_code');
+    ref.invalidate(adminAccessProvider);
+    ref.invalidate(availableAdminContextsProvider);
+    ref.invalidate(activeAdminContextProvider);
+    ref.invalidate(activeAdminAccessProvider);
+    html.window.history.replaceState(
+      null,
+      'HOA Portal Admin',
+      '${html.window.location.origin}/#/admin',
+    );
+    html.window.location.hash = '/admin';
+    return;
+  }
+
+  setSelectedAdminContextId(ref, null);
+  html.window.localStorage.remove('resident_email_callback_payload');
+  html.window.localStorage.remove('resident_pending_tenant_code');
+  await ref.read(supabaseClientProvider).auth.signOut();
+  ref.invalidate(authStateProvider);
+  ref.invalidate(currentUserProvider);
+  ref.invalidate(adminAccessProvider);
+  ref.invalidate(availableAdminContextsProvider);
+  ref.invalidate(activeAdminContextProvider);
+  ref.invalidate(activeAdminAccessProvider);
+  html.window.history.replaceState(
+    null,
+    'HOA Portal Admin',
+    '${html.window.location.origin}/#/sign-in',
+  );
+  html.window.location.hash = '/sign-in';
+}
+
 class AdminNavigationShell extends ConsumerStatefulWidget {
   const AdminNavigationShell({
     required this.currentPath,
@@ -580,7 +655,7 @@ class _AdminNavigationShellState extends ConsumerState<AdminNavigationShell> {
   }
 
   Future<void> _signOut() async {
-    await ref.read(supabaseClientProvider).auth.signOut();
+    await forceAdminSignOut(ref);
   }
 }
 
@@ -1139,9 +1214,7 @@ class _AdminSidebar extends ConsumerWidget {
                   error: (_, __) => 'Role unavailable',
                 ),
                 isCollapsed: isCollapsed,
-                onSignOut: () async {
-                  await ref.read(supabaseClientProvider).auth.signOut();
-                },
+                onSignOut: () => forceAdminSignOut(ref),
               ),
             ),
           ],
@@ -1267,6 +1340,7 @@ class _AdminNavItem {
   final TenantFeature? feature;
 
   bool canShow(AdminAccess access, WidgetRef ref) {
+    if (devSecurityBypassEnabled) return true;
     if (permissionRule.isOpen) return true;
     final hasPermissions = permissionRule.permissions.isEmpty ||
         access.canAny(permissionRule.permissions);

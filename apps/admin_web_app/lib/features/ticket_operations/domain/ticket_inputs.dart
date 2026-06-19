@@ -1,5 +1,37 @@
 import 'ticket.dart';
 
+class TicketAttachmentUploadInput {
+  const TicketAttachmentUploadInput({
+    required this.fileName,
+    required this.mimeType,
+    required this.bytes,
+  });
+
+  final String fileName;
+  final String mimeType;
+  final List<int> bytes;
+
+  int get fileSize => bytes.length;
+}
+
+class ResidentTicketCreateInput {
+  const ResidentTicketCreateInput({
+    required this.hoaId,
+    required this.addressId,
+    required this.type,
+    required this.subject,
+    required this.description,
+    this.attachment,
+  });
+
+  final String hoaId;
+  final String addressId;
+  final TicketType type;
+  final String subject;
+  final String description;
+  final TicketAttachmentUploadInput? attachment;
+}
+
 class TicketStatusUpdateInput {
   const TicketStatusUpdateInput({
     required this.ticket,

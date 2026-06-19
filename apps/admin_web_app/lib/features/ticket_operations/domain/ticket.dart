@@ -44,7 +44,8 @@ enum TicketStatus {
     };
   }
 
-  bool get isTerminal => this == TicketStatus.resolved || this == TicketStatus.closed;
+  bool get isTerminal =>
+      this == TicketStatus.resolved || this == TicketStatus.closed;
 }
 
 enum TicketPriority {
@@ -94,6 +95,15 @@ enum TicketType {
       TicketType.damagedCart => 'Damaged Cart',
       TicketType.complaint => 'Complaint',
       TicketType.serviceIssue => 'Service Issue',
+    };
+  }
+
+  String get databaseValue {
+    return switch (this) {
+      TicketType.missedPickup => 'missed_pickup',
+      TicketType.damagedCart => 'damaged_cart',
+      TicketType.complaint => 'complaint',
+      TicketType.serviceIssue => 'service_issue',
     };
   }
 }
@@ -182,7 +192,8 @@ class ServiceTicket {
     return hoaName ?? hoaCode ?? hoaId;
   }
 
-  String get requesterLabel => requesterName ?? requesterEmail ?? requesterUserId;
+  String get requesterLabel =>
+      requesterName ?? requesterEmail ?? requesterUserId;
 
   String get addressLabel {
     final parts = <String?>[
@@ -195,7 +206,8 @@ class ServiceTicket {
     return parts.isEmpty ? 'Not set' : parts.join(', ');
   }
 
-  DateTime get slaDueAt => createdAt.toUtc().add(Duration(hours: priority.slaHours));
+  DateTime get slaDueAt =>
+      createdAt.toUtc().add(Duration(hours: priority.slaHours));
 
   Duration get age => DateTime.now().toUtc().difference(createdAt.toUtc());
 
@@ -214,7 +226,9 @@ class ServiceTicket {
   String get slaLabel {
     if (slaState == SlaState.complete) return 'Complete';
     final remaining = slaRemaining;
-    if (remaining.isNegative) return 'Overdue by ${_durationLabel(remaining.abs())}';
+    if (remaining.isNegative) {
+      return 'Overdue by ${_durationLabel(remaining.abs())}';
+    }
     return 'Due in ${_durationLabel(remaining)}';
   }
 }
@@ -312,8 +326,11 @@ class TicketAssigneeOption {
   final String label;
   final Set<String> roleCodes;
 
-  bool get canDispatch => roleCodes.contains('tenant_dispatch') || roleCodes.contains('tenant_admin');
-  bool get canCsr => roleCodes.contains('tenant_csr') || roleCodes.contains('tenant_admin');
+  bool get canDispatch =>
+      roleCodes.contains('tenant_dispatch') ||
+      roleCodes.contains('tenant_admin');
+  bool get canCsr =>
+      roleCodes.contains('tenant_csr') || roleCodes.contains('tenant_admin');
 }
 
 class TicketMetrics {
@@ -344,23 +361,41 @@ class TicketMetrics {
     final today = DateTime(now.year, now.month, now.day);
     return TicketMetrics(
       totalOpen: tickets.where((ticket) => !ticket.status.isTerminal).length,
-      newTickets: tickets.where((ticket) => ticket.status == TicketStatus.newTicket).length,
-      assigned: tickets.where((ticket) => ticket.status == TicketStatus.assigned).length,
-      inProgress: tickets.where((ticket) => ticket.status == TicketStatus.inProgress).length,
-      waiting: tickets.where((ticket) => ticket.status == TicketStatus.waitingOnCustomer).length,
+      newTickets: tickets
+          .where((ticket) => ticket.status == TicketStatus.newTicket)
+          .length,
+      assigned: tickets
+          .where((ticket) => ticket.status == TicketStatus.assigned)
+          .length,
+      inProgress: tickets
+          .where((ticket) => ticket.status == TicketStatus.inProgress)
+          .length,
+      waiting: tickets
+          .where((ticket) => ticket.status == TicketStatus.waitingOnCustomer)
+          .length,
       resolvedToday: tickets.where((ticket) {
         final updated = ticket.updatedAt.toLocal();
-        return ticket.status == TicketStatus.resolved && !updated.isBefore(today);
+        return ticket.status == TicketStatus.resolved &&
+            !updated.isBefore(today);
       }).length,
-      urgent: tickets.where((ticket) => ticket.priority == TicketPriority.urgent).length,
-      slaBreached: tickets.where((ticket) => ticket.slaState == SlaState.breached).length,
-      slaDueSoon: tickets.where((ticket) => ticket.slaState == SlaState.dueSoon).length,
+      urgent: tickets
+          .where((ticket) => ticket.priority == TicketPriority.urgent)
+          .length,
+      slaBreached: tickets
+          .where((ticket) => ticket.slaState == SlaState.breached)
+          .length,
+      slaDueSoon:
+          tickets.where((ticket) => ticket.slaState == SlaState.dueSoon).length,
     );
   }
 }
 
 String _durationLabel(Duration duration) {
-  if (duration.inDays >= 1) return '${duration.inDays}d ${duration.inHours.remainder(24)}h';
-  if (duration.inHours >= 1) return '${duration.inHours}h ${duration.inMinutes.remainder(60)}m';
+  if (duration.inDays >= 1) {
+    return '${duration.inDays}d ${duration.inHours.remainder(24)}h';
+  }
+  if (duration.inHours >= 1) {
+    return '${duration.inHours}h ${duration.inMinutes.remainder(60)}m';
+  }
   return '${duration.inMinutes.clamp(0, 59)}m';
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/rbac/admin_context.dart';
 import '../../ticket_operations/domain/ticket.dart';
 import '../../ticket_operations/presentation/ticket_providers.dart';
 import 'hoa_manager_providers.dart';
@@ -30,17 +31,37 @@ class _HoaTicketsPageState extends ConsumerState<HoaTicketsPage> {
     return scope.when(
       data: (item) {
         final hoaId = item?.hoaId;
-        if (hoaId == null) return const Center(child: Text('No HOA scope assigned.'));
-        final tickets = ref.watch(ticketListProvider(TicketListFilter(hoaId: hoaId)));
+        if (hoaId == null) {
+          return const Center(child: Text('No HOA scope assigned.'));
+        }
+        final tickets =
+            ref.watch(ticketListProvider(TicketListFilter(hoaId: hoaId)));
+        final contextValue =
+            ref.watch(activeAdminContextProvider).asData?.value;
+        final canCreateIssue = contextValue?.isResident == true;
 
         return Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const HoaScopeHeader(
-                title: 'HOA Tickets',
-                subtitle: 'Ticket visibility for your HOA community.',
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  const HoaScopeHeader(
+                    title: 'HOA Tickets',
+                    subtitle: 'Ticket visibility for your HOA community.',
+                  ),
+                  if (canCreateIssue)
+                    FilledButton.icon(
+                      onPressed: () => context.go('/admin/hoa/tickets/new'),
+                      icon: const Icon(Icons.add_circle_outline),
+                      label: const Text('Report Issue'),
+                    ),
+                ],
               ),
               const SizedBox(height: 16),
               TextField(
@@ -56,8 +77,10 @@ class _HoaTicketsPageState extends ConsumerState<HoaTicketsPage> {
               Expanded(
                 child: tickets.when(
                   data: (items) => _TicketList(tickets: _filter(items)),
-                  loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (error, _) => Center(child: Text('Unable to load tickets: $error')),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (error, _) =>
+                      Center(child: Text('Unable to load tickets: $error')),
                 ),
               ),
             ],
@@ -65,7 +88,8 @@ class _HoaTicketsPageState extends ConsumerState<HoaTicketsPage> {
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, _) => Center(child: Text('Unable to load HOA scope: $error')),
+      error: (error, _) =>
+          Center(child: Text('Unable to load HOA scope: $error')),
     );
   }
 
@@ -114,7 +138,7 @@ class _TicketList extends StatelessWidget {
               color: _slaColor(context, ticket),
             ),
             title: Text(ticket.subject),
-            subtitle: Text('${ticket.requesterLabel} • ${ticket.addressLabel}'),
+            subtitle: Text('${ticket.requesterLabel} - ${ticket.addressLabel}'),
             trailing: Wrap(
               spacing: 8,
               crossAxisAlignment: WrapCrossAlignment.center,

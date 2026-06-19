@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/rbac/admin_context.dart';
 import '../../../core/supabase/supabase_provider.dart';
+import '../../address_registry/domain/hoa_address.dart';
 import '../data/ticket_repository.dart';
 import '../domain/ticket.dart';
 import '../domain/ticket_inputs.dart';
@@ -12,6 +13,11 @@ export '../data/ticket_repository.dart' show TicketListFilter;
 
 final ticketRepositoryProvider = Provider<TicketRepository>((ref) {
   return SupabaseTicketRepository(ref.watch(supabaseClientProvider));
+});
+
+final residentTicketAddressesProvider =
+    FutureProvider.autoDispose<List<HoaAddress>>((ref) {
+  return ref.watch(ticketRepositoryProvider).currentResidentAddresses();
 });
 
 final ticketListProvider = FutureProvider.autoDispose
@@ -78,6 +84,26 @@ class TicketCommandController extends AutoDisposeAsyncNotifier<void> {
     });
 
     return _finishTicketCommand(result, input.ticket.id);
+  }
+
+  Future<ServiceTicket?> createResidentTicket(
+    ResidentTicketCreateInput input,
+  ) async {
+    state = const AsyncLoading();
+    final result = await AsyncValue.guard(() {
+      return ref.read(ticketRepositoryProvider).createResidentTicket(input);
+    });
+
+    if (result.hasError) {
+      state = AsyncError<void>(result.error!, result.stackTrace!);
+      return null;
+    }
+
+    final ticket = result.value!;
+    state = const AsyncData(null);
+    _invalidateTicketViews(ticket.id);
+    ref.invalidate(residentTicketAddressesProvider);
+    return ticket;
   }
 
   Future<ServiceTicket?> assignTicket(TicketAssignmentInput input) async {

@@ -3,6 +3,7 @@ import 'dart:html' as html;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../dev/dev_security_bypass.dart';
 import '../supabase/supabase_provider.dart';
 import 'admin_access.dart';
 import 'rbac_providers.dart';
@@ -97,6 +98,13 @@ final activeAdminAccessProvider =
   final context = await ref.watch(activeAdminContextProvider.future);
   if (context == null) {
     return access.scopedTo(roles: const [], permissions: const {});
+  }
+
+  if (devSecurityBypassEnabled) {
+    return access.scopedTo(
+      roles: context.roles,
+      permissions: devPermissionCodes,
+    );
   }
 
   final permissions = await ref

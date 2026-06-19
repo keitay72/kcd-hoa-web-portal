@@ -51,6 +51,11 @@ class _TicketDetailContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final canManageTicket = ref.watch(activeAdminAccessProvider).maybeWhen(
+          data: (value) => value.can('tickets.update'),
+          orElse: () => false,
+        );
+
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
@@ -86,7 +91,12 @@ class _TicketDetailContent extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
-                      flex: 3, child: _TicketTimeline(ticketId: ticket.id)),
+                    flex: 3,
+                    child: _TicketTimeline(
+                      ticketId: ticket.id,
+                      showInternalNotes: canManageTicket,
+                    ),
+                  ),
                   const SizedBox(width: 20),
                   Expanded(
                       flex: 2, child: _AttachmentViewer(ticketId: ticket.id)),
@@ -96,7 +106,10 @@ class _TicketDetailContent extends ConsumerWidget {
 
             return Column(
               children: [
-                _TicketTimeline(ticketId: ticket.id),
+                _TicketTimeline(
+                  ticketId: ticket.id,
+                  showInternalNotes: canManageTicket,
+                ),
                 const SizedBox(height: 20),
                 _AttachmentViewer(ticketId: ticket.id),
               ],
@@ -132,7 +145,7 @@ class _TicketHeader extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TextButton.icon(
-                onPressed: () => context.go('/admin/tickets'),
+                onPressed: () => context.go(_backPath(ref)),
                 icon: const Icon(Icons.arrow_back),
                 label: const Text('Back to Tickets'),
               ),
@@ -236,6 +249,13 @@ class _TicketHeader extends ConsumerWidget {
       ),
     );
   }
+
+  String _backPath(WidgetRef ref) {
+    final activeContext = ref.read(activeAdminContextProvider).asData?.value;
+    return activeContext?.isHoa == true
+        ? '/admin/hoa/tickets'
+        : '/admin/tickets';
+  }
 }
 
 class _TicketSummaryCard extends StatelessWidget {
@@ -306,9 +326,13 @@ class _TicketMetadataCard extends StatelessWidget {
 }
 
 class _TicketTimeline extends ConsumerWidget {
-  const _TicketTimeline({required this.ticketId});
+  const _TicketTimeline({
+    required this.ticketId,
+    required this.showInternalNotes,
+  });
 
   final String ticketId;
+  final bool showInternalNotes;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -325,9 +349,14 @@ class _TicketTimeline extends ConsumerWidget {
             const SizedBox(height: 16),
             events.when(
               data: (items) {
-                if (items.isEmpty) return const Text('No ticket events yet.');
+                final visibleItems = showInternalNotes
+                    ? items
+                    : items.where((event) => !event.isInternalNote).toList();
+                if (visibleItems.isEmpty) {
+                  return const Text('No ticket events yet.');
+                }
                 return Column(
-                  children: items
+                  children: visibleItems
                       .map((event) => _TimelineItem(event: event))
                       .toList(),
                 );
@@ -404,8 +433,9 @@ class _TimelineItem extends StatelessWidget {
   String _transitionLabel(TicketEvent event) {
     final oldStatus = event.oldStatus?.label;
     final newStatus = event.newStatus?.label;
-    if (oldStatus != null && newStatus != null)
+    if (oldStatus != null && newStatus != null) {
       return '$oldStatus to $newStatus';
+    }
     if (newStatus != null) return 'Status set to $newStatus';
     return 'Ticket event';
   }
@@ -431,8 +461,9 @@ class _AttachmentViewer extends ConsumerWidget {
             const SizedBox(height: 16),
             attachments.when(
               data: (items) {
-                if (items.isEmpty)
+                if (items.isEmpty) {
                   return const Text('No attachments uploaded.');
+                }
                 return Column(
                   children: items
                       .map((item) => _AttachmentTile(attachment: item))

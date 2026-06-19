@@ -135,11 +135,14 @@ class _AcceptInvitePageState extends ConsumerState<AcceptInvitePage> {
                               )
                             else ...[
                               FilledButton.icon(
-                                onPressed: () => context.go(
-                                  _state == _InviteAcceptState.success
-                                      ? '/admin'
-                                      : '/sign-in',
-                                ),
+                                onPressed: () {
+                                  if (_state == _InviteAcceptState.success) {
+                                    context.go('/admin');
+                                    return;
+                                  }
+
+                                  _leaveInviteRoute();
+                                },
                                 icon: Icon(
                                   _state == _InviteAcceptState.success
                                       ? Icons.arrow_forward
@@ -154,7 +157,7 @@ class _AcceptInvitePageState extends ConsumerState<AcceptInvitePage> {
                               if (_state != _InviteAcceptState.success) ...[
                                 const SizedBox(height: 10),
                                 OutlinedButton.icon(
-                                  onPressed: () => context.go('/sign-in'),
+                                  onPressed: _leaveInviteRoute,
                                   icon:
                                       const Icon(Icons.support_agent_outlined),
                                   label: const Text(
@@ -194,6 +197,14 @@ class _AcceptInvitePageState extends ConsumerState<AcceptInvitePage> {
     final type = params['type'];
     final accessToken = params['access_token'];
     final refreshToken = params['refresh_token'];
+
+    final hasInvitePayload = (tokenHash != null && tokenHash.isNotEmpty) ||
+        (code != null && code.isNotEmpty) ||
+        (refreshToken != null && refreshToken.isNotEmpty);
+    if (!hasInvitePayload) {
+      _leaveInviteRoute();
+      return;
+    }
 
     try {
       await client.auth.signOut();
@@ -353,6 +364,32 @@ class _AcceptInvitePageState extends ConsumerState<AcceptInvitePage> {
   void _clearSensitiveUrl() {
     html.window.history
         .replaceState(null, 'Accept Invitation', '/#/accept-invite');
+  }
+
+  void _leaveInviteRoute() {
+    final client = ref.read(supabaseClientProvider);
+    final storedContext = html.window.localStorage['selected_admin_context_id'];
+    final target = client.auth.currentUser != null &&
+            (storedContext?.startsWith('hoa:') ?? false)
+        ? '/admin/hoa/documents'
+        : '/sign-in';
+
+    html.window.history.replaceState(
+      null,
+      'HOA Portal Admin',
+      '${html.window.location.origin}/#$target',
+    );
+
+    if (mounted) {
+      context.go(target);
+    }
+
+    Future<void>.delayed(const Duration(milliseconds: 100), () {
+      if (!mounted) return;
+      if (html.window.location.hash != '#$target') {
+        html.window.location.hash = target;
+      }
+    });
   }
 
   _InviteView _viewForState(ColorScheme colorScheme) {
