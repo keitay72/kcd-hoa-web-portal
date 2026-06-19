@@ -384,4 +384,4 @@ Conducted annually or as required.
 
 This SOP shall be reviewed annually by Operations, Fleet, and Safety leadership.
 
-Recommended revisions shall be submitted to Executive Leadership and the Board of Directors for approval.
+Recommended revisions shall be submitted for approval.
