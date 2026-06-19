@@ -1,3 +1,6 @@
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -13,10 +16,12 @@ class ResidentRegistrationPage extends ConsumerStatefulWidget {
   final String tenantCode;
 
   @override
-  ConsumerState<ResidentRegistrationPage> createState() => _ResidentRegistrationPageState();
+  ConsumerState<ResidentRegistrationPage> createState() =>
+      _ResidentRegistrationPageState();
 }
 
-class _ResidentRegistrationPageState extends ConsumerState<ResidentRegistrationPage> {
+class _ResidentRegistrationPageState
+    extends ConsumerState<ResidentRegistrationPage> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -26,6 +31,16 @@ class _ResidentRegistrationPageState extends ConsumerState<ResidentRegistrationP
   final _cityController = TextEditingController();
   final _stateController = TextEditingController(text: 'MO');
   final _postalCodeController = TextEditingController();
+  bool _preparedSession = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_preparedSession) return;
+    _preparedSession = true;
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _prepareResidentSession());
+  }
 
   @override
   void dispose() {
@@ -47,7 +62,8 @@ class _ResidentRegistrationPageState extends ConsumerState<ResidentRegistrationP
     return ResidentPortalScaffold(
       tenantCode: widget.tenantCode,
       title: 'Create your resident account',
-      subtitle: 'Enter your HOA service address. We will match you to the correct HOA automatically.',
+      subtitle:
+          'Enter your HOA service address. We will match you to the correct HOA automatically.',
       child: Form(
         key: _formKey,
         child: Column(
@@ -86,7 +102,8 @@ class _ResidentRegistrationPageState extends ConsumerState<ResidentRegistrationP
             const SizedBox(height: 12),
             TextFormField(
               controller: _line2Controller,
-              decoration: const InputDecoration(labelText: 'Unit / Apt (optional)'),
+              decoration:
+                  const InputDecoration(labelText: 'Unit / Apt (optional)'),
             ),
             const SizedBox(height: 12),
             TextFormField(
@@ -133,7 +150,8 @@ class _ResidentRegistrationPageState extends ConsumerState<ResidentRegistrationP
             ),
             const SizedBox(height: 12),
             TextButton(
-              onPressed: () => context.go('/portal/${widget.tenantCode}/sign-in'),
+              onPressed: () =>
+                  context.go('/portal/${widget.tenantCode}/sign-in'),
               child: const Text('Already have an account? Sign in'),
             ),
           ],
@@ -142,26 +160,37 @@ class _ResidentRegistrationPageState extends ConsumerState<ResidentRegistrationP
     );
   }
 
+  Future<void> _prepareResidentSession() async {
+    final repository = ref.read(residentPortalAuthRepositoryProvider);
+    if (repository.currentUser == null) return;
+    await repository.signOut();
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    final result = await ref.read(residentPortalAuthControllerProvider.notifier).register(
-          tenantCode: widget.tenantCode,
-          input: ResidentRegistrationInput(
-            fullName: _nameController.text,
-            email: _emailController.text,
-            password: _passwordController.text,
-            address: ResidentAddressInput(
-              line1: _line1Controller.text,
-              line2: _line2Controller.text,
-              city: _cityController.text,
-              state: _stateController.text,
-              postalCode: _postalCodeController.text,
-            ),
-          ),
-        );
+    html.window.localStorage['resident_pending_tenant_code'] =
+        widget.tenantCode;
+    final result =
+        await ref.read(residentPortalAuthControllerProvider.notifier).register(
+              tenantCode: widget.tenantCode,
+              input: ResidentRegistrationInput(
+                fullName: _nameController.text,
+                email: _emailController.text,
+                password: _passwordController.text,
+                address: ResidentAddressInput(
+                  line1: _line1Controller.text,
+                  line2: _line2Controller.text,
+                  city: _cityController.text,
+                  state: _stateController.text,
+                  postalCode: _postalCodeController.text,
+                ),
+              ),
+            );
     if (result != null && mounted) {
       context.go('/portal/${widget.tenantCode}/email-verification-pending');
+      return;
     }
+    html.window.localStorage.remove('resident_pending_tenant_code');
   }
 
   String? _required(String? value) {
@@ -171,7 +200,8 @@ class _ResidentRegistrationPageState extends ConsumerState<ResidentRegistrationP
   String? _email(String? value) {
     final input = value?.trim() ?? '';
     if (input.isEmpty) return 'Required';
-    if (!input.contains('@') || !input.contains('.')) return 'Enter a valid email';
+    if (!input.contains('@') || !input.contains('.'))
+      return 'Enter a valid email';
     return null;
   }
 

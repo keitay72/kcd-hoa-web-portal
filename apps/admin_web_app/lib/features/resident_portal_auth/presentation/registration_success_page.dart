@@ -15,7 +15,8 @@ class RegistrationSuccessPage extends ConsumerWidget {
     return ResidentPortalScaffold(
       tenantCode: tenantCode,
       title: 'Registration complete',
-      subtitle: 'Your address and activation code have been verified. You can sign back in any time as resident portal features continue to roll out.',
+      subtitle:
+          'Your email and service address have been verified. You can now sign in to access your resident portal.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

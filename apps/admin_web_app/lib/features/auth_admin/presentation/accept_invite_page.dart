@@ -102,8 +102,12 @@ class _AcceptInvitePageState extends ConsumerState<AcceptInvitePage> {
                               view.title,
                               textAlign: TextAlign.center,
                               style: (isCompact
-                                      ? Theme.of(context).textTheme.headlineSmall
-                                      : Theme.of(context).textTheme.headlineMedium)
+                                      ? Theme.of(context)
+                                          .textTheme
+                                          .headlineSmall
+                                      : Theme.of(context)
+                                          .textTheme
+                                          .headlineMedium)
                                   ?.copyWith(fontWeight: FontWeight.w800),
                             ),
                             const SizedBox(height: 10),
@@ -119,11 +123,13 @@ class _AcceptInvitePageState extends ConsumerState<AcceptInvitePage> {
                               _PasswordSetupForm(
                                 formKey: _formKey,
                                 passwordController: _passwordController,
-                                confirmPasswordController: _confirmPasswordController,
+                                confirmPasswordController:
+                                    _confirmPasswordController,
                                 obscurePassword: _obscurePassword,
                                 isSaving: _isSavingPassword,
                                 onToggleObscure: () {
-                                  setState(() => _obscurePassword = !_obscurePassword);
+                                  setState(() =>
+                                      _obscurePassword = !_obscurePassword);
                                 },
                                 onSubmit: _savePassword,
                               )
@@ -149,8 +155,10 @@ class _AcceptInvitePageState extends ConsumerState<AcceptInvitePage> {
                                 const SizedBox(height: 10),
                                 OutlinedButton.icon(
                                   onPressed: () => context.go('/sign-in'),
-                                  icon: const Icon(Icons.support_agent_outlined),
-                                  label: const Text('Ask an admin to resend the invite'),
+                                  icon:
+                                      const Icon(Icons.support_agent_outlined),
+                                  label: const Text(
+                                      'Ask an admin to resend the invite'),
                                 ),
                               ],
                             ],
@@ -188,6 +196,8 @@ class _AcceptInvitePageState extends ConsumerState<AcceptInvitePage> {
     final refreshToken = params['refresh_token'];
 
     try {
+      await client.auth.signOut();
+
       if (tokenHash != null && tokenHash.isNotEmpty) {
         if (type != null && type != 'invite') {
           _setState(
@@ -223,12 +233,6 @@ class _AcceptInvitePageState extends ConsumerState<AcceptInvitePage> {
         return;
       }
 
-      if (client.auth.currentSession != null || client.auth.currentUser != null) {
-        await _markInviteAccepted();
-        _setPasswordSetupState();
-        return;
-      }
-
       _setState(
         _InviteAcceptState.invalid,
         'This invite link is missing required information. Please ask your administrator to resend the invitation.',
@@ -257,14 +261,11 @@ class _AcceptInvitePageState extends ConsumerState<AcceptInvitePage> {
         UserAttributes(password: _passwordController.text),
       );
       final now = DateTime.now().toUtc().toIso8601String();
-      await client
-          .from('profiles')
-          .update({
-            'password_set_at': now,
-            'status': 'active',
-            'updated_at': now,
-          })
-          .eq('id', client.auth.currentUser!.id);
+      await client.from('profiles').update({
+        'password_set_at': now,
+        'status': 'active',
+        'updated_at': now,
+      }).eq('id', client.auth.currentUser!.id);
       ref.invalidate(currentAdminProfileProvider);
       await _markInviteAccepted();
       _setState(
@@ -350,7 +351,8 @@ class _AcceptInvitePageState extends ConsumerState<AcceptInvitePage> {
   }
 
   void _clearSensitiveUrl() {
-    html.window.history.replaceState(null, 'Accept Invitation', '/#/accept-invite');
+    html.window.history
+        .replaceState(null, 'Accept Invitation', '/#/accept-invite');
   }
 
   _InviteView _viewForState(ColorScheme colorScheme) {

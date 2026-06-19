@@ -33,8 +33,6 @@ class AddressNormalizer {
     return value
         .trim()
         .toUpperCase()
-        .replaceAll(RegExp(r'[^A-Z0-9]+'), ' ')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
+        .replaceAll(RegExp(r'[^A-Z0-9]+'), '');
   }
 }

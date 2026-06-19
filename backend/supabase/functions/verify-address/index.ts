@@ -22,6 +22,10 @@ function jsonResponse(body: unknown, status = 200) {
 }
 
 function normalizePart(value: string) {
+  return value.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '');
+}
+
+function normalizeLegacyPart(value: string) {
   return value.trim().toUpperCase().replace(/[^A-Z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
@@ -29,7 +33,10 @@ function normalizePostalCode(value: string) {
   return value.trim().toUpperCase().replace(/\s+/g, '');
 }
 
-function normalizeAddress(input: VerifyAddressRequest) {
+function normalizeAddress(
+  input: VerifyAddressRequest,
+  normalizer: (value: string) => string = normalizePart,
+) {
   return [
     input.line1,
     input.line2,
@@ -38,7 +45,7 @@ function normalizeAddress(input: VerifyAddressRequest) {
     input.postalCode == null ? undefined : normalizePostalCode(input.postalCode),
   ]
     .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
-    .map(normalizePart)
+    .map(normalizer)
     .join('|');
 }
 
@@ -61,6 +68,8 @@ Deno.serve(async (request) => {
   const payload = (await request.json()) as VerifyAddressRequest;
   const tenantCode = payload.tenantCode?.trim().toUpperCase();
   const normalizedKey = normalizeAddress(payload);
+  const legacyNormalizedKey = normalizeAddress(payload, normalizeLegacyPart);
+  const normalizedKeys = Array.from(new Set([normalizedKey, legacyNormalizedKey].filter(Boolean)));
 
   if (!tenantCode) {
     return jsonResponse({ error: 'Tenant code is required' }, 400);
@@ -91,7 +100,7 @@ Deno.serve(async (request) => {
   const { data, error } = await supabase
     .from('hoa_addresses')
     .select('id, hoa_id, line1, line2, city, state, postal_code, is_active, hoa_communities!inner(name, code, tenant_id)')
-    .eq('normalized_key', normalizedKey)
+    .in('normalized_key', normalizedKeys)
     .eq('is_active', true)
     .eq('hoa_communities.tenant_id', tenant.id)
     .limit(1)

@@ -38,6 +38,7 @@ import '../features/schedules_admin/presentation/service_schedule_list_page.dart
 import '../features/resident_portal_auth/presentation/activation_code_verification_page.dart';
 import '../features/resident_portal_auth/presentation/email_verification_pending_page.dart';
 import '../features/resident_portal_auth/presentation/registration_success_page.dart';
+import '../features/resident_portal_auth/presentation/resident_email_confirmation_page.dart';
 import '../features/resident_portal_auth/presentation/resident_registration_page.dart';
 import '../features/resident_portal_auth/presentation/resident_sign_in_page.dart';
 import '../features/ticket_operations/domain/ticket.dart';
@@ -77,9 +78,48 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final user = ref.read(currentUserProvider);
       final path = state.uri.path;
+      final fragmentRoute = _normalizedFragmentRoute(Uri.base);
+      final residentPortalFlow = state.uri.queryParameters['portal_flow'];
+      final residentPortalTenant = state.uri.queryParameters['tenant'];
       final isSignIn = path == '/sign-in';
-      final isAcceptInvite = path == '/accept-invite' || path.startsWith('/accept-invite/');
+      final isAcceptInvite =
+          path == '/accept-invite' || path.startsWith('/accept-invite/');
       final isResidentPortal = path == '/portal' || path.startsWith('/portal/');
+
+      if (fragmentRoute != null &&
+          fragmentRoute.startsWith('/portal/') &&
+          !isResidentPortal) {
+        return fragmentRoute;
+      }
+
+      if (fragmentRoute != null &&
+          fragmentRoute.startsWith('/accept-invite') &&
+          !isAcceptInvite) {
+        return fragmentRoute;
+      }
+
+      if (path == '/' &&
+          residentPortalFlow == 'resident_confirm' &&
+          residentPortalTenant != null &&
+          residentPortalTenant.trim().isNotEmpty) {
+        return state.uri
+            .replace(
+              path: '/portal/$residentPortalTenant/confirm-email',
+            )
+            .toString();
+      }
+
+      if (path == '/' && residentPortalFlow == 'resident_confirm') {
+        return state.uri
+            .replace(
+              path: '/portal/confirm-email',
+            )
+            .toString();
+      }
+
+      if (path == '/') {
+        return user == null ? '/sign-in' : resolveHomeRoute();
+      }
 
       if (isAcceptInvite) {
         if (path != '/accept-invite') {
@@ -101,10 +141,6 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
 
           if (user == null && leaf == 'activation-code') {
             return '/portal/$tenantCode/sign-in';
-          }
-
-          if (user != null && leaf == 'sign-in') {
-            return '/portal/$tenantCode/activation-code';
           }
         }
 
@@ -167,6 +203,19 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
         ),
       ),
       GoRoute(
+        path: '/portal/confirm-email',
+        name: 'residentPortalConfirmEmailGeneric',
+        builder: (context, state) =>
+            const ResidentEmailConfirmationPage.generic(),
+      ),
+      GoRoute(
+        path: '/portal/:tenantCode/confirm-email',
+        name: 'residentPortalConfirmEmail',
+        builder: (context, state) => ResidentEmailConfirmationPage(
+          tenantCode: state.pathParameters['tenantCode']!,
+        ),
+      ),
+      GoRoute(
         path: '/portal/:tenantCode/activation-code',
         name: 'residentPortalActivationCode',
         builder: (context, state) => ActivationCodeVerificationPage(
@@ -198,47 +247,56 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/admin/hoa',
             name: 'hoaManagerDashboard',
-            builder: (context, state) => const HoaManagerDashboardPage().protectedBy(AdminPermissions.hoaScoped),
+            builder: (context, state) => const HoaManagerDashboardPage()
+                .protectedBy(AdminPermissions.hoaScoped),
           ),
           GoRoute(
             path: '/admin/hoa/residents',
             name: 'hoaResidentList',
-            builder: (context, state) => const HoaResidentListPage().protectedBy(AdminPermissions.hoaScoped),
+            builder: (context, state) => const HoaResidentListPage()
+                .protectedBy(AdminPermissions.hoaScoped),
           ),
           GoRoute(
             path: '/admin/hoa/staff',
             name: 'hoaStaff',
-            builder: (context, state) => const HoaStaffPage().protectedBy(AdminPermissions.hoaScoped),
+            builder: (context, state) =>
+                const HoaStaffPage().protectedBy(AdminPermissions.hoaScoped),
           ),
           GoRoute(
             path: '/admin/hoa/documents',
             name: 'hoaDocuments',
-            builder: (context, state) => const HoaDocumentsPage().protectedBy(AdminPermissions.hoaDocuments),
+            builder: (context, state) => const HoaDocumentsPage()
+                .protectedBy(AdminPermissions.hoaDocuments),
           ),
           GoRoute(
             path: '/admin/hoa/announcements',
             name: 'hoaAnnouncements',
-            builder: (context, state) => const HoaAnnouncementsPage().protectedBy(AdminPermissions.hoaAnnouncements),
+            builder: (context, state) => const HoaAnnouncementsPage()
+                .protectedBy(AdminPermissions.hoaAnnouncements),
           ),
           GoRoute(
             path: '/admin/hoa/tickets',
             name: 'hoaTickets',
-            builder: (context, state) => const HoaTicketsPage().protectedBy(AdminPermissions.hoaTickets),
+            builder: (context, state) =>
+                const HoaTicketsPage().protectedBy(AdminPermissions.hoaTickets),
           ),
           GoRoute(
             path: '/admin/hoa/service-schedules',
             name: 'hoaServiceSchedules',
-            builder: (context, state) => const HoaServiceSchedulesPage().protectedBy(AdminPermissions.hoaSchedules),
+            builder: (context, state) => const HoaServiceSchedulesPage()
+                .protectedBy(AdminPermissions.hoaSchedules),
           ),
           GoRoute(
             path: '/admin/commercial-catalog',
             name: 'commercialCatalog',
-            builder: (context, state) => const CommercialCatalogPage().protectedBy(AdminPermissions.commercialCatalog),
+            builder: (context, state) => const CommercialCatalogPage()
+                .protectedBy(AdminPermissions.commercialCatalog),
           ),
           GoRoute(
             path: '/admin/tenants',
             name: 'tenantList',
-            builder: (context, state) => const TenantListPage().protectedBy(AdminPermissions.tenantRead),
+            builder: (context, state) =>
+                const TenantListPage().protectedBy(AdminPermissions.tenantRead),
           ),
           GoRoute(
             path: '/admin/tenants/:tenantId',
@@ -250,7 +308,8 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/admin/hoas',
             name: 'hoaList',
-            builder: (context, state) => const HoaListPage().protectedBy(AdminPermissions.hoaRead),
+            builder: (context, state) =>
+                const HoaListPage().protectedBy(AdminPermissions.hoaRead),
           ),
           GoRoute(
             path: '/admin/hoas/:hoaId',
@@ -262,7 +321,8 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/admin/addresses',
             name: 'addressList',
-            builder: (context, state) => const AddressListPage().protectedBy(AdminPermissions.addressRead),
+            builder: (context, state) => const AddressListPage()
+                .protectedBy(AdminPermissions.addressRead),
           ),
           GoRoute(
             path: '/admin/addresses/:addressId',
@@ -274,7 +334,8 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/admin/activation-codes',
             name: 'activationCodeList',
-            builder: (context, state) => const ActivationCodeListPage().protectedBy(AdminPermissions.activationCodes),
+            builder: (context, state) => const ActivationCodeListPage()
+                .protectedBy(AdminPermissions.activationCodes),
           ),
           GoRoute(
             path: '/admin/activation-codes/:activationCodeId',
@@ -286,7 +347,8 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/admin/resident-verification',
             name: 'residentVerificationList',
-            builder: (context, state) => const ResidentVerificationListPage().protectedBy(AdminPermissions.verificationRead),
+            builder: (context, state) => const ResidentVerificationListPage()
+                .protectedBy(AdminPermissions.verificationRead),
           ),
           GoRoute(
             path: '/admin/resident-verification/:verificationId',
@@ -298,7 +360,8 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/admin/announcements',
             name: 'announcementList',
-            builder: (context, state) => const AnnouncementListPage().protectedBy(AdminPermissions.announcementsRead),
+            builder: (context, state) => const AnnouncementListPage()
+                .protectedBy(AdminPermissions.announcementsRead),
           ),
           GoRoute(
             path: '/admin/announcements/:announcementId',
@@ -310,7 +373,8 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/admin/documents',
             name: 'documentList',
-            builder: (context, state) => const DocumentListPage().protectedBy(AdminPermissions.documentsRead),
+            builder: (context, state) => const DocumentListPage()
+                .protectedBy(AdminPermissions.documentsRead),
           ),
           GoRoute(
             path: '/admin/documents/:documentId',
@@ -322,7 +386,8 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/admin/service-schedules',
             name: 'serviceScheduleList',
-            builder: (context, state) => const ServiceScheduleListPage().protectedBy(AdminPermissions.schedulesRead),
+            builder: (context, state) => const ServiceScheduleListPage()
+                .protectedBy(AdminPermissions.schedulesRead),
           ),
           GoRoute(
             path: '/admin/service-schedules/:scheduleId',
@@ -334,7 +399,8 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/admin/tickets',
             name: 'ticketList',
-            builder: (context, state) => const TicketListPage().protectedBy(AdminPermissions.ticketsRead),
+            builder: (context, state) => const TicketListPage()
+                .protectedBy(AdminPermissions.ticketsRead),
           ),
           GoRoute(
             path: '/admin/tickets/csr',
@@ -403,13 +469,30 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/admin/audit-logs',
             name: 'auditLogs',
-            builder: (context, state) => const AuditLogListPage().protectedBy(AdminPermissions.auditRead),
+            builder: (context, state) => const AuditLogListPage()
+                .protectedBy(AdminPermissions.auditRead),
           ),
         ],
       ),
     ],
   );
 });
+
+String? _normalizedFragmentRoute(Uri uri) {
+  final fragment = uri.fragment.trim();
+  if (fragment.isEmpty) return null;
+
+  final normalized = fragment.startsWith('/')
+      ? fragment
+      : fragment.startsWith('#/')
+          ? fragment.substring(1)
+          : fragment.startsWith('#')
+              ? fragment.substring(1)
+              : '/$fragment';
+
+  if (!normalized.startsWith('/')) return null;
+  return normalized;
+}
 
 class AdminNavigationShell extends ConsumerStatefulWidget {
   const AdminNavigationShell({
@@ -422,7 +505,8 @@ class AdminNavigationShell extends ConsumerStatefulWidget {
   final Widget child;
 
   @override
-  ConsumerState<AdminNavigationShell> createState() => _AdminNavigationShellState();
+  ConsumerState<AdminNavigationShell> createState() =>
+      _AdminNavigationShellState();
 }
 
 class _AdminNavigationShellState extends ConsumerState<AdminNavigationShell> {
@@ -430,10 +514,11 @@ class _AdminNavigationShellState extends ConsumerState<AdminNavigationShell> {
 
   @override
   Widget build(BuildContext context) {
-    final passwordSetupRequired = ref.watch(currentAdminProfileProvider).maybeWhen(
-          data: (profile) => profile?.requiresPasswordSetup ?? false,
-          orElse: () => false,
-        );
+    final passwordSetupRequired =
+        ref.watch(currentAdminProfileProvider).maybeWhen(
+              data: (profile) => profile?.requiresPasswordSetup ?? false,
+              orElse: () => false,
+            );
 
     if (passwordSetupRequired) {
       return const AcceptInvitePage();
@@ -443,9 +528,8 @@ class _AdminNavigationShellState extends ConsumerState<AdminNavigationShell> {
     final nav = _AdminSidebar(
       currentPath: widget.currentPath,
       isCollapsed: isCompact ? false : _isCollapsed,
-      onToggleCollapsed: isCompact
-          ? null
-          : () => setState(() => _isCollapsed = !_isCollapsed),
+      onToggleCollapsed:
+          isCompact ? null : () => setState(() => _isCollapsed = !_isCollapsed),
     );
 
     if (isCompact) {
@@ -482,7 +566,6 @@ class _AdminNavigationShellState extends ConsumerState<AdminNavigationShell> {
     await ref.read(supabaseClientProvider).auth.signOut();
   }
 }
-
 
 class _SidebarHeader extends StatelessWidget {
   const _SidebarHeader({
@@ -665,7 +748,6 @@ class _AdminSidebar extends ConsumerWidget {
     ),
   ];
 
-
   static const _tenantItems = [
     _AdminNavItem(
       label: 'Dashboard',
@@ -741,7 +823,6 @@ class _AdminSidebar extends ConsumerWidget {
       feature: TenantFeature.roleManagement,
     ),
   ];
-
 
   static const _hoaItems = [
     _AdminNavItem(
@@ -833,7 +914,8 @@ class _AdminSidebar extends ConsumerWidget {
             const Divider(height: 1),
             Expanded(
               child: ListView.builder(
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+                padding:
+                    const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
                 itemCount: visibleItems.length,
                 itemBuilder: (context, index) {
                   final item = visibleItems[index];
@@ -864,7 +946,9 @@ class _AdminSidebar extends ConsumerWidget {
                                 Icon(
                                   item.icon,
                                   color: isActive
-                                      ? Theme.of(context).colorScheme.onPrimaryContainer
+                                      ? Theme.of(context)
+                                          .colorScheme
+                                          .onPrimaryContainer
                                       : null,
                                 ),
                                 if (!isCollapsed) ...[
@@ -900,12 +984,17 @@ class _AdminSidebar extends ConsumerWidget {
               padding: const EdgeInsets.all(12),
               child: _AdminUserPanel(
                 displayName: profile.when(
-                  data: (value) => value?.displayName ?? user?.email ?? user?.id ?? 'Unknown user',
+                  data: (value) =>
+                      value?.displayName ??
+                      user?.email ??
+                      user?.id ??
+                      'Unknown user',
                   loading: () => user?.email ?? user?.id ?? 'Loading user...',
                   error: (_, __) => user?.email ?? user?.id ?? 'Unknown user',
                 ),
                 email: profile.when(
-                  data: (value) => value?.email ?? user?.email ?? user?.id ?? 'Unknown user',
+                  data: (value) =>
+                      value?.email ?? user?.email ?? user?.id ?? 'Unknown user',
                   loading: () => user?.email ?? user?.id ?? 'Loading user...',
                   error: (_, __) => user?.email ?? user?.id ?? 'Unknown user',
                 ),
@@ -944,9 +1033,8 @@ class _AdminUserPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tooltipMessage = displayName == email
-        ? '$email\n$role'
-        : '$displayName\n$email\n$role';
+    final tooltipMessage =
+        displayName == email ? '$email\n$role' : '$displayName\n$email\n$role';
 
     if (isCollapsed) {
       return Column(
@@ -1023,6 +1111,7 @@ class _AdminUserPanel extends StatelessWidget {
     );
   }
 }
+
 class _AdminNavItem {
   const _AdminNavItem({
     required this.label,

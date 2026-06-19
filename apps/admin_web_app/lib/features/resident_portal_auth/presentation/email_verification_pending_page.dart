@@ -18,7 +18,7 @@ class EmailVerificationPendingPage extends ConsumerWidget {
       tenantCode: tenantCode,
       title: 'Check your email',
       subtitle:
-          'We sent a verification link to ${registration?.email ?? 'your email address'}. After verifying your email, sign in and enter your activation code.',
+          'We sent a verification link to ${registration?.email ?? 'your email address'}. After you tap the link, we will bring you back here and continue setup automatically.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -26,7 +26,7 @@ class EmailVerificationPendingPage extends ConsumerWidget {
           const SizedBox(height: 20),
           FilledButton(
             onPressed: () => context.go('/portal/$tenantCode/sign-in'),
-            child: const Text('Continue to sign in'),
+            child: const Text('Back to sign in'),
           ),
         ],
       ),

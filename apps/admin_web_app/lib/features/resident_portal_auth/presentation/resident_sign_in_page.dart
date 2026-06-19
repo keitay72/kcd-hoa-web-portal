@@ -18,6 +18,16 @@ class ResidentSignInPage extends ConsumerStatefulWidget {
 class _ResidentSignInPageState extends ConsumerState<ResidentSignInPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _preparedSession = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_preparedSession) return;
+    _preparedSession = true;
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _prepareResidentSession());
+  }
 
   @override
   void dispose() {
@@ -29,20 +39,12 @@ class _ResidentSignInPageState extends ConsumerState<ResidentSignInPage> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(residentPortalAuthControllerProvider);
-    final user = ref.watch(currentUserProvider);
-
-    if (user != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          context.go('/portal/${widget.tenantCode}/activation-code');
-        }
-      });
-    }
 
     return ResidentPortalScaffold(
       tenantCode: widget.tenantCode,
       title: 'Resident sign in',
-      subtitle: 'Sign in after you verify your email so you can enter your activation code.',
+      subtitle:
+          'Sign in after you verify your email to access your resident portal.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -77,7 +79,8 @@ class _ResidentSignInPageState extends ConsumerState<ResidentSignInPage> {
           ),
           const SizedBox(height: 12),
           TextButton(
-            onPressed: () => context.go('/portal/${widget.tenantCode}/register'),
+            onPressed: () =>
+                context.go('/portal/${widget.tenantCode}/register'),
             child: const Text('Need an account? Register here'),
           ),
         ],
@@ -85,13 +88,20 @@ class _ResidentSignInPageState extends ConsumerState<ResidentSignInPage> {
     );
   }
 
+  Future<void> _prepareResidentSession() async {
+    final repository = ref.read(residentPortalAuthRepositoryProvider);
+    if (repository.currentUser == null) return;
+    await repository.signOut();
+  }
+
   Future<void> _signIn() async {
-    final success = await ref.read(residentPortalAuthControllerProvider.notifier).signIn(
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
-        );
+    final success =
+        await ref.read(residentPortalAuthControllerProvider.notifier).signIn(
+              email: _emailController.text.trim(),
+              password: _passwordController.text,
+            );
     if (success && mounted) {
-      context.go('/portal/${widget.tenantCode}/activation-code');
+      context.go('/portal/${widget.tenantCode}/success');
     }
   }
 }
