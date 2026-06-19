@@ -19,6 +19,7 @@ class TenantSettingsInput {
     this.emailFromName,
     this.emailReplyTo,
     this.timezone = 'America/Chicago',
+    this.residentActivationCodesRequired = true,
   });
 
   final String? supportEmail;
@@ -30,6 +31,7 @@ class TenantSettingsInput {
   final String? emailFromName;
   final String? emailReplyTo;
   final String timezone;
+  final bool residentActivationCodesRequired;
 }
 
 class TenantEmailSettingsInput {
@@ -135,7 +137,6 @@ class TenantOnboardingInput {
   final DateTime? launchReadyAt;
   final DateTime? launchedAt;
 }
-
 
 class TenantStaffAssignmentInput {
   const TenantStaffAssignmentInput({

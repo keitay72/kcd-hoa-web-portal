@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/rbac/rbac_providers.dart';
+import '../../../core/rbac/admin_context.dart';
 import '../../../core/subscriptions/subscription_providers.dart';
 import '../../../core/subscriptions/tenant_entitlements.dart';
 import '../../hoa_management/domain/hoa_community.dart';
@@ -42,22 +42,26 @@ class _TicketListPageState extends ConsumerState<TicketListPage> {
   Widget build(BuildContext context) {
     final tickets = ref.watch(ticketListProvider(_filter));
     final hoas = ref.watch(hoaListProvider);
-    final access = ref.watch(adminAccessProvider);
-    final csrEntitlement = ref.watch(adminFeatureEntitlementProvider(TenantFeature.advancedTicketManagement));
-    final dispatchEntitlement = ref.watch(adminFeatureEntitlementProvider(TenantFeature.dispatchDashboard));
+    final access = ref.watch(activeAdminAccessProvider);
+    final csrEntitlement = ref.watch(adminFeatureEntitlementProvider(
+        TenantFeature.advancedTicketManagement));
+    final dispatchEntitlement = ref.watch(
+        adminFeatureEntitlementProvider(TenantFeature.dispatchDashboard));
 
     final canReadTickets = access.maybeWhen(
       data: (value) => value.can('tickets.read'),
       orElse: () => false,
     );
-    final canOpenCsrDashboard = canReadTickets && csrEntitlement.maybeWhen(
-      data: (result) => result.isEnabled,
-      orElse: () => false,
-    );
-    final canOpenDispatchDashboard = canReadTickets && dispatchEntitlement.maybeWhen(
-      data: (result) => result.isEnabled,
-      orElse: () => false,
-    );
+    final canOpenCsrDashboard = canReadTickets &&
+        csrEntitlement.maybeWhen(
+          data: (result) => result.isEnabled,
+          orElse: () => false,
+        );
+    final canOpenDispatchDashboard = canReadTickets &&
+        dispatchEntitlement.maybeWhen(
+          data: (result) => result.isEnabled,
+          orElse: () => false,
+        );
 
     return Padding(
       padding: const EdgeInsets.all(24),
@@ -70,7 +74,8 @@ class _TicketListPageState extends ConsumerState<TicketListPage> {
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Text('Tickets', style: Theme.of(context).textTheme.headlineMedium),
+              Text('Tickets',
+                  style: Theme.of(context).textTheme.headlineMedium),
               if (canOpenCsrDashboard || canOpenDispatchDashboard)
                 Wrap(
                   spacing: 8,
@@ -125,7 +130,8 @@ class _TicketListPageState extends ConsumerState<TicketListPage> {
             child: tickets.when(
               data: (items) => _TicketTable(tickets: items),
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, _) => Center(child: Text('Unable to load tickets: $error')),
+              error: (error, _) =>
+                  Center(child: Text('Unable to load tickets: $error')),
             ),
           ),
         ],
@@ -215,35 +221,45 @@ class _TicketFilterBar extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final hoaFilter = hoas.when(
-          data: (items) => _HoaFilter(hoas: items, value: hoaId, onChanged: onHoaChanged),
-          loading: () => const SizedBox(height: 56, child: Center(child: LinearProgressIndicator())),
+          data: (items) =>
+              _HoaFilter(hoas: items, value: hoaId, onChanged: onHoaChanged),
+          loading: () => const SizedBox(
+              height: 56, child: Center(child: LinearProgressIndicator())),
           error: (error, _) => Text('Unable to load HOAs: $error'),
         );
         final statusFilter = DropdownButtonFormField<String>(
           value: status ?? _allValue,
           isExpanded: true,
-          decoration: const InputDecoration(labelText: 'Status', border: OutlineInputBorder()),
+          decoration: const InputDecoration(
+              labelText: 'Status', border: OutlineInputBorder()),
           items: [
-            const DropdownMenuItem(value: _allValue, child: Text('All Statuses')),
+            const DropdownMenuItem(
+                value: _allValue, child: Text('All Statuses')),
             ...TicketStatus.values
                 .where((item) => item != TicketStatus.waitingOnCustomer)
                 .map(
-                  (item) => DropdownMenuItem(value: item.databaseValue, child: Text(item.label)),
+                  (item) => DropdownMenuItem(
+                      value: item.databaseValue, child: Text(item.label)),
                 ),
           ],
-          onChanged: (value) => onStatusChanged(value == _allValue ? null : value),
+          onChanged: (value) =>
+              onStatusChanged(value == _allValue ? null : value),
         );
         final priorityFilter = DropdownButtonFormField<String>(
           value: priority ?? _allValue,
           isExpanded: true,
-          decoration: const InputDecoration(labelText: 'Priority', border: OutlineInputBorder()),
+          decoration: const InputDecoration(
+              labelText: 'Priority', border: OutlineInputBorder()),
           items: [
-            const DropdownMenuItem(value: _allValue, child: Text('All Priorities')),
+            const DropdownMenuItem(
+                value: _allValue, child: Text('All Priorities')),
             ...TicketPriority.values.map(
-              (item) => DropdownMenuItem(value: item.name, child: Text(item.label)),
+              (item) =>
+                  DropdownMenuItem(value: item.name, child: Text(item.label)),
             ),
           ],
-          onChanged: (value) => onPriorityChanged(value == _allValue ? null : value),
+          onChanged: (value) =>
+              onPriorityChanged(value == _allValue ? null : value),
         );
         final search = TextField(
           controller: searchController,
@@ -294,7 +310,8 @@ class _TicketFilterBar extends StatelessWidget {
 }
 
 class _HoaFilter extends StatelessWidget {
-  const _HoaFilter({required this.hoas, required this.value, required this.onChanged});
+  const _HoaFilter(
+      {required this.hoas, required this.value, required this.onChanged});
 
   final List<HoaCommunity> hoas;
   final String? value;
@@ -305,13 +322,15 @@ class _HoaFilter extends StatelessWidget {
     return DropdownButtonFormField<String?>(
       value: value,
       isExpanded: true,
-      decoration: const InputDecoration(labelText: 'HOA', border: OutlineInputBorder()),
+      decoration:
+          const InputDecoration(labelText: 'HOA', border: OutlineInputBorder()),
       items: [
         const DropdownMenuItem<String?>(value: null, child: Text('All HOAs')),
         ...hoas.map(
           (hoa) => DropdownMenuItem<String?>(
             value: hoa.id,
-            child: Text('${hoa.name} (${hoa.code})', overflow: TextOverflow.ellipsis),
+            child: Text('${hoa.name} (${hoa.code})',
+                overflow: TextOverflow.ellipsis),
           ),
         ),
       ],
@@ -319,7 +338,8 @@ class _HoaFilter extends StatelessWidget {
         return [
           const Text('All HOAs', overflow: TextOverflow.ellipsis),
           ...hoas.map(
-            (hoa) => Text('${hoa.name} (${hoa.code})', overflow: TextOverflow.ellipsis),
+            (hoa) => Text('${hoa.name} (${hoa.code})',
+                overflow: TextOverflow.ellipsis),
           ),
         ];
       },
@@ -341,7 +361,10 @@ class _FilterActions extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          OutlinedButton.icon(onPressed: onApply, icon: const Icon(Icons.search), label: const Text('Apply')),
+          OutlinedButton.icon(
+              onPressed: onApply,
+              icon: const Icon(Icons.search),
+              label: const Text('Apply')),
           const SizedBox(width: 8),
           TextButton(onPressed: onReset, child: const Text('Reset')),
         ],

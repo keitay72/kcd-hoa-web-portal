@@ -51,18 +51,24 @@ class PlatformTenant {
   final int? includedHoaCount;
   final int? includedResidentCount;
 
-  String get onboardingStatusLabel => _titleCase((onboardingStatus ?? 'not_started').replaceAll('_', ' '));
-  String get betaStatusLabel => _titleCase((betaStatus ?? 'not_started').replaceAll('_', ' '));
-  String get hoaDataStatusLabel => _titleCase((hoaDataStatus ?? 'not_requested').replaceAll('_', ' '));
-  String get subscriptionStatusLabel => _titleCase((subscriptionStatus ?? 'not_assigned').replaceAll('_', ' '));
-  bool get hasSubscription => subscriptionStatus != null && subscriptionStatus != 'cancelled';
+  String get onboardingStatusLabel =>
+      _titleCase((onboardingStatus ?? 'not_started').replaceAll('_', ' '));
+  String get betaStatusLabel =>
+      _titleCase((betaStatus ?? 'not_started').replaceAll('_', ' '));
+  String get hoaDataStatusLabel =>
+      _titleCase((hoaDataStatus ?? 'not_requested').replaceAll('_', ' '));
+  String get subscriptionStatusLabel =>
+      _titleCase((subscriptionStatus ?? 'not_assigned').replaceAll('_', ' '));
+  bool get hasSubscription =>
+      subscriptionStatus != null && subscriptionStatus != 'cancelled';
   bool get hasTenantAdmin => tenantAdminCount > 0;
   bool get hasBillingContact => billingContactCount > 0;
   bool get hasHoas => hoaCount > 0;
   bool get hasHoaLimit => includedHoaCount != null;
   bool get hasResidentLimit => includedResidentCount != null;
   bool get isFreeBeta => subscriptionBillingMode == 'free_beta';
-  bool get hasStripePending => hasSubscription && !isFreeBeta && !subscriptionHasStripePrice;
+  bool get hasStripePending =>
+      hasSubscription && !isFreeBeta && !subscriptionHasStripePrice;
   bool get isHoaOverIncluded => hasHoaLimit && hoaCount > includedHoaCount!;
   bool get isResidentOverIncluded =>
       hasResidentLimit && residentCount > includedResidentCount!;
@@ -73,7 +79,8 @@ class PlatformTenant {
       hasResidentLimit &&
       residentCount >= includedResidentCount! * 0.8 &&
       !isResidentOverIncluded;
-  bool get isApproachingLimits => isHoaApproachingLimit || isResidentApproachingLimit;
+  bool get isApproachingLimits =>
+      isHoaApproachingLimit || isResidentApproachingLimit;
   int get hoaOverageCount => _positiveOverage(hoaCount, includedHoaCount);
   int get residentOverageCount =>
       _positiveOverage(residentCount, includedResidentCount);
@@ -88,8 +95,10 @@ class PlatformTenant {
 
   bool get needsSetup => !isLaunchReady && !isLaunched && !isOnboardingBlocked;
   bool get isOnboardingBlocked => onboardingStatus == 'blocked';
-  bool get isLaunchReady => onboardingStatus == 'ready_to_launch' || onboardingLaunchReadyAt != null;
-  bool get isLaunched => onboardingStatus == 'launched' || onboardingLaunchedAt != null;
+  bool get isLaunchReady =>
+      onboardingStatus == 'ready_to_launch' || onboardingLaunchReadyAt != null;
+  bool get isLaunched =>
+      onboardingStatus == 'launched' || onboardingLaunchedAt != null;
 
   PlatformTenant copyWith({
     String? onboardingStatus,
@@ -119,12 +128,15 @@ class PlatformTenant {
       createdAt: createdAt,
       updatedAt: updatedAt,
       onboardingStatus: onboardingStatus ?? this.onboardingStatus,
-      onboardingBlockedReason: onboardingBlockedReason ?? this.onboardingBlockedReason,
-      onboardingLaunchReadyAt: onboardingLaunchReadyAt ?? this.onboardingLaunchReadyAt,
+      onboardingBlockedReason:
+          onboardingBlockedReason ?? this.onboardingBlockedReason,
+      onboardingLaunchReadyAt:
+          onboardingLaunchReadyAt ?? this.onboardingLaunchReadyAt,
       onboardingLaunchedAt: onboardingLaunchedAt ?? this.onboardingLaunchedAt,
       betaStatus: betaStatus ?? this.betaStatus,
       hoaDataStatus: hoaDataStatus ?? this.hoaDataStatus,
-      readyForHoaOnboarding: readyForHoaOnboarding ?? this.readyForHoaOnboarding,
+      readyForHoaOnboarding:
+          readyForHoaOnboarding ?? this.readyForHoaOnboarding,
       subscriptionStatus: subscriptionStatus ?? this.subscriptionStatus,
       subscriptionPlanName: subscriptionPlanName ?? this.subscriptionPlanName,
       subscriptionBillingMode:
@@ -136,7 +148,8 @@ class PlatformTenant {
       tenantAdminCount: tenantAdminCount ?? this.tenantAdminCount,
       billingContactCount: billingContactCount ?? this.billingContactCount,
       includedHoaCount: includedHoaCount ?? this.includedHoaCount,
-      includedResidentCount: includedResidentCount ?? this.includedResidentCount,
+      includedResidentCount:
+          includedResidentCount ?? this.includedResidentCount,
     );
   }
 
@@ -155,6 +168,7 @@ class TenantSettings {
     this.emailFromName,
     this.emailReplyTo,
     this.timezone = 'America/Chicago',
+    this.residentActivationCodesRequired = true,
   });
 
   final String tenantId;
@@ -167,6 +181,7 @@ class TenantSettings {
   final String? emailFromName;
   final String? emailReplyTo;
   final String timezone;
+  final bool residentActivationCodesRequired;
 }
 
 class TenantEmailSettings {
@@ -191,7 +206,8 @@ class TenantEmailSettings {
   final DateTime? lastVerifiedAt;
 
   String get providerLabel => _titleCase(provider.replaceAll('_', ' '));
-  String get verificationStatusLabel => _titleCase(verificationStatus.replaceAll('_', ' '));
+  String get verificationStatusLabel =>
+      _titleCase(verificationStatus.replaceAll('_', ' '));
 }
 
 class TenantSmsSettings {
@@ -290,7 +306,8 @@ class TenantStaffAssignment {
     return name == null || name.isEmpty ? email : name;
   }
 
-  String get statusLabel => _titleCase((status ?? 'active').replaceAll('_', ' '));
+  String get statusLabel =>
+      _titleCase((status ?? 'active').replaceAll('_', ' '));
 }
 
 class TenantAssignableUser {
@@ -339,10 +356,12 @@ class SubscriptionPlanSummary {
 
   String get statusLabel => _titleCase(status.replaceAll('_', ' '));
 
-  String get hoaLimitLabel => includedHoaCount == null ? 'Unlimited HOAs' : '$includedHoaCount HOAs';
+  String get hoaLimitLabel =>
+      includedHoaCount == null ? 'Unlimited HOAs' : '$includedHoaCount HOAs';
 
-  String get residentLimitLabel =>
-      includedResidentCount == null ? 'Unlimited residents' : '$includedResidentCount residents';
+  String get residentLimitLabel => includedResidentCount == null
+      ? 'Unlimited residents'
+      : '$includedResidentCount residents';
 
   String get limitLabel => '$hoaLimitLabel / $residentLimitLabel';
 
@@ -375,7 +394,8 @@ class SubscriptionPriceSummary {
   }
 
   bool get isActive => status == 'active';
-  bool get hasStripePrice => stripePriceId != null && stripePriceId!.trim().isNotEmpty;
+  bool get hasStripePrice =>
+      stripePriceId != null && stripePriceId!.trim().isNotEmpty;
   String get statusLabel => _titleCase(status.replaceAll('_', ' '));
 }
 
@@ -431,7 +451,8 @@ class TenantSubscriptionSummary {
     if (isFreeBeta && (unitAmountCents == null || billingInterval == null)) {
       return 'Free beta / no charge';
     }
-    if (unitAmountCents == null || billingInterval == null) return 'No price assigned';
+    if (unitAmountCents == null || billingInterval == null)
+      return 'No price assigned';
     final amount = (unitAmountCents! / 100).toStringAsFixed(2);
     return '\$$amount/$billingInterval';
   }
@@ -519,7 +540,8 @@ class TenantOnboardingStatus {
 
   String get statusLabel => _titleCase(status.replaceAll('_', ' '));
   String get betaStatusLabel => _titleCase(betaStatus.replaceAll('_', ' '));
-  String get hoaDataStatusLabel => _titleCase(hoaDataStatus.replaceAll('_', ' '));
+  String get hoaDataStatusLabel =>
+      _titleCase(hoaDataStatus.replaceAll('_', ' '));
 }
 
 class OnboardingChecklistItem {
@@ -601,23 +623,29 @@ class TenantDetail {
   bool get hasResidentLimit => residentLimit != null;
 
   bool get isHoaLimitReached => hasHoaLimit && hoaCount >= hoaLimit!;
-  bool get isResidentLimitReached => hasResidentLimit && residentCount >= residentLimit!;
+  bool get isResidentLimitReached =>
+      hasResidentLimit && residentCount >= residentLimit!;
 
   bool get isHoaOverLimit => hasHoaLimit && hoaCount > hoaLimit!;
-  bool get isResidentOverLimit => hasResidentLimit && residentCount > residentLimit!;
+  bool get isResidentOverLimit =>
+      hasResidentLimit && residentCount > residentLimit!;
 
   int get hoaOverageCount => _positiveOverage(hoaCount, hoaLimit);
-  int get projectedHoaOverageAfterCreate => _positiveOverage(hoaCount + 1, hoaLimit);
-  int get residentOverageCount => _positiveOverage(residentCount, residentLimit);
+  int get projectedHoaOverageAfterCreate =>
+      _positiveOverage(hoaCount + 1, hoaLimit);
+  int get residentOverageCount =>
+      _positiveOverage(residentCount, residentLimit);
 
   int get hoaOverageMonthlyCents => hoaOverageCount * 1000;
   int get projectedHoaOverageMonthlyCentsAfterCreate =>
       projectedHoaOverageAfterCreate * 1000;
   int get residentOverageMonthlyCents => residentOverageCount * 5;
 
-  double? get hoaUsageRatio => hasHoaLimit && hoaLimit! > 0 ? hoaCount / hoaLimit! : null;
-  double? get residentUsageRatio =>
-      hasResidentLimit && residentLimit! > 0 ? residentCount / residentLimit! : null;
+  double? get hoaUsageRatio =>
+      hasHoaLimit && hoaLimit! > 0 ? hoaCount / hoaLimit! : null;
+  double? get residentUsageRatio => hasResidentLimit && residentLimit! > 0
+      ? residentCount / residentLimit!
+      : null;
 
   bool get isHoaUsageWarning {
     final ratio = hoaUsageRatio;
@@ -654,21 +682,28 @@ class TenantDetail {
         isComplete: currentSubscription?.planId != null &&
             (currentSubscription?.priceId != null ||
                 currentSubscription?.isFreeBeta == true),
-        description: currentSubscription?.planName ?? 'Assign a plan and billing mode.',
+        description:
+            currentSubscription?.planName ?? 'Assign a plan and billing mode.',
         action: 'subscription',
-        actionLabel: currentSubscription == null ? 'Assign plan' : 'Review plan',
+        actionLabel:
+            currentSubscription == null ? 'Assign plan' : 'Review plan',
       ),
       OnboardingChecklistItem(
         label: 'Billing contact added',
         isComplete: billingContacts.isNotEmpty,
-        description: billingContacts.isEmpty ? 'Add at least one billing contact.' : billingContacts.first.email,
+        description: billingContacts.isEmpty
+            ? 'Add at least one billing contact.'
+            : billingContacts.first.email,
         action: 'billing_contact',
         actionLabel: billingContacts.isEmpty ? 'Add contact' : 'Review contact',
       ),
       OnboardingChecklistItem(
         label: 'Support contact configured',
-        isComplete: settings?.supportEmail != null || settings?.supportPhone != null,
-        description: settings?.supportEmail ?? settings?.supportPhone ?? 'Add support email or phone.',
+        isComplete:
+            settings?.supportEmail != null || settings?.supportPhone != null,
+        description: settings?.supportEmail ??
+            settings?.supportPhone ??
+            'Add support email or phone.',
         action: 'settings',
         actionLabel: 'Edit support',
       ),
@@ -690,29 +725,40 @@ class TenantDetail {
       ),
       OnboardingChecklistItem(
         label: 'SMS decision recorded',
-        isComplete: smsAddon == null || smsSettings?.status == 'pending' || smsSettings?.status == 'active',
-        description: smsAddon == null ? 'SMS add-on is not enabled.' : 'SMS status: ${smsSettings?.statusLabel ?? 'Not configured'}',
+        isComplete: smsAddon == null ||
+            smsSettings?.status == 'pending' ||
+            smsSettings?.status == 'active',
+        description: smsAddon == null
+            ? 'SMS add-on is not enabled.'
+            : 'SMS status: ${smsSettings?.statusLabel ?? 'Not configured'}',
         action: 'sms_settings',
         actionLabel: 'Review SMS',
       ),
       OnboardingChecklistItem(
         label: 'Tenant admin assigned',
         isComplete: tenantAdminCount > 0,
-        description: tenantAdminCount > 0 ? '$tenantAdminCount tenant admin/manager role(s).' : 'Invite or assign a tenant admin.',
+        description: tenantAdminCount > 0
+            ? '$tenantAdminCount tenant admin/manager role(s).'
+            : 'Invite or assign a tenant admin.',
         action: 'tenant_admin',
         actionLabel: tenantAdminCount > 0 ? 'Manage staff' : 'Assign admin',
       ),
       OnboardingChecklistItem(
         label: 'First HOA created',
         isComplete: hoaCount > 0,
-        description: hoaCount > 0 ? '$hoaCount HOA community record(s).' : "Create the tenant's first HOA.",
+        description: hoaCount > 0
+            ? '$hoaCount HOA community record(s).'
+            : "Create the tenant's first HOA.",
         action: 'first_hoa',
         actionLabel: hoaCount > 0 ? 'View HOAs' : 'Create HOA',
       ),
       OnboardingChecklistItem(
         label: 'Marked ready to launch',
-        isComplete: onboardingStatus?.launchReadyAt != null || onboardingStatus?.status == 'ready_to_launch' || onboardingStatus?.status == 'launched',
-        description: onboardingStatus?.statusLabel ?? 'Mark ready once configuration is complete.',
+        isComplete: onboardingStatus?.launchReadyAt != null ||
+            onboardingStatus?.status == 'ready_to_launch' ||
+            onboardingStatus?.status == 'launched',
+        description: onboardingStatus?.statusLabel ??
+            'Mark ready once configuration is complete.',
         action: 'onboarding_status',
         actionLabel: 'Update status',
       ),

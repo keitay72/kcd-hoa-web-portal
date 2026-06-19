@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/rbac/admin_context.dart';
 import '../../../core/supabase/supabase_provider.dart';
 import '../data/resident_verification_repository.dart';
 import '../domain/resident_verification.dart';
@@ -15,27 +16,40 @@ final residentVerificationRepositoryProvider =
 
 final residentVerificationListProvider = FutureProvider.autoDispose
     .family<List<ResidentVerification>, ResidentVerificationListFilter>(
-  (ref, filter) {
-    return ref.watch(residentVerificationRepositoryProvider).list(filter);
+  (ref, filter) async {
+    final allowedHoaIds = await ref.watch(activeHoaIdsProvider.future);
+    final items =
+        await ref.watch(residentVerificationRepositoryProvider).list(filter);
+    if (allowedHoaIds == null) return items;
+    return items.where((item) => allowedHoaIds.contains(item.hoaId)).toList();
   },
 );
 
 final residentVerificationDetailProvider = FutureProvider.autoDispose
-    .family<ResidentVerification, String>((ref, id) {
-  return ref.watch(residentVerificationRepositoryProvider).getById(id);
+    .family<ResidentVerification, String>((ref, id) async {
+  final allowedHoaIds = await ref.watch(activeHoaIdsProvider.future);
+  final item =
+      await ref.watch(residentVerificationRepositoryProvider).getById(id);
+  if (allowedHoaIds != null && !allowedHoaIds.contains(item.hoaId)) {
+    throw StateError('Resident verification is outside the active view.');
+  }
+  return item;
 });
 
 final residentVerificationHistoryProvider = FutureProvider.autoDispose
     .family<List<ResidentAddressMembershipHistory>, String>((ref, userId) {
-  return ref.watch(residentVerificationRepositoryProvider).historyForUser(userId);
+  return ref
+      .watch(residentVerificationRepositoryProvider)
+      .historyForUser(userId);
 });
 
-final residentVerificationCommandProvider =
-    AsyncNotifierProvider.autoDispose<ResidentVerificationCommandController, void>(
+final residentVerificationCommandProvider = AsyncNotifierProvider.autoDispose<
+    ResidentVerificationCommandController, void>(
   ResidentVerificationCommandController.new,
 );
 
-class ResidentVerificationCommandController extends AutoDisposeAsyncNotifier<void> {
+class ResidentVerificationCommandController
+    extends AutoDisposeAsyncNotifier<void> {
   @override
   FutureOr<void> build() {}
 
@@ -78,7 +92,9 @@ class ResidentVerificationCommandController extends AutoDisposeAsyncNotifier<voi
   }) async {
     state = const AsyncLoading();
     final result = await AsyncValue.guard(() {
-      return ref.read(residentVerificationRepositoryProvider).deactivateResident(
+      return ref
+          .read(residentVerificationRepositoryProvider)
+          .deactivateResident(
             userId: userId,
             reason: reason,
           );

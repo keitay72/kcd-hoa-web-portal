@@ -41,6 +41,19 @@ class AdminAccess {
   final List<AdminRoleAssignment> hoaRoles;
   final Set<String> permissions;
 
+  AdminAccess scopedTo({
+    required List<AdminRoleAssignment> roles,
+    required Set<String> permissions,
+  }) {
+    return AdminAccess(
+      userId: userId,
+      globalRoles: roles.where((role) => role.isGlobalPlatformRole).toList(),
+      tenantRoles: roles.where((role) => role.isTenantScoped).toList(),
+      hoaRoles: roles.where((role) => role.isHoaScoped).toList(),
+      permissions: permissions,
+    );
+  }
+
   // Compatibility alias while older admin screens are migrated from
   // platform-role terminology to tenant-role terminology.
   List<AdminRoleAssignment> get platformRoles => tenantRoles;
@@ -59,8 +72,10 @@ class AdminAccess {
   bool get hasAnyRole => allRoles.isNotEmpty;
   bool get hasGlobalRoleAssignment => globalRoles.isNotEmpty;
   bool get hasTenantRoleAssignment => tenantRoles.isNotEmpty;
-  bool get hasPlatformRole => hasGlobalRoleAssignment || hasTenantRoleAssignment;
-  bool get isTenantScopedOnly => hasTenantRoleAssignment && !hasGlobalRoleAssignment;
+  bool get hasPlatformRole =>
+      hasGlobalRoleAssignment || hasTenantRoleAssignment;
+  bool get isTenantScopedOnly =>
+      hasTenantRoleAssignment && !hasGlobalRoleAssignment;
   bool get isHoaScopedOnly => !hasPlatformRole && hoaRoles.isNotEmpty;
 
   List<AdminRoleAssignment> get allRoles => [
@@ -96,26 +111,40 @@ class AdminAccess {
   }
 
   bool can(String permissionCode) {
-    return isPlatformOwner || isPlatformAdmin || permissions.contains(permissionCode);
+    return isPlatformOwner ||
+        isPlatformAdmin ||
+        permissions.contains(permissionCode);
   }
 
   bool canAny(Iterable<String> permissionCodes) {
-    return isPlatformOwner || isPlatformAdmin || permissionCodes.any(permissions.contains);
+    return isPlatformOwner ||
+        isPlatformAdmin ||
+        permissionCodes.any(permissions.contains);
   }
 
   bool canAll(Iterable<String> permissionCodes) {
-    return isPlatformOwner || isPlatformAdmin || permissionCodes.every(permissions.contains);
+    return isPlatformOwner ||
+        isPlatformAdmin ||
+        permissionCodes.every(permissions.contains);
   }
 
-  List<String> get tenantScopeIds => tenantRoles.map((role) => role.tenantId).whereType<String>().toSet().toList();
-  List<String> get hoaScopeIds => hoaRoles.map((role) => role.hoaId).whereType<String>().toSet().toList();
+  List<String> get tenantScopeIds => tenantRoles
+      .map((role) => role.tenantId)
+      .whereType<String>()
+      .toSet()
+      .toList();
+  List<String> get hoaScopeIds =>
+      hoaRoles.map((role) => role.hoaId).whereType<String>().toSet().toList();
 
   bool canAccessTenant(String tenantId) {
-    return isPlatformOperator || tenantRoles.any((role) => role.tenantId == tenantId);
+    return isPlatformOperator ||
+        tenantRoles.any((role) => role.tenantId == tenantId);
   }
 
   bool canAccessHoa(String hoaId) {
-    return isPlatformOperator || isTenantStaff || hoaRoles.any((role) => role.hoaId == hoaId);
+    return isPlatformOperator ||
+        isTenantStaff ||
+        hoaRoles.any((role) => role.hoaId == hoaId);
   }
 
   bool canManageHoa(String hoaId) {

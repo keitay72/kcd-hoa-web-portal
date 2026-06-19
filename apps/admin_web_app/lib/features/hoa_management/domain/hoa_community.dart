@@ -19,6 +19,7 @@ class HoaCommunity {
     required this.status,
     required this.createdAt,
     required this.updatedAt,
+    this.residentActivationCodesRequiredOverride,
   });
 
   final String id;
@@ -28,6 +29,15 @@ class HoaCommunity {
   final HoaCommunityStatus status;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final bool? residentActivationCodesRequiredOverride;
 
   bool get isActive => status == HoaCommunityStatus.active;
+
+  String get residentActivationCodeSettingLabel {
+    return switch (residentActivationCodesRequiredOverride) {
+      null => 'Activation codes: tenant default',
+      true => 'Activation codes: required',
+      false => 'Activation codes: bypassed',
+    };
+  }
 }

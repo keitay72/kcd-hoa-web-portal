@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/rbac/admin_context.dart';
 import '../../announcements_cms/domain/announcement.dart';
 import '../../announcements_cms/presentation/announcement_form_dialog.dart';
 import '../../announcements_cms/presentation/announcement_providers.dart';
@@ -12,7 +13,8 @@ class HoaAnnouncementsPage extends ConsumerStatefulWidget {
   const HoaAnnouncementsPage({super.key});
 
   @override
-  ConsumerState<HoaAnnouncementsPage> createState() => _HoaAnnouncementsPageState();
+  ConsumerState<HoaAnnouncementsPage> createState() =>
+      _HoaAnnouncementsPageState();
 }
 
 class _HoaAnnouncementsPageState extends ConsumerState<HoaAnnouncementsPage> {
@@ -31,8 +33,14 @@ class _HoaAnnouncementsPageState extends ConsumerState<HoaAnnouncementsPage> {
     return scope.when(
       data: (item) {
         final hoaId = item?.hoaId;
-        if (hoaId == null) return const Center(child: Text('No HOA scope assigned.'));
-        final announcements = ref.watch(announcementListProvider(AnnouncementListFilter(hoaId: hoaId)));
+        if (hoaId == null)
+          return const Center(child: Text('No HOA scope assigned.'));
+        final canManage = ref.watch(activeAdminAccessProvider).maybeWhen(
+              data: (access) => access.can('announcements.manage'),
+              orElse: () => false,
+            );
+        final announcements = ref.watch(
+            announcementListProvider(AnnouncementListFilter(hoaId: hoaId)));
 
         return Padding(
           padding: const EdgeInsets.all(24),
@@ -49,11 +57,12 @@ class _HoaAnnouncementsPageState extends ConsumerState<HoaAnnouncementsPage> {
                     title: 'HOA Announcements',
                     subtitle: 'Create and manage announcements for your HOA.',
                   ),
-                  FilledButton.icon(
-                    onPressed: () => _openCreateDialog(context, ref, hoaId),
-                    icon: const Icon(Icons.campaign_outlined),
-                    label: const Text('Create Announcement'),
-                  ),
+                  if (canManage)
+                    FilledButton.icon(
+                      onPressed: () => _openCreateDialog(context, ref, hoaId),
+                      icon: const Icon(Icons.campaign_outlined),
+                      label: const Text('Create Announcement'),
+                    ),
                 ],
               ),
               const SizedBox(height: 16),
@@ -70,8 +79,10 @@ class _HoaAnnouncementsPageState extends ConsumerState<HoaAnnouncementsPage> {
               Expanded(
                 child: announcements.when(
                   data: (items) => _AnnouncementList(items: _filter(items)),
-                  loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (error, _) => Center(child: Text('Unable to load announcements: $error')),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (error, _) => Center(
+                      child: Text('Unable to load announcements: $error')),
                 ),
               ),
             ],
@@ -79,7 +90,8 @@ class _HoaAnnouncementsPageState extends ConsumerState<HoaAnnouncementsPage> {
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, _) => Center(child: Text('Unable to load HOA scope: $error')),
+      error: (error, _) =>
+          Center(child: Text('Unable to load HOA scope: $error')),
     );
   }
 
@@ -93,7 +105,8 @@ class _HoaAnnouncementsPageState extends ConsumerState<HoaAnnouncementsPage> {
     }).toList();
   }
 
-  Future<void> _openCreateDialog(BuildContext context, WidgetRef ref, String hoaId) async {
+  Future<void> _openCreateDialog(
+      BuildContext context, WidgetRef ref, String hoaId) async {
     final result = await showDialog<Object?>(
       context: context,
       barrierDismissible: false,
@@ -136,7 +149,8 @@ class _AnnouncementList extends StatelessWidget {
           return ListTile(
             leading: const Icon(Icons.campaign_outlined),
             title: Text(item.title),
-            subtitle: Text('${item.statusLabel} • Publishes ${_formatDate(item.publishAt)}'),
+            subtitle: Text(
+                '${item.statusLabel} • Publishes ${_formatDate(item.publishAt)}'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.go('/admin/announcements/${item.id}'),
           );

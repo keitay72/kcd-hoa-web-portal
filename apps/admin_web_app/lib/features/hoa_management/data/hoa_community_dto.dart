@@ -9,6 +9,7 @@ class HoaCommunityDto {
     required this.status,
     required this.createdAt,
     required this.updatedAt,
+    this.residentActivationCodesRequiredOverride,
   });
 
   final String id;
@@ -18,6 +19,7 @@ class HoaCommunityDto {
   final String status;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final bool? residentActivationCodesRequiredOverride;
 
   factory HoaCommunityDto.fromJson(Map<String, dynamic> json) {
     return HoaCommunityDto(
@@ -28,6 +30,8 @@ class HoaCommunityDto {
       status: json['status'] as String,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
+      residentActivationCodesRequiredOverride:
+          json['resident_activation_codes_required_override'] as bool?,
     );
   }
 
@@ -40,6 +44,8 @@ class HoaCommunityDto {
       status: HoaCommunityStatus.fromDatabase(status),
       createdAt: createdAt,
       updatedAt: updatedAt,
+      residentActivationCodesRequiredOverride:
+          residentActivationCodesRequiredOverride,
     );
   }
 }

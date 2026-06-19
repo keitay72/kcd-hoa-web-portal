@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/rbac/admin_context.dart';
 import '../../../core/supabase/supabase_provider.dart';
 import '../data/ticket_repository.dart';
 import '../domain/ticket.dart';
@@ -13,32 +14,46 @@ final ticketRepositoryProvider = Provider<TicketRepository>((ref) {
   return SupabaseTicketRepository(ref.watch(supabaseClientProvider));
 });
 
-final ticketListProvider =
-    FutureProvider.autoDispose.family<List<ServiceTicket>, TicketListFilter>((ref, filter) {
-  return ref.watch(ticketRepositoryProvider).list(filter);
+final ticketListProvider = FutureProvider.autoDispose
+    .family<List<ServiceTicket>, TicketListFilter>((ref, filter) async {
+  final allowedHoaIds = await ref.watch(activeHoaIdsProvider.future);
+  final items = await ref.watch(ticketRepositoryProvider).list(filter);
+  if (allowedHoaIds == null) return items;
+  return items.where((item) => allowedHoaIds.contains(item.hoaId)).toList();
 });
 
-final ticketQueueProvider =
-    FutureProvider.autoDispose.family<List<ServiceTicket>, TicketQueue>((ref, queue) {
-  return ref.watch(ticketRepositoryProvider).queue(queue);
+final ticketQueueProvider = FutureProvider.autoDispose
+    .family<List<ServiceTicket>, TicketQueue>((ref, queue) async {
+  final allowedHoaIds = await ref.watch(activeHoaIdsProvider.future);
+  final items = await ref.watch(ticketRepositoryProvider).queue(queue);
+  if (allowedHoaIds == null) return items;
+  return items.where((item) => allowedHoaIds.contains(item.hoaId)).toList();
 });
 
-final ticketMetricsProvider = FutureProvider.autoDispose<TicketMetrics>((ref) {
-  return ref.watch(ticketRepositoryProvider).metrics();
+final ticketMetricsProvider =
+    FutureProvider.autoDispose<TicketMetrics>((ref) async {
+  final tickets =
+      await ref.watch(ticketListProvider(const TicketListFilter()).future);
+  return TicketMetrics.fromTickets(tickets);
 });
 
 final ticketDetailProvider =
-    FutureProvider.autoDispose.family<ServiceTicket, String>((ref, id) {
-  return ref.watch(ticketRepositoryProvider).getById(id);
+    FutureProvider.autoDispose.family<ServiceTicket, String>((ref, id) async {
+  final allowedHoaIds = await ref.watch(activeHoaIdsProvider.future);
+  final item = await ref.watch(ticketRepositoryProvider).getById(id);
+  if (allowedHoaIds != null && !allowedHoaIds.contains(item.hoaId)) {
+    throw StateError('Ticket is outside the active view.');
+  }
+  return item;
 });
 
-final ticketEventsProvider =
-    FutureProvider.autoDispose.family<List<TicketEvent>, String>((ref, ticketId) {
+final ticketEventsProvider = FutureProvider.autoDispose
+    .family<List<TicketEvent>, String>((ref, ticketId) {
   return ref.watch(ticketRepositoryProvider).eventsForTicket(ticketId);
 });
 
-final ticketAttachmentsProvider =
-    FutureProvider.autoDispose.family<List<TicketAttachment>, String>((ref, ticketId) {
+final ticketAttachmentsProvider = FutureProvider.autoDispose
+    .family<List<TicketAttachment>, String>((ref, ticketId) {
   return ref.watch(ticketRepositoryProvider).attachmentsForTicket(ticketId);
 });
 

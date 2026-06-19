@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/rbac/admin_context.dart';
 import '../../../core/rbac/admin_access.dart';
 import 'hoa_manager_providers.dart';
 
@@ -49,7 +50,8 @@ class HoaScopeHeader extends ConsumerWidget {
         ),
         roles.when(
           data: (items) => _HoaScopeSelect(items: items),
-          loading: () => const SizedBox(width: 180, child: LinearProgressIndicator()),
+          loading: () =>
+              const SizedBox(width: 180, child: LinearProgressIndicator()),
           error: (error, _) => Text('Unable to load HOA scope: $error'),
         ),
       ],
@@ -66,7 +68,8 @@ class _HoaScopeSelect extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (items.length <= 1) return const SizedBox.shrink();
 
-    final selected = ref.watch(selectedHoaScopeProvider) ?? items.first.hoaId;
+    final activeContext = ref.watch(activeAdminContextProvider).asData?.value;
+    final selected = activeContext?.scopeId ?? items.first.hoaId;
 
     return SizedBox(
       width: 280,
@@ -86,7 +89,9 @@ class _HoaScopeSelect extends ConsumerWidget {
             )
             .toList(),
         onChanged: (value) {
-          ref.read(selectedHoaScopeProvider.notifier).state = value;
+          setSelectedAdminContextId(ref, 'hoa:$value');
+          ref.invalidate(activeAdminContextProvider);
+          ref.invalidate(activeAdminAccessProvider);
           ref.invalidate(activeHoaScopeProvider);
           ref.invalidate(hoaManagerSummaryProvider);
           ref.invalidate(hoaResidentListProvider);

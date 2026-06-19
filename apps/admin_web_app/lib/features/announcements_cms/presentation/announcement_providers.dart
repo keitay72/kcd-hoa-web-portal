@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/rbac/admin_context.dart';
 import '../../../core/supabase/supabase_provider.dart';
 import '../data/announcement_repository.dart';
 import '../domain/announcement.dart';
@@ -14,13 +15,21 @@ final announcementRepositoryProvider = Provider<AnnouncementRepository>((ref) {
 });
 
 final announcementListProvider = FutureProvider.autoDispose
-    .family<List<Announcement>, AnnouncementListFilter>((ref, filter) {
-  return ref.watch(announcementRepositoryProvider).list(filter);
+    .family<List<Announcement>, AnnouncementListFilter>((ref, filter) async {
+  final allowedHoaIds = await ref.watch(activeHoaIdsProvider.future);
+  final items = await ref.watch(announcementRepositoryProvider).list(filter);
+  if (allowedHoaIds == null) return items;
+  return items.where((item) => allowedHoaIds.contains(item.hoaId)).toList();
 });
 
 final announcementDetailProvider =
-    FutureProvider.autoDispose.family<Announcement, String>((ref, id) {
-  return ref.watch(announcementRepositoryProvider).getById(id);
+    FutureProvider.autoDispose.family<Announcement, String>((ref, id) async {
+  final allowedHoaIds = await ref.watch(activeHoaIdsProvider.future);
+  final item = await ref.watch(announcementRepositoryProvider).getById(id);
+  if (allowedHoaIds != null && !allowedHoaIds.contains(item.hoaId)) {
+    throw StateError('Announcement is outside the active view.');
+  }
+  return item;
 });
 
 final announcementCommandProvider =
@@ -54,7 +63,9 @@ class AnnouncementCommandController extends AutoDisposeAsyncNotifier<void> {
   }) async {
     state = const AsyncLoading();
     final result = await AsyncValue.guard(() {
-      return ref.read(announcementRepositoryProvider).update(id: id, input: input);
+      return ref
+          .read(announcementRepositoryProvider)
+          .update(id: id, input: input);
     });
 
     if (result.hasError) {

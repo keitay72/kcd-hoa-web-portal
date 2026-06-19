@@ -24,7 +24,8 @@ class TenantSettingsDialog extends ConsumerStatefulWidget {
   final String? customDomainLockReason;
 
   @override
-  ConsumerState<TenantSettingsDialog> createState() => _TenantSettingsDialogState();
+  ConsumerState<TenantSettingsDialog> createState() =>
+      _TenantSettingsDialogState();
 }
 
 class _TenantSettingsDialogState extends ConsumerState<TenantSettingsDialog> {
@@ -38,6 +39,7 @@ class _TenantSettingsDialogState extends ConsumerState<TenantSettingsDialog> {
   late final TextEditingController _primaryColor;
   late final TextEditingController _secondaryColor;
   late final TextEditingController _timezone;
+  late bool _residentActivationCodesRequired;
 
   @override
   void initState() {
@@ -45,13 +47,18 @@ class _TenantSettingsDialogState extends ConsumerState<TenantSettingsDialog> {
     final settings = widget.settings;
     _supportEmail = TextEditingController(text: settings?.supportEmail ?? '');
     _supportPhone = TextEditingController(text: settings?.supportPhone ?? '');
-    _portalHostname = TextEditingController(text: settings?.portalHostname ?? '');
+    _portalHostname =
+        TextEditingController(text: settings?.portalHostname ?? '');
     _logoUrl = TextEditingController(text: settings?.logoUrl ?? '');
     _emailFromName = TextEditingController(text: settings?.emailFromName ?? '');
     _emailReplyTo = TextEditingController(text: settings?.emailReplyTo ?? '');
     _primaryColor = TextEditingController(text: settings?.primaryColor ?? '');
-    _secondaryColor = TextEditingController(text: settings?.secondaryColor ?? '');
-    _timezone = TextEditingController(text: settings?.timezone ?? 'America/Chicago');
+    _secondaryColor =
+        TextEditingController(text: settings?.secondaryColor ?? '');
+    _timezone =
+        TextEditingController(text: settings?.timezone ?? 'America/Chicago');
+    _residentActivationCodesRequired =
+        settings?.residentActivationCodesRequired ?? true;
   }
 
   @override
@@ -92,9 +99,11 @@ class _TenantSettingsDialogState extends ConsumerState<TenantSettingsDialog> {
                   _lockedNotice(
                     context,
                     title: 'Custom domain locked',
-                    message: widget.customDomainLockReason ?? 'Add-on not enabled',
+                    message:
+                        widget.customDomainLockReason ?? 'Add-on not enabled',
                   ),
-                _field(_supportEmail, 'Support email', validator: _optionalEmail),
+                _field(_supportEmail, 'Support email',
+                    validator: _optionalEmail),
                 _field(_supportPhone, 'Support phone'),
                 _field(
                   _portalHostname,
@@ -107,7 +116,8 @@ class _TenantSettingsDialogState extends ConsumerState<TenantSettingsDialog> {
                   enabled: widget.canManageBranding,
                 ),
                 _field(_emailFromName, 'Email from name'),
-                _field(_emailReplyTo, 'Reply-to email', validator: _optionalEmail),
+                _field(_emailReplyTo, 'Reply-to email',
+                    validator: _optionalEmail),
                 _field(
                   _primaryColor,
                   'Primary color',
@@ -123,12 +133,27 @@ class _TenantSettingsDialogState extends ConsumerState<TenantSettingsDialog> {
                   enabled: widget.canManageBranding,
                 ),
                 _field(_timezone, 'Timezone'),
+                SizedBox(
+                  width: 640,
+                  child: SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Require resident activation codes'),
+                    subtitle: const Text(
+                      'When off, residents only verify their email and service address during self-registration.',
+                    ),
+                    value: _residentActivationCodesRequired,
+                    onChanged: (value) {
+                      setState(() => _residentActivationCodesRequired = value);
+                    },
+                  ),
+                ),
                 if (state.hasError)
                   SizedBox(
                     width: 640,
                     child: Text(
                       'Unable to save settings: ${state.error}',
-                      style: TextStyle(color: Theme.of(context).colorScheme.error),
+                      style:
+                          TextStyle(color: Theme.of(context).colorScheme.error),
                     ),
                   ),
               ],
@@ -213,7 +238,9 @@ class _TenantSettingsDialogState extends ConsumerState<TenantSettingsDialog> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    final ok = await ref.read(tenantMutationControllerProvider.notifier).updateSettings(
+    final ok = await ref
+        .read(tenantMutationControllerProvider.notifier)
+        .updateSettings(
           tenantId: widget.tenantId,
           input: TenantSettingsInput(
             supportEmail: _supportEmail.text,
@@ -225,6 +252,7 @@ class _TenantSettingsDialogState extends ConsumerState<TenantSettingsDialog> {
             primaryColor: _primaryColor.text,
             secondaryColor: _secondaryColor.text,
             timezone: _timezone.text,
+            residentActivationCodesRequired: _residentActivationCodesRequired,
           ),
         );
     if (ok && mounted) Navigator.of(context).pop(true);

@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/rbac/admin_access.dart';
+import '../core/rbac/admin_context.dart';
 import '../core/rbac/permission_rules.dart';
 import '../core/rbac/protected_admin_page.dart';
-import '../core/rbac/rbac_providers.dart';
 import '../core/rbac/unauthorized_page.dart';
 import '../core/subscriptions/protected_tenant_feature_page.dart';
 import '../core/subscriptions/subscription_providers.dart';
@@ -52,14 +52,11 @@ import '../features/user_management/presentation/user_list_page.dart';
 import '../features/verification_admin/presentation/resident_verification_detail_page.dart';
 import '../features/verification_admin/presentation/resident_verification_list_page.dart';
 
-final currentAdminRoleProvider = currentAdminRoleSummaryProvider;
+final currentAdminRoleProvider = currentAdminContextSummaryProvider;
 
 final adminRouterProvider = Provider<GoRouter>((ref) {
-  ref.watch(authStateProvider);
-  ref.watch(adminAccessProvider);
-
   String resolveHomeRoute() {
-    final accessState = ref.read(adminAccessProvider);
+    final accessState = ref.read(activeAdminAccessProvider);
     final access = accessState.asData?.value;
 
     if (access == null) {
@@ -67,7 +64,14 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
     }
 
     if (access.isHoaScopedOnly) {
+      if (!access.hasAnyRoleCode(const {'hoa_manager', 'hoa_board'})) {
+        return '/admin/hoa/documents';
+      }
       return '/admin/hoa';
+    }
+
+    if (access.isTenantScopedOnly) {
+      return '/admin/hoas';
     }
 
     return '/admin';
@@ -76,7 +80,7 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/admin',
     redirect: (context, state) {
-      final user = ref.read(currentUserProvider);
+      final user = ref.read(supabaseClientProvider).auth.currentUser;
       final path = state.uri.path;
       final fragmentRoute = _normalizedFragmentRoute(Uri.base);
       final residentPortalFlow = state.uri.queryParameters['portal_flow'];
@@ -94,6 +98,7 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
 
       if (fragmentRoute != null &&
           fragmentRoute.startsWith('/accept-invite') &&
+          _routeContainsAuthPayload(fragmentRoute) &&
           !isAcceptInvite) {
         return fragmentRoute;
       }
@@ -494,6 +499,18 @@ String? _normalizedFragmentRoute(Uri uri) {
   return normalized;
 }
 
+bool _routeContainsAuthPayload(String route) {
+  final queryStart = route.indexOf('?');
+  if (queryStart < 0) return false;
+  final query = route.substring(queryStart + 1);
+  return query.contains('access_token=') ||
+      query.contains('refresh_token=') ||
+      query.contains('token_hash=') ||
+      query.contains('code=') ||
+      query.contains('type=invite') ||
+      query.contains('error_description=');
+}
+
 class AdminNavigationShell extends ConsumerStatefulWidget {
   const AdminNavigationShell({
     required this.currentPath,
@@ -640,6 +657,92 @@ class _SidebarHeader extends StatelessWidget {
   }
 }
 
+class _AdminContextSelector extends ConsumerWidget {
+  const _AdminContextSelector({
+    required this.currentPath,
+  });
+
+  final String currentPath;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final contexts = ref.watch(availableAdminContextsProvider);
+    final activeContext = ref.watch(activeAdminContextProvider);
+
+    return contexts.when(
+      data: (items) {
+        if (items.length <= 1) return const SizedBox.shrink();
+
+        final activeId = activeContext.asData?.value?.id ?? items.first.id;
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: DropdownButtonFormField<String>(
+            value: items.any((item) => item.id == activeId)
+                ? activeId
+                : items.first.id,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: 'Current view',
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.switch_account_outlined),
+            ),
+            items: items
+                .map(
+                  (item) => DropdownMenuItem(
+                    value: item.id,
+                    child: Text(
+                      item.label,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                )
+                .toList(),
+            onChanged: (value) {
+              if (value == null) return;
+              setSelectedAdminContextId(ref, value);
+              ref.invalidate(activeAdminContextProvider);
+              ref.invalidate(activeAdminAccessProvider);
+              _redirectForContext(
+                  context, items.firstWhere((item) => item.id == value));
+            },
+          ),
+        );
+      },
+      loading: () => const Padding(
+        padding: EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: LinearProgressIndicator(),
+      ),
+      error: (error, _) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Text('Unable to load views: $error'),
+      ),
+    );
+  }
+
+  void _redirectForContext(BuildContext context, AdminContext adminContext) {
+    if (adminContext.isHoa && !adminContext.isHoaManagement) {
+      if (!currentPath.startsWith('/admin/hoa/documents') &&
+          !currentPath.startsWith('/admin/hoa/announcements') &&
+          !currentPath.startsWith('/admin/hoa/service-schedules') &&
+          !currentPath.startsWith('/admin/hoa/tickets')) {
+        context.go('/admin/hoa/documents');
+      }
+      return;
+    }
+    if (adminContext.isHoa && currentPath.startsWith('/admin/hoa')) {
+      return;
+    }
+    if (adminContext.isHoa) {
+      context.go('/admin/hoa');
+      return;
+    }
+
+    if (!adminContext.isHoa && currentPath.startsWith('/admin/hoa')) {
+      context.go('/admin');
+    }
+  }
+}
+
 class _AdminSidebar extends ConsumerWidget {
   const _AdminSidebar({
     required this.currentPath,
@@ -749,15 +852,6 @@ class _AdminSidebar extends ConsumerWidget {
   ];
 
   static const _tenantItems = [
-    _AdminNavItem(
-      label: 'Dashboard',
-      permissionRule: AdminPermissions.dashboard,
-      path: '/admin',
-      icon: Icons.dashboard_outlined,
-      activePrefixes: ['/admin'],
-      exact: true,
-      feature: TenantFeature.analyticsDashboard,
-    ),
     _AdminNavItem(
       label: 'HOA Management',
       permissionRule: AdminPermissions.hoaRead,
@@ -877,17 +971,52 @@ class _AdminSidebar extends ConsumerWidget {
     ),
   ];
 
+  static const _residentItems = [
+    _AdminNavItem(
+      label: 'Documents',
+      permissionRule: AdminPermissions.hoaDocuments,
+      path: '/admin/hoa/documents',
+      icon: Icons.description_outlined,
+      activePrefixes: ['/admin/hoa/documents'],
+    ),
+    _AdminNavItem(
+      label: 'Announcements',
+      permissionRule: AdminPermissions.hoaAnnouncements,
+      path: '/admin/hoa/announcements',
+      icon: Icons.campaign_outlined,
+      activePrefixes: ['/admin/hoa/announcements'],
+    ),
+    _AdminNavItem(
+      label: 'Service Schedules',
+      permissionRule: AdminPermissions.hoaSchedules,
+      path: '/admin/hoa/service-schedules',
+      icon: Icons.event_repeat_outlined,
+      activePrefixes: ['/admin/hoa/service-schedules'],
+    ),
+    _AdminNavItem(
+      label: 'Tickets',
+      permissionRule: AdminPermissions.hoaTickets,
+      path: '/admin/hoa/tickets',
+      icon: Icons.confirmation_number_outlined,
+      activePrefixes: ['/admin/hoa/tickets'],
+    ),
+  ];
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
     final role = ref.watch(currentAdminRoleProvider);
     final profile = ref.watch(currentAdminProfileProvider);
-    final access = ref.watch(adminAccessProvider);
+    final activeContext = ref.watch(activeAdminContextProvider);
+    final access = ref.watch(activeAdminAccessProvider);
     final visibleItems = access.maybeWhen(
       data: (value) {
-        final source = value.isHoaScopedOnly
-            ? _hoaItems
-            : value.isTenantScopedOnly
+        final context = activeContext.asData?.value;
+        final source = context?.isHoa == true
+            ? context?.isHoaManagement == true
+                ? _hoaItems
+                : _residentItems
+            : context?.isTenant == true
                 ? _tenantItems
                 : _items;
         return source.where((item) => item.canShow(value, ref)).toList();
@@ -911,6 +1040,12 @@ class _AdminSidebar extends ConsumerWidget {
               isCollapsed: isCollapsed,
               onToggleCollapsed: onToggleCollapsed,
             ),
+            if (!isCollapsed) ...[
+              _AdminContextSelector(
+                currentPath: currentPath,
+              ),
+              const Divider(height: 1),
+            ],
             const Divider(height: 1),
             Expanded(
               child: ListView.builder(

@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/rbac/admin_access.dart';
-import '../../../core/rbac/rbac_providers.dart';
+import '../../../core/rbac/admin_context.dart';
 import '../../user_management/domain/admin_user.dart';
 import '../../user_management/presentation/invite_user_dialog.dart';
 import '../../user_management/presentation/user_management_providers.dart';
@@ -71,6 +71,11 @@ class HoaDetailPage extends ConsumerWidget {
                     _DetailRow(label: 'Name', value: item.name),
                     _DetailRow(label: 'Status', value: item.status.name),
                     _DetailRow(
+                      label: 'Activation codes',
+                      value: item.residentActivationCodeSettingLabel
+                          .replaceFirst('Activation codes: ', ''),
+                    ),
+                    _DetailRow(
                       label: 'Created',
                       value: item.createdAt.toLocal().toString(),
                     ),
@@ -107,7 +112,7 @@ class _HoaStaffSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final staff = ref.watch(hoaStaffProvider(hoaId));
-    final access = ref.watch(adminAccessProvider);
+    final access = ref.watch(activeAdminAccessProvider);
     final canInvite = access.maybeWhen(
       data: _canInviteHoaStaff,
       orElse: () => false,
@@ -141,7 +146,8 @@ class _HoaStaffSection extends ConsumerWidget {
                 ),
                 const SizedBox(width: 12),
                 FilledButton.icon(
-                  onPressed: canInvite ? () => _openInviteDialog(context, ref) : null,
+                  onPressed:
+                      canInvite ? () => _openInviteDialog(context, ref) : null,
                   icon: const Icon(Icons.person_add_alt_1_outlined),
                   label: const Text('Add HOA User'),
                 ),
@@ -156,7 +162,8 @@ class _HoaStaffSection extends ConsumerWidget {
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(16),
-                      color: Theme.of(context).colorScheme.surfaceContainerLowest,
+                      color:
+                          Theme.of(context).colorScheme.surfaceContainerLowest,
                     ),
                     child: const Text(
                       'No HOA users have been assigned yet. Add an HOA manager or board member to get started.',
@@ -191,7 +198,9 @@ class _HoaStaffSection extends ConsumerWidget {
   }
 
   bool _canInviteHoaStaff(AdminAccess access) {
-    if (access.isPlatformOperator || access.isTenantAdmin || access.isTenantManager) {
+    if (access.isPlatformOperator ||
+        access.isTenantAdmin ||
+        access.isTenantManager) {
       return true;
     }
 
@@ -201,11 +210,14 @@ class _HoaStaffSection extends ConsumerWidget {
   }
 
   Set<String> _allowedInviteRoleCodes(AdminAccess access) {
-    if (access.isPlatformOperator || access.isTenantAdmin || access.isTenantManager) {
+    if (access.isPlatformOperator ||
+        access.isTenantAdmin ||
+        access.isTenantManager) {
       return const {'hoa_manager', 'hoa_board'};
     }
 
-    if (access.hoaRoles.any((role) => role.hoaId == hoaId && role.code == 'hoa_manager')) {
+    if (access.hoaRoles
+        .any((role) => role.hoaId == hoaId && role.code == 'hoa_manager')) {
       return const {'hoa_board'};
     }
 
@@ -213,7 +225,7 @@ class _HoaStaffSection extends ConsumerWidget {
   }
 
   Future<void> _openInviteDialog(BuildContext context, WidgetRef ref) async {
-    final access = await ref.read(adminAccessProvider.future);
+    final access = await ref.read(activeAdminAccessProvider.future);
     final allowedRoleCodes = _allowedInviteRoleCodes(access);
     if (allowedRoleCodes.isEmpty) return;
 
@@ -222,7 +234,9 @@ class _HoaStaffSection extends ConsumerWidget {
       builder: (_) => InviteUserDialog(
         title: 'Add HOA User - $hoaName',
         initialCategory: 'hoa',
-        initialRoleCode: allowedRoleCodes.length == 1 ? allowedRoleCodes.first : 'hoa_manager',
+        initialRoleCode: allowedRoleCodes.length == 1
+            ? allowedRoleCodes.first
+            : 'hoa_manager',
         initialHoaId: hoaId,
         allowedRoleCodes: allowedRoleCodes,
         lockScope: true,
@@ -253,8 +267,10 @@ class _HoaStaffTile extends ConsumerWidget {
         .toList();
     final subtitleParts = <String>[
       user.email,
-      if (currentHoaRoles.isNotEmpty) currentHoaRoles.map((role) => role.roleName).join(', '),
-      if (user.isPendingInvite) user.latestInvite?.statusLabel ?? user.statusLabel,
+      if (currentHoaRoles.isNotEmpty)
+        currentHoaRoles.map((role) => role.roleName).join(', '),
+      if (user.isPendingInvite)
+        user.latestInvite?.statusLabel ?? user.statusLabel,
     ];
 
     return ListTile(
@@ -264,7 +280,9 @@ class _HoaStaffTile extends ConsumerWidget {
             ? theme.colorScheme.secondaryContainer
             : theme.colorScheme.primaryContainer,
         child: Icon(
-          user.isPendingInvite ? Icons.mark_email_unread_outlined : Icons.person_outline,
+          user.isPendingInvite
+              ? Icons.mark_email_unread_outlined
+              : Icons.person_outline,
           color: user.isPendingInvite
               ? theme.colorScheme.onSecondaryContainer
               : theme.colorScheme.onPrimaryContainer,
@@ -280,7 +298,8 @@ class _HoaStaffTile extends ConsumerWidget {
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           if (user.isPendingInvite)
-            Chip(label: Text(user.latestInvite?.statusLabel ?? user.statusLabel))
+            Chip(
+                label: Text(user.latestInvite?.statusLabel ?? user.statusLabel))
           else
             const Chip(label: Text('Active')),
           if (user.latestInvite?.canResend == true)
@@ -291,7 +310,9 @@ class _HoaStaffTile extends ConsumerWidget {
                   : () async {
                       final invite = user.latestInvite;
                       if (invite == null) return;
-                      final didResend = await ref.read(userCommandProvider.notifier).resendInvite(
+                      final didResend = await ref
+                          .read(userCommandProvider.notifier)
+                          .resendInvite(
                             userId: user.id,
                             inviteId: invite.id,
                           );
@@ -307,7 +328,9 @@ class _HoaStaffTile extends ConsumerWidget {
                   : () async {
                       final invite = user.latestInvite;
                       if (invite == null) return;
-                      final didCancel = await ref.read(userCommandProvider.notifier).cancelInvite(
+                      final didCancel = await ref
+                          .read(userCommandProvider.notifier)
+                          .cancelInvite(
                             userId: user.id,
                             inviteId: invite.id,
                           );
@@ -319,8 +342,9 @@ class _HoaStaffTile extends ConsumerWidget {
             PopupMenuButton<UserHoaRoleAssignment>(
               tooltip: 'Manage role',
               onSelected: (assignment) async {
-                final didRemove =
-                    await ref.read(userCommandProvider.notifier).removeHoaRole(assignment);
+                final didRemove = await ref
+                    .read(userCommandProvider.notifier)
+                    .removeHoaRole(assignment);
                 if (didRemove) ref.invalidate(hoaStaffProvider(hoaId));
               },
               itemBuilder: (context) => currentHoaRoles

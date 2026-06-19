@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/rbac/admin_context.dart';
 import '../../../core/supabase/supabase_provider.dart';
 import '../data/hoa_repository.dart';
 import '../domain/hoa_community.dart';
@@ -11,13 +12,22 @@ final hoaRepositoryProvider = Provider<HoaRepository>((ref) {
   return SupabaseHoaRepository(ref.watch(supabaseClientProvider));
 });
 
-final hoaListProvider = FutureProvider.autoDispose<List<HoaCommunity>>((ref) {
-  return ref.watch(hoaRepositoryProvider).list();
+final hoaListProvider =
+    FutureProvider.autoDispose<List<HoaCommunity>>((ref) async {
+  final allowedHoaIds = await ref.watch(activeHoaIdsProvider.future);
+  final items = await ref.watch(hoaRepositoryProvider).list();
+  if (allowedHoaIds == null) return items;
+  return items.where((item) => allowedHoaIds.contains(item.id)).toList();
 });
 
 final hoaDetailProvider =
-    FutureProvider.autoDispose.family<HoaCommunity, String>((ref, id) {
-  return ref.watch(hoaRepositoryProvider).getById(id);
+    FutureProvider.autoDispose.family<HoaCommunity, String>((ref, id) async {
+  final allowedHoaIds = await ref.watch(activeHoaIdsProvider.future);
+  final item = await ref.watch(hoaRepositoryProvider).getById(id);
+  if (allowedHoaIds != null && !allowedHoaIds.contains(item.id)) {
+    throw StateError('HOA is outside the active view.');
+  }
+  return item;
 });
 
 final hoaCodePreviewProvider =
@@ -63,7 +73,8 @@ class HoaFormController extends AutoDisposeAsyncNotifier<void> {
   @override
   FutureOr<void> build() {}
 
-  Future<HoaCommunity?> create(HoaCommunityInput input, {String? tenantId}) async {
+  Future<HoaCommunity?> create(HoaCommunityInput input,
+      {String? tenantId}) async {
     state = const AsyncLoading();
     final result = await AsyncValue.guard(() {
       return ref.read(hoaRepositoryProvider).create(input, tenantId: tenantId);

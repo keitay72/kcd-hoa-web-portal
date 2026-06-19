@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/rbac/admin_context.dart';
 import '../../../core/supabase/supabase_provider.dart';
 import '../data/document_repository.dart';
 import '../domain/hoa_document.dart';
@@ -12,17 +13,25 @@ final documentRepositoryProvider = Provider<DocumentRepository>((ref) {
 });
 
 final documentListProvider = FutureProvider.autoDispose
-    .family<List<HoaDocument>, DocumentListFilter>((ref, filter) {
-  return ref.watch(documentRepositoryProvider).list(
+    .family<List<HoaDocument>, DocumentListFilter>((ref, filter) async {
+  final allowedHoaIds = await ref.watch(activeHoaIdsProvider.future);
+  final items = await ref.watch(documentRepositoryProvider).list(
         hoaId: filter.hoaId,
         status: filter.status,
         category: filter.category,
       );
+  if (allowedHoaIds == null) return items;
+  return items.where((item) => allowedHoaIds.contains(item.hoaId)).toList();
 });
 
 final documentDetailProvider =
-    FutureProvider.autoDispose.family<HoaDocument, String>((ref, id) {
-  return ref.watch(documentRepositoryProvider).getById(id);
+    FutureProvider.autoDispose.family<HoaDocument, String>((ref, id) async {
+  final allowedHoaIds = await ref.watch(activeHoaIdsProvider.future);
+  final item = await ref.watch(documentRepositoryProvider).getById(id);
+  if (allowedHoaIds != null && !allowedHoaIds.contains(item.hoaId)) {
+    throw StateError('Document is outside the active view.');
+  }
+  return item;
 });
 
 final documentCommandProvider =

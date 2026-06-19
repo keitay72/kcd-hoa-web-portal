@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/rbac/rbac_providers.dart';
+import '../../../core/rbac/admin_context.dart';
 import '../domain/ticket.dart';
 import 'ticket_assignment_dialog.dart';
 import 'ticket_internal_note_dialog.dart';
@@ -85,9 +85,11 @@ class _TicketDetailContent extends ConsumerWidget {
               return Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(flex: 3, child: _TicketTimeline(ticketId: ticket.id)),
+                  Expanded(
+                      flex: 3, child: _TicketTimeline(ticketId: ticket.id)),
                   const SizedBox(width: 20),
-                  Expanded(flex: 2, child: _AttachmentViewer(ticketId: ticket.id)),
+                  Expanded(
+                      flex: 2, child: _AttachmentViewer(ticketId: ticket.id)),
                 ],
               );
             }
@@ -113,7 +115,7 @@ class _TicketHeader extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final canManageTicket = ref.watch(adminAccessProvider).maybeWhen(
+    final canManageTicket = ref.watch(activeAdminAccessProvider).maybeWhen(
           data: (value) => value.can('tickets.update'),
           orElse: () => false,
         );
@@ -135,7 +137,8 @@ class _TicketHeader extends ConsumerWidget {
                 label: const Text('Back to Tickets'),
               ),
               const SizedBox(height: 8),
-              Text(ticket.subject, style: Theme.of(context).textTheme.headlineMedium),
+              Text(ticket.subject,
+                  style: Theme.of(context).textTheme.headlineMedium),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
@@ -206,7 +209,8 @@ class _TicketHeader extends ConsumerWidget {
     );
   }
 
-  Future<void> _openInternalNoteDialog(BuildContext context, ServiceTicket ticket) {
+  Future<void> _openInternalNoteDialog(
+      BuildContext context, ServiceTicket ticket) {
     return showDialog<void>(
       context: context,
       builder: (_) => TicketInternalNoteDialog(ticket: ticket),
@@ -218,12 +222,16 @@ class _TicketHeader extends ConsumerWidget {
     WidgetRef ref,
     ServiceTicket ticket,
   ) async {
-    final result = await ref.read(ticketCommandProvider.notifier).runWorkflowAutomation(ticket);
+    final result = await ref
+        .read(ticketCommandProvider.notifier)
+        .runWorkflowAutomation(ticket);
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          result == null ? 'Workflow automation failed.' : 'Workflow automation completed.',
+          result == null
+              ? 'Workflow automation failed.'
+              : 'Workflow automation completed.',
         ),
       ),
     );
@@ -244,14 +252,17 @@ class _TicketSummaryCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Ticket Details', style: Theme.of(context).textTheme.titleLarge),
+            Text('Ticket Details',
+                style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 16),
             _InfoRow(label: 'Subject', value: ticket.subject),
             _InfoRow(label: 'Description', value: ticket.description),
             _InfoRow(label: 'Type', value: ticket.type.label),
             _InfoRow(label: 'Priority', value: ticket.priority.label),
             _InfoRow(label: 'Status', value: ticket.status.label),
-            _InfoRow(label: 'SLA', value: '${ticket.slaState.label} - ${ticket.slaLabel}'),
+            _InfoRow(
+                label: 'SLA',
+                value: '${ticket.slaState.label} - ${ticket.slaLabel}'),
             _InfoRow(label: 'Age', value: ticket.ageLabel),
           ],
         ),
@@ -274,14 +285,19 @@ class _TicketMetadataCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Resident and HOA', style: Theme.of(context).textTheme.titleLarge),
+            Text('Resident and HOA',
+                style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 16),
             _InfoRow(label: 'HOA', value: ticket.hoaLabel),
             _InfoRow(label: 'Resident', value: ticket.requesterLabel),
-            _InfoRow(label: 'Email', value: ticket.requesterEmail ?? 'Not available'),
+            _InfoRow(
+                label: 'Email',
+                value: ticket.requesterEmail ?? 'Not available'),
             _InfoRow(label: 'Address', value: ticket.addressLabel),
-            _InfoRow(label: 'Created', value: _formatDateTime(ticket.createdAt)),
-            _InfoRow(label: 'Updated', value: _formatDateTime(ticket.updatedAt)),
+            _InfoRow(
+                label: 'Created', value: _formatDateTime(ticket.createdAt)),
+            _InfoRow(
+                label: 'Updated', value: _formatDateTime(ticket.updatedAt)),
           ],
         ),
       ),
@@ -311,7 +327,9 @@ class _TicketTimeline extends ConsumerWidget {
               data: (items) {
                 if (items.isEmpty) return const Text('No ticket events yet.');
                 return Column(
-                  children: items.map((event) => _TimelineItem(event: event)).toList(),
+                  children: items
+                      .map((event) => _TimelineItem(event: event))
+                      .toList(),
                 );
               },
               loading: () => const LinearProgressIndicator(),
@@ -352,7 +370,8 @@ class _TimelineItem extends StatelessWidget {
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
                 const SizedBox(height: 4),
-                Text('${event.actorLabel} on ${_formatDateTime(event.createdAt)}'),
+                Text(
+                    '${event.actorLabel} on ${_formatDateTime(event.createdAt)}'),
                 if (event.note != null && event.note!.trim().isNotEmpty) ...[
                   const SizedBox(height: 6),
                   Wrap(
@@ -360,12 +379,17 @@ class _TimelineItem extends StatelessWidget {
                     runSpacing: 8,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      if (event.isInternalNote) const Chip(label: Text('Internal')),
-                      if (event.isAssignment) const Chip(label: Text('Assignment')),
-                      if (event.isAutomation) const Chip(label: Text('Automation')),
+                      if (event.isInternalNote)
+                        const Chip(label: Text('Internal')),
+                      if (event.isAssignment)
+                        const Chip(label: Text('Assignment')),
+                      if (event.isAutomation)
+                        const Chip(label: Text('Automation')),
                     ],
                   ),
-                  if (event.isInternalNote || event.isAssignment || event.isAutomation)
+                  if (event.isInternalNote ||
+                      event.isAssignment ||
+                      event.isAutomation)
                     const SizedBox(height: 6),
                   Text(event.displayNote),
                 ],
@@ -380,7 +404,8 @@ class _TimelineItem extends StatelessWidget {
   String _transitionLabel(TicketEvent event) {
     final oldStatus = event.oldStatus?.label;
     final newStatus = event.newStatus?.label;
-    if (oldStatus != null && newStatus != null) return '$oldStatus to $newStatus';
+    if (oldStatus != null && newStatus != null)
+      return '$oldStatus to $newStatus';
     if (newStatus != null) return 'Status set to $newStatus';
     return 'Ticket event';
   }
@@ -406,9 +431,12 @@ class _AttachmentViewer extends ConsumerWidget {
             const SizedBox(height: 16),
             attachments.when(
               data: (items) {
-                if (items.isEmpty) return const Text('No attachments uploaded.');
+                if (items.isEmpty)
+                  return const Text('No attachments uploaded.');
                 return Column(
-                  children: items.map((item) => _AttachmentTile(attachment: item)).toList(),
+                  children: items
+                      .map((item) => _AttachmentTile(attachment: item))
+                      .toList(),
                 );
               },
               loading: () => const LinearProgressIndicator(),
@@ -445,7 +473,9 @@ class _AttachmentTile extends ConsumerWidget {
 
   Future<void> _openAttachment(BuildContext context, WidgetRef ref) async {
     try {
-      final url = await ref.read(ticketRepositoryProvider).createAttachmentUrl(attachment);
+      final url = await ref
+          .read(ticketRepositoryProvider)
+          .createAttachmentUrl(attachment);
       html.window.open(url, '_blank');
     } catch (error) {
       if (!context.mounted) return;
@@ -480,7 +510,9 @@ class _InfoRow extends StatelessWidget {
 
 String _formatDateTime(DateTime value) {
   final local = value.toLocal();
-  final date = '${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')}/${local.year}';
-  final time = '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+  final date =
+      '${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')}/${local.year}';
+  final time =
+      '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
   return '$date $time';
 }

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'rbac_providers.dart';
+import 'admin_context.dart';
 
 class UnauthorizedPage extends ConsumerWidget {
   const UnauthorizedPage({
@@ -16,7 +16,7 @@ class UnauthorizedPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final homePath = ref.watch(adminAccessProvider).maybeWhen(
+    final homePath = ref.watch(activeAdminAccessProvider).maybeWhen(
           data: (access) => access.isHoaScopedOnly ? '/admin/hoa' : '/admin',
           orElse: () => '/admin',
         );

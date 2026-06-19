@@ -134,7 +134,7 @@ class _ResidentRegistrationPageState
             if (state.hasError) ...[
               const SizedBox(height: 12),
               Text(
-                state.error.toString(),
+                _errorText(state.error),
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
             ],
@@ -200,13 +200,21 @@ class _ResidentRegistrationPageState
   String? _email(String? value) {
     final input = value?.trim() ?? '';
     if (input.isEmpty) return 'Required';
-    if (!input.contains('@') || !input.contains('.'))
+    if (!input.contains('@') || !input.contains('.')) {
       return 'Enter a valid email';
+    }
     return null;
   }
 
   String? _password(String? value) {
     if (value == null || value.length < 8) return 'Use at least 8 characters';
     return null;
+  }
+
+  String _errorText(Object? error) {
+    final message =
+        error?.toString().replaceFirst('Bad state: ', '').trim() ?? '';
+    if (message.isEmpty) return 'Unable to create account.';
+    return message;
   }
 }

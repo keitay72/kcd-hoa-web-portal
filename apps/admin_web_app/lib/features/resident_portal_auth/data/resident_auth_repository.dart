@@ -13,7 +13,10 @@ abstract interface class ResidentPortalAuthRepository {
 
   Future<void> signIn({required String email, required String password});
   Future<void> signOut();
-  Future<void> completeEmailVerificationFromUri(Uri uri);
+  Future<String?> currentUserResidentHoaId();
+  Future<ResidentEmailVerificationCompletion> completeEmailVerificationFromUri(
+    Uri uri,
+  );
   Future<String> resolveTenantCodeForCurrentResident();
   Future<VerifiedResidentAddress> verifyAddress({
     required String tenantCode,
@@ -49,6 +52,7 @@ class SupabaseResidentPortalAuthRepository
       email: email.trim(),
       password: password,
     );
+    await _waitForAuthenticatedSession();
   }
 
   @override
@@ -57,7 +61,26 @@ class SupabaseResidentPortalAuthRepository
   }
 
   @override
-  Future<void> completeEmailVerificationFromUri(Uri uri) async {
+  Future<String?> currentUserResidentHoaId() async {
+    final user = _client.auth.currentUser;
+    if (user == null) return null;
+
+    final rows = await _client
+        .from('user_hoa_memberships')
+        .select('hoa_id, roles!inner(code)')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .eq('roles.code', 'hoa_resident')
+        .limit(1);
+
+    if (rows.isEmpty) return null;
+    return rows.first['hoa_id'] as String?;
+  }
+
+  @override
+  Future<ResidentEmailVerificationCompletion> completeEmailVerificationFromUri(
+    Uri uri,
+  ) async {
     final params = _combinedParams(uri);
     final urlError = params['error_description'] ?? params['error'];
     if (urlError != null && urlError.trim().isNotEmpty) {
@@ -70,22 +93,43 @@ class SupabaseResidentPortalAuthRepository
     final accessToken = params['access_token'];
     final refreshToken = params['refresh_token'];
 
+    if (tokenHash == null &&
+        code == null &&
+        refreshToken == null &&
+        _client.auth.currentUser != null) {
+      final result = await _completeResidentEmailVerification();
+      _clearResidentEmailCallbackPayload();
+      return result;
+    }
+
     if (tokenHash != null && tokenHash.isNotEmpty) {
       final otpType = _residentOtpType(type);
-      await _client.auth.verifyOTP(
-        tokenHash: tokenHash,
-        type: otpType,
-      );
+      try {
+        await _client.auth.verifyOTP(
+          tokenHash: tokenHash,
+          type: otpType,
+        );
+      } on AuthException catch (error) {
+        if (_client.auth.currentUser != null &&
+            _looksLikeAlreadyHandledToken(error.message)) {
+          final result = await _completeResidentEmailVerification();
+          _clearResidentEmailCallbackPayload();
+          return result;
+        }
+        rethrow;
+      }
       await _waitForAuthenticatedSession();
+      final result = await _completeResidentEmailVerification();
       _clearResidentEmailCallbackPayload();
-      return;
+      return result;
     }
 
     if (code != null && code.isNotEmpty) {
       await _client.auth.exchangeCodeForSession(code);
       await _waitForAuthenticatedSession();
+      final result = await _completeResidentEmailVerification();
       _clearResidentEmailCallbackPayload();
-      return;
+      return result;
     }
 
     if (refreshToken != null && refreshToken.isNotEmpty) {
@@ -94,13 +138,34 @@ class SupabaseResidentPortalAuthRepository
         accessToken: accessToken,
       );
       await _waitForAuthenticatedSession();
+      final result = await _completeResidentEmailVerification();
       _clearResidentEmailCallbackPayload();
-      return;
+      return result;
     }
 
     throw StateError(
       'This verification link is missing required information. Please request a new verification email.',
     );
+  }
+
+  Future<ResidentEmailVerificationCompletion>
+      _completeResidentEmailVerification() async {
+    final response = await _client.functions.invoke(
+      'complete-resident-email-verification',
+      body: const <String, dynamic>{},
+    );
+    final data = response.data as Map<String, dynamic>;
+    return ResidentEmailVerificationCompletion(
+      verified: data['verified'] == true,
+      activationCodeRequired: data['activationCodeRequired'] == true,
+    );
+  }
+
+  bool _looksLikeAlreadyHandledToken(String message) {
+    final normalized = message.toLowerCase();
+    return normalized.contains('invalid') ||
+        normalized.contains('expired') ||
+        normalized.contains('otp');
   }
 
   Future<void> _waitForAuthenticatedSession() async {
@@ -205,29 +270,41 @@ class SupabaseResidentPortalAuthRepository
     final address =
         await verifyAddress(tenantCode: tenantCode, input: input.address);
     final emailRedirectTo = await _resolveResidentEmailRedirectUrl(tenantCode);
-    final signUp = await _client.auth.signUp(
-      email: input.email.trim(),
-      password: input.password,
-      emailRedirectTo: emailRedirectTo,
-    );
+    final AuthResponse signUp;
+    try {
+      signUp = await _client.auth.signUp(
+        email: input.email.trim(),
+        password: input.password,
+        emailRedirectTo: emailRedirectTo,
+      );
+    } on AuthException catch (error) {
+      throw StateError(_friendlyRegistrationError(error.message));
+    }
     final user = signUp.user;
 
     if (user == null) {
       throw StateError('Unable to create resident account.');
     }
 
-    final response = await _client.functions.invoke(
-      'start-resident-registration',
-      body: {
-        'tenantCode': tenantCode,
-        'userId': user.id,
-        'fullName': input.fullName.trim(),
-        'email': input.email.trim(),
-        'addressId': address.id,
-      },
-    );
+    final FunctionResponse response;
+    try {
+      response = await _client.functions.invoke(
+        'start-resident-registration',
+        body: {
+          'tenantCode': tenantCode,
+          'userId': user.id,
+          'fullName': input.fullName.trim(),
+          'email': input.email.trim(),
+          'addressId': address.id,
+        },
+      );
+    } catch (error) {
+      throw StateError(_friendlyRegistrationError(error.toString()));
+    }
     final data = response.data as Map<String, dynamic>;
     final verification = data['verification'] as Map<String, dynamic>;
+    final activationCodeRequired =
+        data['activationCodeRequired'] as bool? ?? true;
 
     return ResidentRegistrationResult(
       userId: user.id,
@@ -235,7 +312,19 @@ class SupabaseResidentPortalAuthRepository
       verificationId: verification['id'] as String,
       address: address,
       tenantCode: tenantCode,
+      activationCodeRequired: activationCodeRequired,
     );
+  }
+
+  String _friendlyRegistrationError(String message) {
+    final normalized = message.toLowerCase();
+    if (normalized.contains('profiles_email_key') ||
+        normalized.contains('duplicate key') ||
+        normalized.contains('already registered') ||
+        normalized.contains('already exists')) {
+      return 'An account already exists for this email. Please sign in instead.';
+    }
+    return message.replaceFirst('Exception: ', '').trim();
   }
 
   @override

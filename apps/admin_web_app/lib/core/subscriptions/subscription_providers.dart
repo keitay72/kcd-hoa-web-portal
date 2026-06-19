@@ -1,22 +1,25 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../rbac/rbac_providers.dart';
+import '../rbac/admin_context.dart';
 import '../supabase/supabase_provider.dart';
 import 'tenant_entitlement_service.dart';
 import 'tenant_entitlements.dart';
 
-final tenantEntitlementServiceProvider = Provider<TenantEntitlementService>((ref) {
+final tenantEntitlementServiceProvider =
+    Provider<TenantEntitlementService>((ref) {
   return SupabaseTenantEntitlementService(ref.watch(supabaseClientProvider));
 });
 
 final tenantEntitlementsProvider = FutureProvider.autoDispose
     .family<TenantSubscriptionEntitlements, String>((ref, tenantId) {
-  return ref.watch(tenantEntitlementServiceProvider).entitlementsForTenant(tenantId);
+  return ref
+      .watch(tenantEntitlementServiceProvider)
+      .entitlementsForTenant(tenantId);
 });
 
 final adminFeatureEntitlementProvider = FutureProvider.autoDispose
     .family<TenantEntitlementResult, TenantFeature>((ref, feature) async {
-  final access = await ref.watch(adminAccessProvider.future);
+  final access = await ref.watch(activeAdminAccessProvider.future);
 
   if (access.isPlatformOperator) {
     return TenantEntitlementResult(

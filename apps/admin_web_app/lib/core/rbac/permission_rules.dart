@@ -18,25 +18,28 @@ class AdminPermissions {
   );
   static const hoaDocuments = AdminPermissionRule.any(
     {'documents.read'},
-    roleCodes: {'hoa_manager', 'hoa_board'},
+    roleCodes: {'hoa_manager', 'hoa_board', 'hoa_resident'},
   );
   static const hoaAnnouncements = AdminPermissionRule.any(
     {'announcements.read'},
-    roleCodes: {'hoa_manager', 'hoa_board'},
+    roleCodes: {'hoa_manager', 'hoa_board', 'hoa_resident'},
   );
   static const hoaSchedules = AdminPermissionRule.any(
     {'schedules.read'},
-    roleCodes: {'hoa_manager', 'hoa_board'},
+    roleCodes: {'hoa_manager', 'hoa_board', 'hoa_resident'},
   );
   static const hoaTickets = AdminPermissionRule.any(
     {'tickets.read'},
-    roleCodes: {'hoa_manager', 'hoa_board'},
+    roleCodes: {'hoa_manager', 'hoa_board', 'hoa_resident'},
   );
   static const hoaRead = AdminPermissionRule.any({'hoa.read'});
   static const addressRead = AdminPermissionRule.any({'addresses.read'});
-  static const activationCodes = AdminPermissionRule.any({'verification.manage'});
-  static const verificationRead = AdminPermissionRule.any({'verification.read'});
-  static const announcementsRead = AdminPermissionRule.any({'announcements.read'});
+  static const activationCodes =
+      AdminPermissionRule.any({'verification.manage'});
+  static const verificationRead =
+      AdminPermissionRule.any({'verification.read'});
+  static const announcementsRead =
+      AdminPermissionRule.any({'announcements.read'});
   static const documentsRead = AdminPermissionRule.any({'documents.read'});
   static const schedulesRead = AdminPermissionRule.any({'schedules.read'});
   static const ticketsRead = AdminPermissionRule.any({'tickets.read'});
@@ -48,7 +51,12 @@ class AdminPermissions {
   static const rolesManage = AdminPermissionRule.any({'roles.manage'});
   static const tenantRead = AdminPermissionRule.any(
     {'tenants.read'},
-    roleCodes: {'platform_owner', 'platform_admin', 'platform_support', 'platform_sales'},
+    roleCodes: {
+      'platform_owner',
+      'platform_admin',
+      'platform_support',
+      'platform_sales'
+    },
   );
   static const tenantManage = AdminPermissionRule.any(
     {'tenants.manage'},

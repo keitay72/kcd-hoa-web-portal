@@ -1,7 +1,12 @@
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/rbac/admin_context.dart';
+import '../../../core/rbac/rbac_providers.dart';
 import '../../../core/supabase/supabase_provider.dart';
 import 'resident_auth_providers.dart';
 import 'resident_portal_scaffold.dart';
@@ -18,16 +23,8 @@ class ResidentSignInPage extends ConsumerStatefulWidget {
 class _ResidentSignInPageState extends ConsumerState<ResidentSignInPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _preparedSession = false;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_preparedSession) return;
-    _preparedSession = true;
-    WidgetsBinding.instance
-        .addPostFrameCallback((_) => _prepareResidentSession());
-  }
+  String? _postSignInError;
+  String? _postSignInStatus;
 
   @override
   void dispose() {
@@ -63,8 +60,22 @@ class _ResidentSignInPageState extends ConsumerState<ResidentSignInPage> {
           if (state.hasError) ...[
             const SizedBox(height: 12),
             Text(
-              state.error.toString(),
+              _errorText(state.error),
               style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ],
+          if (_postSignInError != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              _postSignInError!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ],
+          if (_postSignInStatus != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              _postSignInStatus!,
+              style: TextStyle(color: Theme.of(context).colorScheme.primary),
             ),
           ],
           const SizedBox(height: 20),
@@ -88,20 +99,81 @@ class _ResidentSignInPageState extends ConsumerState<ResidentSignInPage> {
     );
   }
 
-  Future<void> _prepareResidentSession() async {
-    final repository = ref.read(residentPortalAuthRepositoryProvider);
-    if (repository.currentUser == null) return;
-    await repository.signOut();
-  }
-
   Future<void> _signIn() async {
+    setState(() {
+      _postSignInError = null;
+      _postSignInStatus = 'Signing in...';
+    });
     final success =
         await ref.read(residentPortalAuthControllerProvider.notifier).signIn(
               email: _emailController.text.trim(),
               password: _passwordController.text,
             );
-    if (success && mounted) {
-      context.go('/portal/${widget.tenantCode}/success');
+    if (!mounted) return;
+    if (!success) {
+      setState(() => _postSignInStatus = null);
+      return;
     }
+
+    setState(() => _postSignInStatus = 'Checking resident access...');
+
+    final repository = ref.read(residentPortalAuthRepositoryProvider);
+    final String? residentHoaId;
+    try {
+      residentHoaId = await repository
+          .currentUserResidentHoaId()
+          .timeout(const Duration(seconds: 8));
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _postSignInStatus = null;
+        _postSignInError = 'Signed in, but resident access check failed: '
+            '${_errorText(error)}';
+      });
+      return;
+    }
+
+    if (!mounted) return;
+    if (residentHoaId == null || residentHoaId.isEmpty) {
+      setState(() {
+        _postSignInStatus = null;
+        _postSignInError =
+            'Signed in, but this account does not have an active resident HOA role yet.';
+      });
+      return;
+    }
+
+    setState(() => _postSignInStatus = 'Opening resident portal...');
+    setSelectedAdminContextId(ref, 'hoa:$residentHoaId');
+    ref.invalidate(authStateProvider);
+    ref.invalidate(currentUserProvider);
+    ref.invalidate(adminAccessProvider);
+    ref.invalidate(availableAdminContextsProvider);
+    ref.invalidate(activeAdminContextProvider);
+    ref.invalidate(activeAdminAccessProvider);
+    _openResidentPortal();
+  }
+
+  void _openResidentPortal() {
+    const target = '/admin/hoa/documents';
+    html.window.history.replaceState(
+      null,
+      'HOA Portal Admin',
+      '${html.window.location.origin}/#$target',
+    );
+    context.go(target);
+    Future<void>.delayed(const Duration(milliseconds: 500), () {
+      if (!mounted) return;
+      if (html.window.location.hash != '#$target') {
+        html.window.location.hash = target;
+      }
+    });
+  }
+
+  String _errorText(Object? error) {
+    final message =
+        error?.toString().replaceFirst('Bad state: ', '').trim() ?? '';
+    if (message.isEmpty) return 'Unable to sign in.';
+    return message;
   }
 }

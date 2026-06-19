@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/rbac/rbac_providers.dart';
+import '../../../core/rbac/admin_context.dart';
 import '../domain/analytics_dashboard.dart';
 import 'analytics_dashboard_providers.dart';
 
@@ -17,12 +17,12 @@ class AnalyticsDashboardPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dashboard = ref.watch(analyticsDashboardProvider);
-    final access = ref.watch(adminAccessProvider);
+    final access = ref.watch(activeAdminAccessProvider);
 
     return access.when(
       data: (resolvedAccess) {
-        final isTenantScoped =
-            resolvedAccess.hasTenantRoleAssignment && !resolvedAccess.hasGlobalRoleAssignment;
+        final isTenantScoped = resolvedAccess.hasTenantRoleAssignment &&
+            !resolvedAccess.hasGlobalRoleAssignment;
         return dashboard.when(
           data: (snapshot) => _AnalyticsDashboardContent(
             snapshot: snapshot,
@@ -91,7 +91,8 @@ class _AnalyticsDashboardContent extends ConsumerWidget {
                   ),
                   _MetricCardData(
                     label: 'Pending Verifications',
-                    value: snapshot.platformMetrics.pendingResidentVerifications,
+                    value:
+                        snapshot.platformMetrics.pendingResidentVerifications,
                     icon: Icons.verified_user_outlined,
                     color: Colors.orange,
                     onTapPath: '/admin/resident-verification',
@@ -121,9 +122,13 @@ class _AnalyticsDashboardContent extends ConsumerWidget {
               ),
               const SizedBox(height: 28),
               if (!isTenantScoped ||
-                  _tenantVisibleAttentionCount(snapshot.launchReadinessMetrics) > 0) ...[
+                  _tenantVisibleAttentionCount(
+                          snapshot.launchReadinessMetrics) >
+                      0) ...[
                 _SectionHeader(
-                  title: isTenantScoped ? 'Launch Readiness' : 'Tenant Launch Readiness',
+                  title: isTenantScoped
+                      ? 'Launch Readiness'
+                      : 'Tenant Launch Readiness',
                   subtitle: isTenantScoped
                       ? 'Subscription, billing, staffing, and onboarding status for your tenant.'
                       : 'Subscription, billing, staffing, and onboarding blockers across SaaS tenants.',
@@ -203,7 +208,9 @@ class _DashboardHeader extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              isTenantScoped ? 'Tenant Operations Dashboard' : 'Analytics & Operations Dashboard',
+              isTenantScoped
+                  ? 'Tenant Operations Dashboard'
+                  : 'Analytics & Operations Dashboard',
               style: Theme.of(context).textTheme.headlineMedium,
             ),
             const SizedBox(height: 6),
@@ -263,7 +270,10 @@ class _MetricGrid extends StatelessWidget {
         return Wrap(
           spacing: 12,
           runSpacing: 12,
-          children: cards.map((card) => SizedBox(width: cardWidth, child: _MetricCard(data: card))).toList(),
+          children: cards
+              .map((card) =>
+                  SizedBox(width: cardWidth, child: _MetricCard(data: card)))
+              .toList(),
         );
       },
     );
@@ -309,9 +319,11 @@ class _MetricCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(data.value.toString(), style: Theme.of(context).textTheme.headlineSmall),
+                  Text(data.value.toString(),
+                      style: Theme.of(context).textTheme.headlineSmall),
                   const SizedBox(height: 2),
-                  Text(data.label, maxLines: 2, overflow: TextOverflow.ellipsis),
+                  Text(data.label,
+                      maxLines: 2, overflow: TextOverflow.ellipsis),
                 ],
               ),
             ),
@@ -330,7 +342,6 @@ class _MetricCard extends StatelessWidget {
     );
   }
 }
-
 
 class _TenantLaunchReadinessPanel extends StatelessWidget {
   const _TenantLaunchReadinessPanel({
@@ -557,7 +568,8 @@ class _ReadinessCounter extends StatelessWidget {
       decoration: BoxDecoration(
         color: data.color.withOpacity(data.value == 0 ? 0.06 : 0.11),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: data.color.withOpacity(data.value == 0 ? 0.12 : 0.28)),
+        border: Border.all(
+            color: data.color.withOpacity(data.value == 0 ? 0.12 : 0.28)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -600,7 +612,9 @@ class _TicketMetricsPanel extends StatelessWidget {
       ('Resolved', metrics.resolved, Colors.green),
       ('Closed', metrics.closed, Colors.grey),
     ];
-    final maxValue = rows.map((row) => row.$2).fold<int>(1, (max, value) => value > max ? value : max);
+    final maxValue = rows
+        .map((row) => row.$2)
+        .fold<int>(1, (max, value) => value > max ? value : max);
 
     return Card(
       margin: EdgeInsets.zero,
@@ -609,9 +623,11 @@ class _TicketMetricsPanel extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Ticket Metrics', style: Theme.of(context).textTheme.titleLarge),
+            Text('Ticket Metrics',
+                style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 4),
-            Text('${metrics.activeTotal} active, ${metrics.completedTotal} completed'),
+            Text(
+                '${metrics.activeTotal} active, ${metrics.completedTotal} completed'),
             const SizedBox(height: 18),
             ...rows.map((row) {
               return _MetricBarRow(
@@ -642,15 +658,31 @@ class _OperationalMetricsPanel extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Operational Metrics', style: Theme.of(context).textTheme.titleLarge),
+            Text('Operational Metrics',
+                style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 4),
             const Text('Role coverage across HOA and tenant staff users.'),
             const SizedBox(height: 18),
-            _CompactMetric(label: 'HOA Managers', value: metrics.hoaManagers, icon: Icons.supervisor_account_outlined),
-            _CompactMetric(label: 'HOA Board Members', value: metrics.hoaBoardMembers, icon: Icons.groups_outlined),
-            _CompactMetric(label: 'Tenant Staff', value: metrics.tenantStaff, icon: Icons.badge_outlined),
-            _CompactMetric(label: 'Dispatch Users', value: metrics.dispatchUsers, icon: Icons.local_shipping_outlined),
-            _CompactMetric(label: 'CSR Users', value: metrics.csrUsers, icon: Icons.support_agent_outlined),
+            _CompactMetric(
+                label: 'HOA Managers',
+                value: metrics.hoaManagers,
+                icon: Icons.supervisor_account_outlined),
+            _CompactMetric(
+                label: 'HOA Board Members',
+                value: metrics.hoaBoardMembers,
+                icon: Icons.groups_outlined),
+            _CompactMetric(
+                label: 'Tenant Staff',
+                value: metrics.tenantStaff,
+                icon: Icons.badge_outlined),
+            _CompactMetric(
+                label: 'Dispatch Users',
+                value: metrics.dispatchUsers,
+                icon: Icons.local_shipping_outlined),
+            _CompactMetric(
+                label: 'CSR Users',
+                value: metrics.csrUsers,
+                icon: Icons.support_agent_outlined),
           ],
         ),
       ),
@@ -684,7 +716,8 @@ class _MetricBarRow extends StatelessWidget {
               child: LinearProgressIndicator(
                 value: maxValue == 0 ? 0 : value / maxValue,
                 minHeight: 10,
-                backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                backgroundColor:
+                    Theme.of(context).colorScheme.surfaceContainerHighest,
                 valueColor: AlwaysStoppedAnimation<Color>(color),
               ),
             ),
@@ -705,7 +738,8 @@ class _MetricBarRow extends StatelessWidget {
 }
 
 class _CompactMetric extends StatelessWidget {
-  const _CompactMetric({required this.label, required this.value, required this.icon});
+  const _CompactMetric(
+      {required this.label, required this.value, required this.icon});
 
   final String label;
   final int value;
@@ -717,7 +751,8 @@ class _CompactMetric extends StatelessWidget {
       contentPadding: EdgeInsets.zero,
       leading: CircleAvatar(child: Icon(icon)),
       title: Text(label),
-      trailing: Text(value.toString(), style: Theme.of(context).textTheme.titleLarge),
+      trailing:
+          Text(value.toString(), style: Theme.of(context).textTheme.titleLarge),
     );
   }
 }
@@ -755,7 +790,8 @@ class _RecentActivityGrid extends StatelessWidget {
                 title: registration.residentName,
                 subtitle: '${registration.email} • ${registration.hoaName}',
                 meta: _labelize(registration.status),
-                onTap: () => context.go('/admin/resident-verification/${registration.id}'),
+                onTap: () => context
+                    .go('/admin/resident-verification/${registration.id}'),
               );
             }).toList(),
           ),
@@ -924,9 +960,11 @@ class _DashboardError extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline, size: 48, color: Theme.of(context).colorScheme.error),
+            Icon(Icons.error_outline,
+                size: 48, color: Theme.of(context).colorScheme.error),
             const SizedBox(height: 16),
-            Text('Unable to load analytics dashboard.', style: Theme.of(context).textTheme.titleLarge),
+            Text('Unable to load analytics dashboard.',
+                style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
             Text(error.toString(), textAlign: TextAlign.center),
             const SizedBox(height: 16),

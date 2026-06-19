@@ -9,6 +9,7 @@ import 'admin_app.dart';
 
 Future<void> bootstrapAdminApp() async {
   WidgetsFlutterBinding.ensureInitialized();
+  _clearStaleAdminInviteCallback();
   _normalizeResidentEmailCallback();
 
   const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
@@ -26,19 +27,32 @@ Future<void> bootstrapAdminApp() async {
     anonKey: supabaseAnonKey,
     authOptions: const FlutterAuthClientOptions(
       authFlowType: AuthFlowType.implicit,
+      detectSessionInUri: false,
     ),
   );
 
   runApp(const ProviderScope(child: AdminApp()));
 }
 
+void _clearStaleAdminInviteCallback() {
+  final uri = Uri.base;
+  final normalizedFragment = _normalizedRouteFragment(uri.fragment);
+  if (!normalizedFragment.startsWith('/accept-invite')) return;
+  if (_extractAuthPayloadSegment(_fragmentPayload(uri.fragment) ?? '') !=
+      null) {
+    return;
+  }
+
+  html.window.history.replaceState(
+    null,
+    'HOA Portal Admin',
+    '${uri.origin}/#/',
+  );
+}
+
 void _normalizeResidentEmailCallback() {
   final uri = Uri.base;
-  final normalizedFragment = uri.fragment.startsWith('/')
-      ? uri.fragment
-      : uri.fragment.startsWith('?')
-          ? uri.fragment.substring(1)
-          : uri.fragment;
+  final normalizedFragment = _normalizedRouteFragment(uri.fragment);
 
   if (normalizedFragment.startsWith('/portal/')) return;
   if (normalizedFragment.startsWith('/accept-invite')) return;
@@ -72,17 +86,28 @@ String? _extractResidentAuthPayload(Uri uri) {
     return queryPayload;
   }
 
-  final fragment = uri.fragment;
+  return _extractAuthPayloadSegment(_fragmentPayload(uri.fragment) ?? '');
+}
+
+String _normalizedRouteFragment(String fragment) {
+  if (fragment.startsWith('/')) return fragment;
+  if (fragment.startsWith('?')) return fragment.substring(1);
+  return fragment;
+}
+
+String? _fragmentPayload(String fragment) {
   if (fragment.isEmpty) return null;
 
   final fragmentQueryStart = fragment.indexOf('?');
-  final fragmentPayload = fragmentQueryStart >= 0
-      ? fragment.substring(fragmentQueryStart + 1)
-      : fragment.startsWith('?')
-          ? fragment.substring(1)
-          : fragment;
+  if (fragmentQueryStart >= 0) {
+    return fragment.substring(fragmentQueryStart + 1);
+  }
 
-  return _extractAuthPayloadSegment(fragmentPayload);
+  if (fragment.startsWith('?')) {
+    return fragment.substring(1);
+  }
+
+  return fragment;
 }
 
 String? _extractAuthPayloadSegment(String candidate) {

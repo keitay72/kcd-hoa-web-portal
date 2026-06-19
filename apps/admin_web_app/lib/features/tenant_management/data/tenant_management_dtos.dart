@@ -37,13 +37,22 @@ class PlatformTenantDto {
       isPrimary: json['is_primary'] as bool? ?? false,
       createdAt: _date(json['created_at']),
       updatedAt: _date(json['updated_at']),
-      onboardingStatus: _onboardingText(json['tenant_onboarding_status'], 'status'),
-      onboardingBlockedReason: _onboardingText(json['tenant_onboarding_status'], 'blocked_reason'),
-      onboardingLaunchReadyAt: _date(_onboardingValue(json['tenant_onboarding_status'], 'launch_ready_at')),
-      onboardingLaunchedAt: _date(_onboardingValue(json['tenant_onboarding_status'], 'launched_at')),
-      betaStatus: _onboardingText(json['tenant_onboarding_status'], 'beta_status'),
-      hoaDataStatus: _onboardingText(json['tenant_onboarding_status'], 'hoa_data_status'),
-      readyForHoaOnboarding: _onboardingValue(json['tenant_onboarding_status'], 'ready_for_hoa_onboarding') as bool? ?? false,
+      onboardingStatus:
+          _onboardingText(json['tenant_onboarding_status'], 'status'),
+      onboardingBlockedReason:
+          _onboardingText(json['tenant_onboarding_status'], 'blocked_reason'),
+      onboardingLaunchReadyAt: _date(_onboardingValue(
+          json['tenant_onboarding_status'], 'launch_ready_at')),
+      onboardingLaunchedAt: _date(
+          _onboardingValue(json['tenant_onboarding_status'], 'launched_at')),
+      betaStatus:
+          _onboardingText(json['tenant_onboarding_status'], 'beta_status'),
+      hoaDataStatus:
+          _onboardingText(json['tenant_onboarding_status'], 'hoa_data_status'),
+      readyForHoaOnboarding: _onboardingValue(
+                  json['tenant_onboarding_status'], 'ready_for_hoa_onboarding')
+              as bool? ??
+          false,
       subscriptionStatus: _text(json['subscription_status']),
       subscriptionPlanName: _text(json['subscription_plan_name']),
       subscriptionBillingMode: _text(json['subscription_billing_mode']),
@@ -76,6 +85,8 @@ class TenantSettingsDto {
       emailFromName: _text(json['email_from_name']),
       emailReplyTo: _text(json['email_reply_to']),
       timezone: json['timezone'] as String? ?? 'America/Chicago',
+      residentActivationCodesRequired:
+          json['resident_activation_codes_required'] as bool? ?? true,
     );
   }
 }
@@ -89,7 +100,8 @@ class TenantEmailSettingsDto {
     return TenantEmailSettings(
       tenantId: json['tenant_id'] as String,
       provider: json['provider'] as String? ?? 'platform_managed',
-      verificationStatus: json['verification_status'] as String? ?? 'not_configured',
+      verificationStatus:
+          json['verification_status'] as String? ?? 'not_configured',
       senderDomain: _text(json['sender_domain']),
       senderEmail: _text(json['sender_email']),
       replyToEmail: _text(json['reply_to_email']),
@@ -226,7 +238,6 @@ class TenantOnboardingStatusDto {
   }
 }
 
-
 class TenantStaffAssignmentDto {
   const TenantStaffAssignmentDto({
     required this.json,
@@ -267,7 +278,6 @@ class TenantAssignableUserDto {
     );
   }
 }
-
 
 class TenantHoaSummaryDto {
   const TenantHoaSummaryDto({required this.json});

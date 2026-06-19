@@ -98,70 +98,69 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
     final residentCounts = await _residentCountsByTenant(tenantHoaIds);
     final staffCounts = await _tenantAdminCountsByTenant(tenantIds);
     final billingContactCounts = await _billingContactCountsByTenant(tenantIds);
-    final subscriptions = await _currentSubscriptionSnapshotsByTenant(tenantIds);
+    final subscriptions =
+        await _currentSubscriptionSnapshotsByTenant(tenantIds);
 
-    final tenants = rows
-        .map((row) {
-          final tenantId = row['id'] as String;
-          final subscription = subscriptions[tenantId];
-          return PlatformTenantDto(
-            json: {
-              ...Map<String, dynamic>.from(row),
-              'hoa_count': hoaCounts[tenantId] ?? 0,
-              'resident_count': residentCounts[tenantId] ?? 0,
-              'tenant_admin_count': staffCounts[tenantId] ?? 0,
-              'billing_contact_count': billingContactCounts[tenantId] ?? 0,
-              'subscription_status': subscription?.status,
-              'subscription_plan_name': subscription?.planName,
-              'subscription_billing_mode': subscription?.billingMode,
-              'subscription_has_stripe_price': subscription?.hasStripePrice,
-              'included_hoa_count': subscription?.includedHoaCount,
-              'included_resident_count': subscription?.includedResidentCount,
-            },
-          ).toDomain();
-        })
-        .where((tenant) {
-          final search = filters.search.trim().toLowerCase();
-          final matchesSearch = search.isEmpty ||
-              tenant.name.toLowerCase().contains(search) ||
-              tenant.code.toLowerCase().contains(search) ||
-              (tenant.subscriptionPlanName?.toLowerCase().contains(search) ?? false);
-          if (!matchesSearch) return false;
+    final tenants = rows.map((row) {
+      final tenantId = row['id'] as String;
+      final subscription = subscriptions[tenantId];
+      return PlatformTenantDto(
+        json: {
+          ...Map<String, dynamic>.from(row),
+          'hoa_count': hoaCounts[tenantId] ?? 0,
+          'resident_count': residentCounts[tenantId] ?? 0,
+          'tenant_admin_count': staffCounts[tenantId] ?? 0,
+          'billing_contact_count': billingContactCounts[tenantId] ?? 0,
+          'subscription_status': subscription?.status,
+          'subscription_plan_name': subscription?.planName,
+          'subscription_billing_mode': subscription?.billingMode,
+          'subscription_has_stripe_price': subscription?.hasStripePrice,
+          'included_hoa_count': subscription?.includedHoaCount,
+          'included_resident_count': subscription?.includedResidentCount,
+        },
+      ).toDomain();
+    }).where((tenant) {
+      final search = filters.search.trim().toLowerCase();
+      final matchesSearch = search.isEmpty ||
+          tenant.name.toLowerCase().contains(search) ||
+          tenant.code.toLowerCase().contains(search) ||
+          (tenant.subscriptionPlanName?.toLowerCase().contains(search) ??
+              false);
+      if (!matchesSearch) return false;
 
-          return switch (filters.readiness) {
-            'needs_setup' => tenant.needsSetup,
-            'ready_to_launch' => tenant.isLaunchReady && !tenant.isLaunched,
-            'launched' => tenant.isLaunched,
-            'blocked' => tenant.isOnboardingBlocked,
-            'missing_subscription' => !tenant.hasSubscription,
-            'missing_admin' => !tenant.hasTenantAdmin,
-            'missing_hoa' => !tenant.hasHoas,
-            _ => true,
-          };
-        })
-        .where((tenant) {
-          return switch (filters.subscriptionHealth) {
-            'missing_subscription' => !tenant.hasSubscription,
-            'over_limits' => tenant.isOverIncludedLimits,
-            'approaching_limits' => tenant.isApproachingLimits,
-            'stripe_pending' => tenant.hasStripePending,
-            _ => true,
-          };
-        })
-        .where((tenant) {
-          return switch (filters.billingReadiness) {
-            'missing_subscription' => !tenant.hasSubscription,
-            'missing_billing_contact' => !tenant.hasBillingContact,
-            'over_limits' => tenant.isOverIncludedLimits,
-            'stripe_pending' => tenant.hasStripePending,
-            _ => true,
-          };
-        }).toList();
+      return switch (filters.readiness) {
+        'needs_setup' => tenant.needsSetup,
+        'ready_to_launch' => tenant.isLaunchReady && !tenant.isLaunched,
+        'launched' => tenant.isLaunched,
+        'blocked' => tenant.isOnboardingBlocked,
+        'missing_subscription' => !tenant.hasSubscription,
+        'missing_admin' => !tenant.hasTenantAdmin,
+        'missing_hoa' => !tenant.hasHoas,
+        _ => true,
+      };
+    }).where((tenant) {
+      return switch (filters.subscriptionHealth) {
+        'missing_subscription' => !tenant.hasSubscription,
+        'over_limits' => tenant.isOverIncludedLimits,
+        'approaching_limits' => tenant.isApproachingLimits,
+        'stripe_pending' => tenant.hasStripePending,
+        _ => true,
+      };
+    }).where((tenant) {
+      return switch (filters.billingReadiness) {
+        'missing_subscription' => !tenant.hasSubscription,
+        'missing_billing_contact' => !tenant.hasBillingContact,
+        'over_limits' => tenant.isOverIncludedLimits,
+        'stripe_pending' => tenant.hasStripePending,
+        _ => true,
+      };
+    }).toList();
 
     return tenants;
   }
 
-  Future<Map<String, List<String>>> _hoaIdsByTenant(List<String> tenantIds) async {
+  Future<Map<String, List<String>>> _hoaIdsByTenant(
+      List<String> tenantIds) async {
     if (tenantIds.isEmpty) return const {};
     final rows = await _client
         .from('hoa_communities')
@@ -207,11 +206,13 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
     }
 
     return {
-      for (final entry in residentIdsByTenant.entries) entry.key: entry.value.length,
+      for (final entry in residentIdsByTenant.entries)
+        entry.key: entry.value.length,
     };
   }
 
-  Future<Map<String, int>> _billingContactCountsByTenant(List<String> tenantIds) async {
+  Future<Map<String, int>> _billingContactCountsByTenant(
+      List<String> tenantIds) async {
     if (tenantIds.isEmpty) return const {};
     final rows = await _client
         .from('tenant_billing_contacts')
@@ -226,7 +227,8 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
     return counts;
   }
 
-  Future<Map<String, int>> _tenantAdminCountsByTenant(List<String> tenantIds) async {
+  Future<Map<String, int>> _tenantAdminCountsByTenant(
+      List<String> tenantIds) async {
     if (tenantIds.isEmpty) return const {};
     final rows = await _client
         .from('user_platform_roles')
@@ -307,7 +309,8 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
 
     final subscriptionRows = await _client
         .from('tenant_subscriptions')
-        .select('*, subscription_plans(code, name), subscription_plan_prices(billing_interval, currency, unit_amount_cents)')
+        .select(
+            '*, subscription_plans(code, name), subscription_plan_prices(billing_interval, currency, unit_amount_cents)')
         .eq('tenant_id', tenantId)
         .order('created_at', ascending: false);
 
@@ -327,10 +330,12 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
     final assignableUsers = await _listAssignableUsers();
     final tenantHoas = await _listTenantHoas(tenantId);
     final tenantAdminCount = tenantStaff
-        .where((staff) => const {'tenant_admin', 'tenant_manager'}.contains(staff.roleCode))
+        .where((staff) =>
+            const {'tenant_admin', 'tenant_manager'}.contains(staff.roleCode))
         .length;
     final hoaCount = tenantHoas.length;
-    final residentCount = await _tenantResidentCount(tenantHoas.map((hoa) => hoa.id).toList());
+    final residentCount =
+        await _tenantResidentCount(tenantHoas.map((hoa) => hoa.id).toList());
 
     return TenantDetail(
       tenant: PlatformTenantDto(json: tenantRow).toDomain(),
@@ -442,23 +447,25 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
         .eq('tenant_id', tenantId)
         .maybeSingle();
     final payload = <String, dynamic>{
-        'tenant_id': tenantId,
-        'support_email': _blankToNull(input.supportEmail),
-        'support_phone': _blankToNull(input.supportPhone),
-        'logo_url': _blankToNull(input.logoUrl),
-        'primary_color': _blankToNull(input.primaryColor),
-        'secondary_color': _blankToNull(input.secondaryColor),
-        'portal_hostname': _blankToNull(input.portalHostname),
-        'email_from_name': _blankToNull(input.emailFromName),
-        'email_reply_to': _blankToNull(input.emailReplyTo),
-        'timezone': input.timezone.trim().isEmpty
-            ? 'America/Chicago'
-            : input.timezone.trim(),
-      };
+      'tenant_id': tenantId,
+      'support_email': _blankToNull(input.supportEmail),
+      'support_phone': _blankToNull(input.supportPhone),
+      'logo_url': _blankToNull(input.logoUrl),
+      'primary_color': _blankToNull(input.primaryColor),
+      'secondary_color': _blankToNull(input.secondaryColor),
+      'portal_hostname': _blankToNull(input.portalHostname),
+      'email_from_name': _blankToNull(input.emailFromName),
+      'email_reply_to': _blankToNull(input.emailReplyTo),
+      'resident_activation_codes_required':
+          input.residentActivationCodesRequired,
+      'timezone': input.timezone.trim().isEmpty
+          ? 'America/Chicago'
+          : input.timezone.trim(),
+    };
     await _client.from('tenant_settings').upsert(
-      payload,
-      onConflict: 'tenant_id',
-    );
+          payload,
+          onConflict: 'tenant_id',
+        );
     await _audit.log(
       action: 'tenant.settings_updated',
       entityType: 'tenant_settings',
@@ -480,18 +487,18 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
         .eq('tenant_id', tenantId)
         .maybeSingle();
     final payload = <String, dynamic>{
-        'tenant_id': tenantId,
-        'provider': input.provider,
-        'sender_domain': _blankToNull(input.senderDomain),
-        'sender_email': _blankToNull(input.senderEmail),
-        'reply_to_email': _blankToNull(input.replyToEmail),
-        'verification_status': input.verificationStatus,
-        'provider_domain_id': _blankToNull(input.providerDomainId),
-      };
+      'tenant_id': tenantId,
+      'provider': input.provider,
+      'sender_domain': _blankToNull(input.senderDomain),
+      'sender_email': _blankToNull(input.senderEmail),
+      'reply_to_email': _blankToNull(input.replyToEmail),
+      'verification_status': input.verificationStatus,
+      'provider_domain_id': _blankToNull(input.providerDomainId),
+    };
     await _client.from('tenant_email_settings').upsert(
-      payload,
-      onConflict: 'tenant_id',
-    );
+          payload,
+          onConflict: 'tenant_id',
+        );
     await _audit.log(
       action: 'tenant.email_settings_updated',
       entityType: 'tenant_email_settings',
@@ -513,18 +520,19 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
         .eq('tenant_id', tenantId)
         .maybeSingle();
     final payload = <String, dynamic>{
-        'tenant_id': tenantId,
-        'provider': 'twilio',
-        'status': input.status,
-        'twilio_subaccount_sid': _blankToNull(input.twilioSubaccountSid),
-        'twilio_messaging_service_sid': _blankToNull(input.twilioMessagingServiceSid),
-        'sending_phone_number': _blankToNull(input.sendingPhoneNumber),
-        'monthly_message_limit': input.monthlyMessageLimit,
-      };
+      'tenant_id': tenantId,
+      'provider': 'twilio',
+      'status': input.status,
+      'twilio_subaccount_sid': _blankToNull(input.twilioSubaccountSid),
+      'twilio_messaging_service_sid':
+          _blankToNull(input.twilioMessagingServiceSid),
+      'sending_phone_number': _blankToNull(input.sendingPhoneNumber),
+      'monthly_message_limit': input.monthlyMessageLimit,
+    };
     await _client.from('tenant_sms_settings').upsert(
-      payload,
-      onConflict: 'tenant_id',
-    );
+          payload,
+          onConflict: 'tenant_id',
+        );
     await _audit.log(
       action: 'tenant.sms_settings_updated',
       entityType: 'tenant_sms_settings',
@@ -567,8 +575,7 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
     if (input.isPrimary) {
       await _client
           .from('tenant_billing_contacts')
-          .update({'is_primary': false})
-          .eq('tenant_id', tenantId);
+          .update({'is_primary': false}).eq('tenant_id', tenantId);
     }
 
     final payload = <String, dynamic>{
@@ -622,16 +629,17 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
       'tenant_id': tenantId,
       'addon_id': addonId,
       'status': status,
-      'disabled_at': status == 'disabled' ? DateTime.now().toIso8601String() : null,
+      'disabled_at':
+          status == 'disabled' ? DateTime.now().toIso8601String() : null,
     };
     if (status == 'enabled') {
       payload['enabled_at'] = DateTime.now().toIso8601String();
     }
 
     await _client.from('tenant_addons').upsert(
-      payload,
-      onConflict: 'tenant_id,addon_id',
-    );
+          payload,
+          onConflict: 'tenant_id,addon_id',
+        );
     await _audit.log(
       action: 'tenant.addon_status_updated',
       entityType: 'tenant_addon',
@@ -641,7 +649,6 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
       afterJson: payload,
     );
   }
-
 
   @override
   Future<void> saveSubscription({
@@ -667,7 +674,8 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
       'current_period_start': input.currentPeriodStart?.toIso8601String(),
       'current_period_end': input.currentPeriodEnd?.toIso8601String(),
       'trial_ends_at': input.trialEndsAt?.toIso8601String(),
-      'cancelled_at': input.status == 'cancelled' ? DateTime.now().toIso8601String() : null,
+      'cancelled_at':
+          input.status == 'cancelled' ? DateTime.now().toIso8601String() : null,
     };
 
     String entityId = subscriptionId ?? tenantId;
@@ -771,7 +779,6 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
     };
   }
 
-
   @override
   Future<StripeActionResult> createCheckoutSession({
     required String tenantId,
@@ -828,7 +835,8 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
   }
 
   StripeActionResult _stripeActionResult(dynamic data) {
-    final body = data is Map ? data.cast<String, dynamic>() : <String, dynamic>{};
+    final body =
+        data is Map ? data.cast<String, dynamic>() : <String, dynamic>{};
     return StripeActionResult(
       success: body['success'] == true,
       message: body['message']?.toString() ?? 'Stripe action completed.',
@@ -836,7 +844,6 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
       checkoutSessionId: body['checkout_session_id']?.toString(),
     );
   }
-
 
   @override
   Future<void> saveOnboardingStatus({
@@ -874,9 +881,9 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
     }
 
     await _client.from('tenant_onboarding_status').upsert(
-      payload,
-      onConflict: 'tenant_id',
-    );
+          payload,
+          onConflict: 'tenant_id',
+        );
     await _audit.log(
       action: 'tenant.onboarding_updated',
       entityType: 'tenant_onboarding_status',
@@ -926,7 +933,8 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
     await _audit.log(
       action: 'tenant.staff_removed',
       entityType: 'user_platform_role',
-      entityId: '${assignment.userId}:${assignment.tenantId}:${assignment.roleId}',
+      entityId:
+          '${assignment.userId}:${assignment.tenantId}:${assignment.roleId}',
       tenantId: assignment.tenantId,
       beforeJson: before,
     );
@@ -935,17 +943,18 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
   Future<List<TenantStaffAssignment>> _listTenantStaff(String tenantId) async {
     final rows = await _client
         .from('user_platform_roles')
-        .select('user_id, tenant_id, role_id, created_at, roles!inner(code, name)')
+        .select(
+            'user_id, tenant_id, role_id, created_at, roles!inner(code, name)')
         .eq('tenant_id', tenantId)
         .inFilter('roles.code', [
-          'tenant_admin',
-          'tenant_manager',
-          'tenant_csr',
-          'tenant_dispatch',
-        ])
-        .order('created_at', ascending: false);
+      'tenant_admin',
+      'tenant_manager',
+      'tenant_csr',
+      'tenant_dispatch',
+    ]).order('created_at', ascending: false);
 
-    final userIds = rows.map((row) => row['user_id'] as String).toSet().toList();
+    final userIds =
+        rows.map((row) => row['user_id'] as String).toSet().toList();
     final profilesById = <String, Map<String, dynamic>>{};
     if (userIds.isNotEmpty) {
       final profileRows = await _client
@@ -975,7 +984,9 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
         .order('full_name', ascending: true)
         .order('email', ascending: true);
 
-    return rows.map((row) => TenantAssignableUserDto(json: row).toDomain()).toList();
+    return rows
+        .map((row) => TenantAssignableUserDto(json: row).toDomain())
+        .toList();
   }
 
   Future<List<TenantHoaSummary>> _listTenantHoas(String tenantId) async {
@@ -985,9 +996,10 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
         .eq('tenant_id', tenantId)
         .order('name', ascending: true);
 
-    return rows.map((row) => TenantHoaSummaryDto(json: row).toDomain()).toList();
+    return rows
+        .map((row) => TenantHoaSummaryDto(json: row).toDomain())
+        .toList();
   }
-
 
   Future<int> _tenantResidentCount(List<String> hoaIds) async {
     if (hoaIds.isEmpty) return 0;
@@ -1034,12 +1046,14 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
     );
   }
 
-  Future<void> _createDefaultTenantSettings(String tenantId, String name) async {
+  Future<void> _createDefaultTenantSettings(
+      String tenantId, String name) async {
     await _client.from('tenant_settings').upsert(
       {
         'tenant_id': tenantId,
         'email_from_name': name,
         'timezone': 'America/Chicago',
+        'resident_activation_codes_required': true,
       },
       onConflict: 'tenant_id',
     );
@@ -1095,7 +1109,6 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
     return '$year-$month-$day';
   }
 }
-
 
 class _TenantListSubscriptionSnapshot {
   const _TenantListSubscriptionSnapshot({
