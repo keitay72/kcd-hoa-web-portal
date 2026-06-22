@@ -4,6 +4,7 @@ import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/dev/dev_security_bypass.dart';
 import '../core/rbac/admin_access.dart';
@@ -25,6 +26,8 @@ import '../features/announcements_cms/presentation/announcement_detail_page.dart
 import '../features/announcements_cms/presentation/announcement_list_page.dart';
 import '../features/audit_logs/presentation/audit_log_list_page.dart';
 import '../features/auth_admin/presentation/accept_invite_page.dart';
+import '../features/auth_admin/presentation/admin_forgot_password_page.dart';
+import '../features/auth_admin/presentation/admin_reset_password_page.dart';
 import '../features/auth_admin/presentation/sign_in_page.dart';
 import '../features/customer_accounts/presentation/customer_account_list_page.dart';
 import '../features/documents_cms/presentation/document_detail_page.dart';
@@ -52,7 +55,6 @@ import '../features/resident_portal_auth/presentation/resident_email_confirmatio
 import '../features/resident_portal_auth/presentation/resident_forgot_password_page.dart';
 import '../features/resident_portal_auth/presentation/resident_registration_page.dart';
 import '../features/resident_portal_auth/presentation/resident_reset_password_page.dart';
-import '../features/resident_portal_auth/presentation/resident_sign_in_page.dart';
 import '../features/ticket_operations/domain/ticket.dart';
 import '../features/ticket_operations/presentation/ticket_dashboard_page.dart';
 import '../features/ticket_operations/presentation/ticket_detail_page.dart';
@@ -84,7 +86,7 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
     }
 
     if (access.isTenantScopedOnly) {
-      return '/admin/hoas';
+      return '/admin';
     }
 
     return '/admin';
@@ -99,20 +101,34 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
       final residentPortalFlow = state.uri.queryParameters['portal_flow'];
       final residentPortalTenant = state.uri.queryParameters['tenant'];
       final isSignIn = path == '/sign-in';
+      final isPasswordFlow =
+          path == '/forgot-password' || path == '/reset-password';
       final isAcceptInvite =
           path == '/accept-invite' || path.startsWith('/accept-invite/');
       final isResidentPortal = path == '/portal' || path.startsWith('/portal/');
+      final canHonorFragmentRoute =
+          path == '/' || isSignIn || isPasswordFlow || isAcceptInvite;
 
       if (fragmentRoute != null &&
+          canHonorFragmentRoute &&
           fragmentRoute.startsWith('/portal/') &&
           !isResidentPortal) {
         return fragmentRoute;
       }
 
       if (fragmentRoute != null &&
+          canHonorFragmentRoute &&
           fragmentRoute.startsWith('/accept-invite') &&
           _routeContainsAuthPayload(fragmentRoute) &&
           !isAcceptInvite) {
+        return fragmentRoute;
+      }
+
+      if (fragmentRoute != null &&
+          canHonorFragmentRoute &&
+          fragmentRoute.startsWith('/reset-password') &&
+          _routeContainsAuthPayload(fragmentRoute) &&
+          path != '/reset-password') {
         return fragmentRoute;
       }
 
@@ -150,15 +166,6 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
       }
 
       if (isAcceptInvite) {
-        if (!_routeContainsAuthPayload(state.uri.toString())) {
-          final storedContext =
-              html.window.localStorage['selected_admin_context_id'];
-          if (user == null) return '/sign-in';
-          if (storedContext?.startsWith('hoa:') == true) {
-            return '/admin/hoa/documents';
-          }
-          return resolveHomeRoute();
-        }
         if (path != '/accept-invite') {
           return state.uri.replace(path: '/accept-invite').toString();
         }
@@ -167,6 +174,10 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
 
       if (isResidentPortal) {
         final segments = state.uri.pathSegments;
+        if (segments.length == 2 && segments[1] == 'confirm-email') {
+          return null;
+        }
+
         if (segments.length == 2) {
           final tenantCode = segments[1];
           return '/portal/$tenantCode/register';
@@ -192,10 +203,10 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
       }
 
       if (user == null) {
-        return isSignIn ? null : '/sign-in';
+        return isSignIn || isPasswordFlow ? null : '/sign-in';
       }
 
-      if (isSignIn) {
+      if (isSignIn && !isPasswordFlow) {
         return resolveHomeRoute();
       }
 
@@ -215,9 +226,25 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const SignInPage(),
       ),
       GoRoute(
+        path: '/forgot-password',
+        name: 'adminForgotPassword',
+        builder: (context, state) => const AdminForgotPasswordPage(),
+      ),
+      GoRoute(
+        path: '/reset-password',
+        name: 'adminResetPassword',
+        builder: (context, state) => const AdminResetPasswordPage(),
+      ),
+      GoRoute(
         path: '/accept-invite',
         name: 'acceptInvite',
         builder: (context, state) => const AcceptInvitePage(),
+      ),
+      GoRoute(
+        path: '/portal/confirm-email',
+        name: 'genericResidentEmailConfirmation',
+        builder: (context, state) =>
+            const ResidentEmailConfirmationPage.generic(),
       ),
       GoRoute(
         path: '/portal/:tenantCode',
@@ -235,7 +262,7 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/portal/:tenantCode/sign-in',
         name: 'residentPortalSignIn',
-        builder: (context, state) => ResidentSignInPage(
+        builder: (context, state) => SignInPage(
           tenantCode: state.pathParameters['tenantCode']!,
         ),
       ),
@@ -602,6 +629,7 @@ bool _routeContainsAuthPayload(String route) {
       query.contains('token_hash=') ||
       query.contains('code=') ||
       query.contains('type=invite') ||
+      query.contains('type=recovery') ||
       query.contains('error_description=');
 }
 
@@ -618,13 +646,14 @@ Future<void> forceAdminSignOut(WidgetRef ref) async {
     setSelectedAdminContextId(ref, null);
     html.window.localStorage.remove('resident_email_callback_payload');
     html.window.localStorage.remove('resident_pending_tenant_code');
+    html.window.localStorage.remove('resident_pending_email');
     ref.invalidate(adminAccessProvider);
     ref.invalidate(availableAdminContextsProvider);
     ref.invalidate(activeAdminContextProvider);
     ref.invalidate(activeAdminAccessProvider);
     html.window.history.replaceState(
       null,
-      'Customer Portal Admin',
+      'Customer Portal',
       '${html.window.location.origin}/admin',
     );
     return;
@@ -633,6 +662,7 @@ Future<void> forceAdminSignOut(WidgetRef ref) async {
   setSelectedAdminContextId(ref, null);
   html.window.localStorage.remove('resident_email_callback_payload');
   html.window.localStorage.remove('resident_pending_tenant_code');
+  html.window.localStorage.remove('resident_pending_email');
   await ref.read(supabaseClientProvider).auth.signOut();
   ref.invalidate(authStateProvider);
   ref.invalidate(currentUserProvider);
@@ -642,8 +672,53 @@ Future<void> forceAdminSignOut(WidgetRef ref) async {
   ref.invalidate(activeAdminAccessProvider);
   html.window.history.replaceState(
     null,
-    'Customer Portal Admin',
+    'Customer Portal',
     '${html.window.location.origin}/sign-in',
+  );
+}
+
+class _PortalChromeText {
+  const _PortalChromeText({
+    required this.title,
+    required this.subtitle,
+  });
+
+  final String title;
+  final String subtitle;
+
+  String get fullTitle => '$title $subtitle';
+}
+
+_PortalChromeText _portalChromeText(AdminContext? context) {
+  if (context == null || context.isPlatform) {
+    return const _PortalChromeText(
+      title: 'Customer Portal',
+      subtitle: 'Platform Portal',
+    );
+  }
+
+  final scopeName = context.scopeName?.trim();
+  if (context.isTenant) {
+    return _PortalChromeText(
+      title: scopeName == null || scopeName.isEmpty
+          ? 'Customer Portal'
+          : scopeName,
+      subtitle: 'Management Portal',
+    );
+  }
+
+  if (context.isHoa) {
+    return _PortalChromeText(
+      title: scopeName == null || scopeName.isEmpty
+          ? 'Customer Portal'
+          : scopeName,
+      subtitle: 'Community Portal',
+    );
+  }
+
+  return const _PortalChromeText(
+    title: 'Customer Portal',
+    subtitle: 'Management Portal',
   );
 }
 
@@ -664,31 +739,39 @@ class AdminNavigationShell extends ConsumerStatefulWidget {
 
 class _AdminNavigationShellState extends ConsumerState<AdminNavigationShell> {
   bool _isCollapsed = false;
+  bool _isSigningOut = false;
 
   @override
   Widget build(BuildContext context) {
+    if (_isSigningOut) {
+      return const Scaffold(body: SizedBox.expand());
+    }
+
     final passwordSetupRequired =
         ref.watch(currentAdminProfileProvider).maybeWhen(
               data: (profile) => profile?.requiresPasswordSetup ?? false,
               orElse: () => false,
             );
 
-    if (passwordSetupRequired) {
-      return const AcceptInvitePage();
-    }
+    if (passwordSetupRequired) return const _AdminPasswordSetupGate();
 
     final isCompact = MediaQuery.sizeOf(context).width < 900;
+    final chromeText = ref.watch(activeAdminContextProvider).maybeWhen(
+          data: _portalChromeText,
+          orElse: () => _portalChromeText(null),
+        );
     final nav = _AdminSidebar(
       currentPath: widget.currentPath,
       isCollapsed: isCompact ? false : _isCollapsed,
       onToggleCollapsed:
           isCompact ? null : () => setState(() => _isCollapsed = !_isCollapsed),
+      onSignOut: _signOut,
     );
 
     if (isCompact) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Customer Portal Admin'),
+          title: Text(chromeText.fullTitle),
           actions: [
             IconButton(
               tooltip: 'Sign out',
@@ -716,7 +799,10 @@ class _AdminNavigationShellState extends ConsumerState<AdminNavigationShell> {
   }
 
   Future<void> _signOut() async {
+    if (_isSigningOut) return;
+    setState(() => _isSigningOut = true);
     await forceAdminSignOut(ref);
+    if (mounted) context.go('/sign-in');
   }
 }
 
@@ -724,10 +810,16 @@ class _SidebarHeader extends StatelessWidget {
   const _SidebarHeader({
     required this.isCollapsed,
     required this.onToggleCollapsed,
+    required this.title,
+    required this.subtitle,
+    required this.fullTitle,
   });
 
   final bool isCollapsed;
   final VoidCallback? onToggleCollapsed;
+  final String title;
+  final String subtitle;
+  final String fullTitle;
 
   @override
   Widget build(BuildContext context) {
@@ -749,9 +841,9 @@ class _SidebarHeader extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Tooltip(
-              message: 'Customer Portal Admin',
-              child: CircleAvatar(
+            Tooltip(
+              message: fullTitle,
+              child: const CircleAvatar(
                 radius: 20,
                 child: Icon(Icons.delete_outline),
               ),
@@ -774,15 +866,21 @@ class _SidebarHeader extends StatelessWidget {
             child: Icon(Icons.delete_outline),
           ),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Customer Portal',
-                  style: TextStyle(fontWeight: FontWeight.w800),
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
-                Text('Admin Portal'),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
           ),
@@ -884,11 +982,13 @@ class _AdminSidebar extends ConsumerWidget {
     required this.currentPath,
     required this.isCollapsed,
     required this.onToggleCollapsed,
+    required this.onSignOut,
   });
 
   final String currentPath;
   final bool isCollapsed;
   final VoidCallback? onToggleCollapsed;
+  final Future<void> Function() onSignOut;
 
   static const _items = [
     _AdminNavItem(
@@ -922,28 +1022,21 @@ class _AdminSidebar extends ConsumerWidget {
       activePrefixes: ['/admin/customer-accounts'],
     ),
     _AdminNavItem(
-      label: 'HOA Management',
+      label: 'Community Management',
       permissionRule: AdminPermissions.hoaRead,
       path: '/admin/hoas',
       icon: Icons.domain_outlined,
       activePrefixes: ['/admin/hoas'],
     ),
     _AdminNavItem(
-      label: 'Address Registry',
+      label: 'Service Locations',
       permissionRule: AdminPermissions.addressRead,
       path: '/admin/addresses',
       icon: Icons.location_on_outlined,
       activePrefixes: ['/admin/addresses'],
     ),
     _AdminNavItem(
-      label: 'Activation Codes',
-      permissionRule: AdminPermissions.activationCodes,
-      path: '/admin/activation-codes',
-      icon: Icons.password_outlined,
-      activePrefixes: ['/admin/activation-codes'],
-    ),
-    _AdminNavItem(
-      label: 'Resident Verification',
+      label: 'Customer Verification',
       permissionRule: AdminPermissions.verificationRead,
       path: '/admin/resident-verification',
       icon: Icons.verified_user_outlined,
@@ -996,6 +1089,15 @@ class _AdminSidebar extends ConsumerWidget {
 
   static const _tenantItems = [
     _AdminNavItem(
+      label: 'Dashboard',
+      permissionRule: AdminPermissions.dashboard,
+      path: '/admin',
+      icon: Icons.dashboard_outlined,
+      activePrefixes: ['/admin'],
+      exact: true,
+      feature: TenantFeature.analyticsDashboard,
+    ),
+    _AdminNavItem(
       label: 'Customer Accounts',
       permissionRule: AdminPermissions.customerAccountsRead,
       path: '/admin/customer-accounts',
@@ -1003,28 +1105,21 @@ class _AdminSidebar extends ConsumerWidget {
       activePrefixes: ['/admin/customer-accounts'],
     ),
     _AdminNavItem(
-      label: 'HOA Management',
+      label: 'Community Management',
       permissionRule: AdminPermissions.hoaRead,
       path: '/admin/hoas',
       icon: Icons.domain_outlined,
       activePrefixes: ['/admin/hoas'],
     ),
     _AdminNavItem(
-      label: 'Address Registry',
+      label: 'Service Locations',
       permissionRule: AdminPermissions.addressRead,
       path: '/admin/addresses',
       icon: Icons.location_on_outlined,
       activePrefixes: ['/admin/addresses'],
     ),
     _AdminNavItem(
-      label: 'Activation Codes',
-      permissionRule: AdminPermissions.activationCodes,
-      path: '/admin/activation-codes',
-      icon: Icons.password_outlined,
-      activePrefixes: ['/admin/activation-codes'],
-    ),
-    _AdminNavItem(
-      label: 'Resident Verification',
+      label: 'Customer Verification',
       permissionRule: AdminPermissions.verificationRead,
       path: '/admin/resident-verification',
       icon: Icons.verified_user_outlined,
@@ -1070,7 +1165,7 @@ class _AdminSidebar extends ConsumerWidget {
 
   static const _hoaItems = [
     _AdminNavItem(
-      label: 'HOA Dashboard',
+      label: 'Community Dashboard',
       permissionRule: AdminPermissions.hoaScoped,
       path: '/admin/hoa',
       icon: Icons.dashboard_outlined,
@@ -1078,14 +1173,14 @@ class _AdminSidebar extends ConsumerWidget {
       exact: true,
     ),
     _AdminNavItem(
-      label: 'Residents',
+      label: 'Customers',
       permissionRule: AdminPermissions.hoaScoped,
       path: '/admin/hoa/residents',
       icon: Icons.people_outline,
       activePrefixes: ['/admin/hoa/residents'],
     ),
     _AdminNavItem(
-      label: 'HOA Staff',
+      label: 'Community Staff',
       permissionRule: AdminPermissions.hoaScoped,
       path: '/admin/hoa/staff',
       icon: Icons.manage_accounts_outlined,
@@ -1159,6 +1254,10 @@ class _AdminSidebar extends ConsumerWidget {
     final profile = ref.watch(currentAdminProfileProvider);
     final activeContext = ref.watch(activeAdminContextProvider);
     final access = ref.watch(activeAdminAccessProvider);
+    final chromeText = activeContext.maybeWhen(
+      data: _portalChromeText,
+      orElse: () => _portalChromeText(null),
+    );
     final visibleItems = access.maybeWhen(
       data: (value) {
         final context = activeContext.asData?.value;
@@ -1189,6 +1288,9 @@ class _AdminSidebar extends ConsumerWidget {
             _SidebarHeader(
               isCollapsed: isCollapsed,
               onToggleCollapsed: onToggleCollapsed,
+              title: chromeText.title,
+              subtitle: chromeText.subtitle,
+              fullTitle: chromeText.fullTitle,
             ),
             if (!isCollapsed) ...[
               _AdminContextSelector(
@@ -1289,7 +1391,7 @@ class _AdminSidebar extends ConsumerWidget {
                   error: (_, __) => 'Role unavailable',
                 ),
                 isCollapsed: isCollapsed,
-                onSignOut: () => forceAdminSignOut(ref),
+                onSignOut: onSignOut,
               ),
             ),
           ],
@@ -1475,5 +1577,183 @@ class AdminComingSoonPage extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _AdminPasswordSetupGate extends ConsumerStatefulWidget {
+  const _AdminPasswordSetupGate();
+
+  @override
+  ConsumerState<_AdminPasswordSetupGate> createState() =>
+      _AdminPasswordSetupGateState();
+}
+
+class _AdminPasswordSetupGateState
+    extends ConsumerState<_AdminPasswordSetupGate> {
+  final _formKey = GlobalKey<FormState>();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  bool _isSaving = false;
+  String? _message;
+
+  @override
+  void dispose() {
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: Card(
+            margin: const EdgeInsets.all(24),
+            child: Padding(
+              padding: const EdgeInsets.all(28),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Icon(
+                      Icons.lock_reset_outlined,
+                      size: 48,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Create your password',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Finish setting up your portal account to continue.',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: 24),
+                    TextFormField(
+                      controller: _passwordController,
+                      obscureText: true,
+                      autofillHints: const [AutofillHints.newPassword],
+                      decoration: const InputDecoration(
+                        labelText: 'New password',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: _password,
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _confirmPasswordController,
+                      obscureText: true,
+                      autofillHints: const [AutofillHints.newPassword],
+                      decoration: const InputDecoration(
+                        labelText: 'Confirm new password',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: _confirmPassword,
+                    ),
+                    if (_message != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        _message!,
+                        style: TextStyle(color: theme.colorScheme.error),
+                      ),
+                    ],
+                    const SizedBox(height: 18),
+                    FilledButton(
+                      onPressed: _isSaving ? null : _savePassword,
+                      child: _isSaving
+                          ? const SizedBox.square(
+                              dimension: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Continue'),
+                    ),
+                    TextButton(
+                      onPressed: _isSaving
+                          ? null
+                          : () async {
+                              await ref
+                                  .read(supabaseClientProvider)
+                                  .auth
+                                  .signOut();
+                              if (context.mounted) context.go('/sign-in');
+                            },
+                      child: const Text('Sign out'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _savePassword() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _isSaving = true;
+      _message = null;
+    });
+
+    try {
+      final client = ref.read(supabaseClientProvider);
+      await client.auth.updateUser(
+        UserAttributes(password: _passwordController.text),
+      );
+
+      final user = client.auth.currentUser;
+      if (user != null) {
+        final now = DateTime.now().toUtc().toIso8601String();
+        await client.from('profiles').update({
+          'password_set_at': now,
+          'status': 'active',
+          'updated_at': now,
+        }).eq('id', user.id);
+      }
+
+      ref
+        ..invalidate(currentAdminProfileProvider)
+        ..invalidate(activeAdminAccessProvider);
+
+      if (mounted) context.go('/admin');
+    } catch (error) {
+      if (mounted) {
+        setState(() => _message = _friendlyPasswordError(error));
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  String? _password(String? value) {
+    if (value == null || value.length < 8) {
+      return 'Password must be at least 8 characters.';
+    }
+    return null;
+  }
+
+  String? _confirmPassword(String? value) {
+    if (value != _passwordController.text) return 'Passwords do not match.';
+    return null;
+  }
+
+  String _friendlyPasswordError(Object error) {
+    final message = error.toString().replaceFirst('Exception: ', '').trim();
+    if (message.isEmpty) {
+      return 'We could not save your password. Please try again.';
+    }
+    return message;
   }
 }

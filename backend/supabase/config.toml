@@ -163,11 +163,13 @@ site_url = "http://127.0.0.1:8080"
 additional_redirect_urls = [
   "http://127.0.0.1:8080",
   "http://127.0.0.1:8080/accept-invite",
+  "http://127.0.0.1:8080/reset-password",
   "http://127.0.0.1:8080/portal/confirm-email",
   "http://127.0.0.1:8080/portal/*/confirm-email",
   "http://127.0.0.1:8080/portal/*/reset-password",
   "http://localhost:8080",
   "http://localhost:8080/accept-invite",
+  "http://localhost:8080/reset-password",
   "http://localhost:8080/portal/confirm-email",
   "http://localhost:8080/portal/*/confirm-email",
   "http://localhost:8080/portal/*/reset-password",
@@ -254,10 +256,9 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
-# Uncomment to customize email template
-# [auth.email.template.invite]
-# subject = "You have been invited"
-# content_path = "./supabase/templates/invite.html"
+[auth.email.template.invite]
+subject = "You have been invited to Customer Portal"
+content_path = "./supabase/templates/invite.html"
 
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]

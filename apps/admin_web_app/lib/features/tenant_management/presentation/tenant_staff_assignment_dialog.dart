@@ -13,10 +13,12 @@ class TenantStaffAssignmentDialog extends ConsumerStatefulWidget {
   final TenantDetail detail;
 
   @override
-  ConsumerState<TenantStaffAssignmentDialog> createState() => _TenantStaffAssignmentDialogState();
+  ConsumerState<TenantStaffAssignmentDialog> createState() =>
+      _TenantStaffAssignmentDialogState();
 }
 
-class _TenantStaffAssignmentDialogState extends ConsumerState<TenantStaffAssignmentDialog> {
+class _TenantStaffAssignmentDialogState
+    extends ConsumerState<TenantStaffAssignmentDialog> {
   String? _userId;
   int? _roleId;
 
@@ -34,7 +36,8 @@ class _TenantStaffAssignmentDialogState extends ConsumerState<TenantStaffAssignm
           mainAxisSize: MainAxisSize.min,
           children: [
             if (assignableUsers.isEmpty)
-              const Text('No assignable active users were found. Invite the user first, then assign a tenant role.')
+              const Text(
+                  'No assignable active users were found. Invite the user first, then assign a tenant role.')
             else
               DropdownButtonFormField<String>(
                 value: _userId,
@@ -44,15 +47,20 @@ class _TenantStaffAssignmentDialogState extends ConsumerState<TenantStaffAssignm
                   border: OutlineInputBorder(),
                 ),
                 items: assignableUsers
-                    .map((user) => DropdownMenuItem(value: user.id, child: Text(user.label)))
+                    .map((user) => DropdownMenuItem(
+                        value: user.id, child: Text(user.label)))
                     .toList(),
-                onChanged: commandState.isLoading ? null : (value) => setState(() => _userId = value),
+                onChanged: commandState.isLoading
+                    ? null
+                    : (value) => setState(() => _userId = value),
               ),
             const SizedBox(height: 16),
             roles.when(
               data: (items) {
-                final tenantRoles = items.where((role) => role.isTenantRole).toList();
-                final selectedRoleId = _roleId ?? _preferredTenantRoleId(tenantRoles);
+                final tenantRoles =
+                    items.where((role) => role.isTenantRole).toList();
+                final selectedRoleId =
+                    _roleId ?? _preferredTenantRoleId(tenantRoles);
                 return DropdownButtonFormField<int>(
                   value: selectedRoleId,
                   isExpanded: true,
@@ -61,9 +69,12 @@ class _TenantStaffAssignmentDialogState extends ConsumerState<TenantStaffAssignm
                     border: OutlineInputBorder(),
                   ),
                   items: tenantRoles
-                      .map((role) => DropdownMenuItem(value: role.id, child: Text(role.name)))
+                      .map((role) => DropdownMenuItem(
+                          value: role.id, child: Text(role.name)))
                       .toList(),
-                  onChanged: commandState.isLoading ? null : (value) => setState(() => _roleId = value),
+                  onChanged: commandState.isLoading
+                      ? null
+                      : (value) => setState(() => _roleId = value),
                 );
               },
               loading: () => const LinearProgressIndicator(),
@@ -81,14 +92,16 @@ class _TenantStaffAssignmentDialogState extends ConsumerState<TenantStaffAssignm
       ),
       actions: [
         TextButton(
-          onPressed: commandState.isLoading ? null : () => Navigator.of(context).pop(),
+          onPressed:
+              commandState.isLoading ? null : () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
         FilledButton(
           onPressed: commandState.isLoading ||
                   _userId == null ||
                   (_roleId == null &&
-                      _preferredTenantRoleId(roles.valueOrNull ?? const []) == null)
+                      _preferredTenantRoleId(roles.valueOrNull ?? const []) ==
+                          null)
               ? null
               : _submit,
           child: const Text('Assign Role'),
@@ -99,10 +112,14 @@ class _TenantStaffAssignmentDialogState extends ConsumerState<TenantStaffAssignm
 
   Future<void> _submit() async {
     final userId = _userId;
-    final roleId = _roleId ?? _preferredTenantRoleId(ref.read(roleCatalogProvider).valueOrNull ?? const []);
+    final roleId = _roleId ??
+        _preferredTenantRoleId(
+            ref.read(roleCatalogProvider).valueOrNull ?? const []);
     if (userId == null || roleId == null) return;
 
-    final didAssign = await ref.read(tenantMutationControllerProvider.notifier).assignTenantStaff(
+    final didAssign = await ref
+        .read(tenantMutationControllerProvider.notifier)
+        .assignTenantStaff(
           tenantId: widget.detail.tenant.id,
           input: TenantStaffAssignmentInput(userId: userId, roleId: roleId),
         );
@@ -112,6 +129,9 @@ class _TenantStaffAssignmentDialogState extends ConsumerState<TenantStaffAssignm
 }
 
 int? _preferredTenantRoleId(List<RoleCatalogEntry> roles) {
+  for (final role in roles) {
+    if (role.code == 'tenant_owner') return role.id;
+  }
   for (final role in roles) {
     if (role.code == 'tenant_admin') return role.id;
   }

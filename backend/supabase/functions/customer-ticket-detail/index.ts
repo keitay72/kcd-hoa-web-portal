@@ -81,7 +81,7 @@ Deno.serve(async (request) => {
       ticketId: event.ticket_id,
       oldStatus: event.old_status,
       newStatus: event.new_status,
-      note: event.note,
+      note: publicNote(event.note),
       createdAt: event.created_at,
       actorLabel:
         event.actor_user_id === userData.user.id ? "You" : "Service team",
@@ -101,3 +101,13 @@ Deno.serve(async (request) => {
     events: publicEvents,
   });
 });
+
+function publicNote(note: unknown): string | null {
+  const value = String(note ?? "").trim();
+  if (!value) return null;
+  if (value.startsWith("[ASSIGNMENT]")) {
+    return "Your issue has been assigned to the service team.";
+  }
+  if (value.startsWith("[AUTOMATION]")) return null;
+  return value;
+}

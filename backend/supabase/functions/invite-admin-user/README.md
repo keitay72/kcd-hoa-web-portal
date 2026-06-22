@@ -59,7 +59,7 @@ Deploy migration `0015_admin_user_invite_lifecycle.sql` before using this functi
 
 Accepted roles:
 
-- Tenant staff: `tenant_admin`, `tenant_manager`, `tenant_csr`, `tenant_dispatch`
+- Tenant staff: `tenant_owner`, `tenant_admin`, `tenant_manager`, `tenant_csr`, `tenant_dispatch`
 - HOA users: `hoa_manager`, `hoa_board`, `hoa_resident`
 
 Tenant staff assignments are written to `public.user_platform_roles` during the transition and exposed through `public.user_tenant_roles`.
@@ -88,11 +88,11 @@ http://192.168.0.141:8080/#/accept-invite
 Recommended Supabase Invite User email template:
 
 ```html
-<h2>You have been invited</h2>
-<p>You have been invited to the HOA Portal admin platform.</p>
+<h2>You have been invited to Customer Portal</h2>
+<p>An administrator invited you to create a Customer Portal account.</p>
 <p>This invitation link expires and can only be used once.</p>
 <p>
-  <a href="http://192.168.0.141:8080/#/accept-invite?token_hash={{ .TokenHash }}&type=invite">
+  <a href="{{ .SiteURL }}/accept-invite?token_hash={{ .TokenHash }}&type=invite">
     Accept invitation
   </a>
 </p>

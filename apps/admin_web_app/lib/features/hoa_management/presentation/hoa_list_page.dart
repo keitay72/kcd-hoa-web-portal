@@ -15,6 +15,11 @@ class HoaListPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final hoas = ref.watch(hoaListProvider);
+    final tenantId = ref.watch(activeAdminContextProvider).maybeWhen(
+          data: (contextValue) =>
+              contextValue?.isTenant == true ? contextValue?.scopeId : null,
+          orElse: () => null,
+        );
 
     return Padding(
       padding: const EdgeInsets.all(24),
@@ -25,20 +30,27 @@ class HoaListPage extends ConsumerWidget {
             children: [
               Expanded(
                 child: Text(
-                  'HOA Management',
+                  'Community Management',
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
               ),
               IconButton(
                 tooltip: 'Refresh',
-                onPressed: () => ref.invalidate(hoaListProvider),
+                onPressed: () {
+                  ref.invalidate(activeHoaIdsProvider);
+                  ref.invalidate(hoaListProvider);
+                },
                 icon: const Icon(Icons.refresh),
               ),
               const SizedBox(width: 8),
               FilledButton.icon(
-                onPressed: () => _openCreateDialog(context, ref),
+                onPressed: () => _openCreateDialog(
+                  context,
+                  ref,
+                  tenantId: tenantId,
+                ),
                 icon: const Icon(Icons.add),
-                label: const Text('Create HOA'),
+                label: const Text('Create Community'),
               ),
             ],
           ),
@@ -49,7 +61,7 @@ class HoaListPage extends ConsumerWidget {
             child: hoas.when(
               data: (items) {
                 if (items.isEmpty) {
-                  return const Center(child: Text('No HOA communities found.'));
+                  return const Center(child: Text('No communities found.'));
                 }
 
                 return Card(
@@ -79,7 +91,7 @@ class HoaListPage extends ConsumerWidget {
               },
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (error, _) => Center(
-                child: Text('Unable to load HOA communities: $error'),
+                child: Text('Unable to load communities: $error'),
               ),
             ),
           ),
@@ -88,11 +100,15 @@ class HoaListPage extends ConsumerWidget {
     );
   }
 
-  Future<void> _openCreateDialog(BuildContext context, WidgetRef ref) async {
+  Future<void> _openCreateDialog(
+    BuildContext context,
+    WidgetRef ref, {
+    required String? tenantId,
+  }) async {
     final result = await showDialog<Object?>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => const HoaFormDialog(),
+      builder: (_) => HoaFormDialog(tenantId: tenantId),
     );
 
     if (result != null) {
@@ -130,11 +146,11 @@ class _TenantActivationCodeDefaultCard extends ConsumerWidget {
               margin: EdgeInsets.zero,
               child: SwitchListTile(
                 secondary: const Icon(Icons.pin_outlined),
-                title: const Text('Tenant default: resident activation codes'),
+                title: const Text('Tenant default: customer activation codes'),
                 subtitle: Text(
                   requiresCodes
-                      ? 'HOAs using tenant default require activation codes.'
-                      : 'HOAs using tenant default bypass activation codes.',
+                      ? 'Communities using tenant default require activation codes.'
+                      : 'Communities using tenant default bypass activation codes.',
                 ),
                 value: requiresCodes,
                 onChanged: mutationState.isLoading

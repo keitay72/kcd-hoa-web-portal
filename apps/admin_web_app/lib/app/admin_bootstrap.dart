@@ -12,6 +12,8 @@ Future<void> bootstrapAdminApp() async {
   WidgetsFlutterBinding.ensureInitialized();
   usePathUrlStrategy();
   _clearStaleAdminInviteCallback();
+  _normalizeAdminInviteCallback();
+  _normalizeAdminPasswordRecoveryCallback();
   _normalizeResidentEmailCallback();
 
   const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
@@ -47,8 +49,54 @@ void _clearStaleAdminInviteCallback() {
 
   html.window.history.replaceState(
     null,
-    'Customer Portal Admin',
+    'Customer Portal',
     '${uri.origin}/',
+  );
+}
+
+void _normalizeAdminInviteCallback() {
+  final uri = Uri.base;
+  if (uri.path == '/accept-invite') return;
+
+  final normalizedFragment = _normalizedRouteFragment(uri.fragment);
+  if (normalizedFragment.startsWith('/accept-invite')) return;
+
+  final queryPayload = _extractAuthPayloadSegment(uri.query);
+  final fragmentPayload =
+      _extractAuthPayloadSegment(_fragmentPayload(uri.fragment) ?? '');
+  final authPayload = queryPayload ?? fragmentPayload;
+  if (authPayload == null || !_isInviteAuthPayload(authPayload)) return;
+
+  html.window.localStorage.remove('resident_email_callback_payload');
+  html.window.localStorage.remove('resident_pending_tenant_code');
+  html.window.localStorage.remove('resident_pending_email');
+  html.window.history.replaceState(
+    null,
+    'Accept Invitation',
+    '${uri.origin}/accept-invite?$authPayload',
+  );
+}
+
+void _normalizeAdminPasswordRecoveryCallback() {
+  final uri = Uri.base;
+  if (uri.path == '/reset-password') return;
+
+  final normalizedFragment = _normalizedRouteFragment(uri.fragment);
+  if (normalizedFragment.startsWith('/reset-password')) return;
+
+  final queryPayload = _extractAuthPayloadSegment(uri.query);
+  final fragmentPayload =
+      _extractAuthPayloadSegment(_fragmentPayload(uri.fragment) ?? '');
+  final authPayload = queryPayload ?? fragmentPayload;
+  if (authPayload == null || !_isRecoveryAuthPayload(authPayload)) return;
+
+  html.window.localStorage.remove('resident_email_callback_payload');
+  html.window.localStorage.remove('resident_pending_tenant_code');
+  html.window.localStorage.remove('resident_pending_email');
+  html.window.history.replaceState(
+    null,
+    'Reset Password',
+    '${uri.origin}/reset-password?$authPayload',
   );
 }
 
@@ -56,8 +104,10 @@ void _normalizeResidentEmailCallback() {
   final uri = Uri.base;
   final normalizedFragment = _normalizedRouteFragment(uri.fragment);
 
+  if (uri.path == '/reset-password') return;
   if (normalizedFragment.startsWith('/portal/')) return;
   if (normalizedFragment.startsWith('/accept-invite')) return;
+  if (normalizedFragment.startsWith('/reset-password')) return;
 
   final authPayload = _extractResidentAuthPayload(uri);
   if (authPayload == null) return;
@@ -84,11 +134,21 @@ void _normalizeResidentEmailCallback() {
 
 String? _extractResidentAuthPayload(Uri uri) {
   final queryPayload = _extractAuthPayloadSegment(uri.query);
-  if (queryPayload != null) {
+  if (queryPayload != null &&
+      !_isInviteAuthPayload(queryPayload) &&
+      !_isRecoveryAuthPayload(queryPayload)) {
     return queryPayload;
   }
 
-  return _extractAuthPayloadSegment(_fragmentPayload(uri.fragment) ?? '');
+  final fragmentPayload =
+      _extractAuthPayloadSegment(_fragmentPayload(uri.fragment) ?? '');
+  if (fragmentPayload != null &&
+      !_isInviteAuthPayload(fragmentPayload) &&
+      !_isRecoveryAuthPayload(fragmentPayload)) {
+    return fragmentPayload;
+  }
+
+  return null;
 }
 
 String _normalizedRouteFragment(String fragment) {
@@ -126,5 +186,23 @@ bool _looksLikeAuthPayload(String value) {
       value.contains('code=') ||
       value.contains('type=signup') ||
       value.contains('type=email') ||
+      value.contains('type=invite') ||
+      value.contains('type=recovery') ||
       value.contains('error_description=');
+}
+
+bool _isInviteAuthPayload(String value) {
+  try {
+    return Uri.splitQueryString(value)['type'] == 'invite';
+  } on FormatException {
+    return value.contains('type=invite');
+  }
+}
+
+bool _isRecoveryAuthPayload(String value) {
+  try {
+    return Uri.splitQueryString(value)['type'] == 'recovery';
+  } on FormatException {
+    return value.contains('type=recovery');
+  }
 }

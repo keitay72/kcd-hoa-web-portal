@@ -30,6 +30,7 @@ type ParsedInvite = {
   hoaId: string | null;
   isGlobalPlatformRole: boolean;
   isTenantRole: boolean;
+  isCommunityRole: boolean;
 };
 
 type ParseResult =
@@ -64,8 +65,8 @@ const corsHeaders = {
 };
 
 const globalPlatformRoles = new Set(['platform_owner', 'platform_admin', 'platform_support', 'platform_sales']);
-const tenantRoles = new Set(['tenant_admin', 'tenant_manager', 'tenant_csr', 'tenant_dispatch']);
-const hoaRoles = new Set(['hoa_manager', 'hoa_board', 'hoa_resident']);
+const tenantRoles = new Set(['tenant_owner', 'tenant_admin', 'tenant_manager', 'tenant_csr', 'tenant_dispatch']);
+const communityRoles = new Set(['community_admin']);
 const namePattern = /^[A-Za-z][A-Za-z .'-]*$/;
 const emailPattern = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -139,6 +140,21 @@ function validateInviteRedirect(redirectTo: string | undefined) {
   return null;
 }
 
+function defaultLocalInviteRedirect(supabaseUrl: string | undefined) {
+  if (!supabaseUrl) return undefined;
+
+  try {
+    const url = new URL(supabaseUrl);
+    if (url.hostname === '127.0.0.1' || url.hostname === 'localhost' || url.hostname === 'kong') {
+      return 'http://127.0.0.1:8080/accept-invite';
+    }
+  } catch (_) {
+    return undefined;
+  }
+
+  return undefined;
+}
+
 function fullName(firstName: string, middleName: string | null, lastName: string) {
   return [firstName, middleName, lastName]
     .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
@@ -175,11 +191,12 @@ function parsePayload(payload: InviteAdminUserRequest): ParseResult {
   if (lastNameError) return { ok: false, error: lastNameError };
 
   if (phone.length !== 10) return { ok: false, error: 'Phone must be a 10-digit US phone number' };
-  if (!globalPlatformRoles.has(role) && !tenantRoles.has(role) && !hoaRoles.has(role)) return { ok: false, error: 'Role is invalid' };
+  if (role === 'platform_owner') return { ok: false, error: 'Platform Owner accounts must be created manually' };
+  if (!globalPlatformRoles.has(role) && !tenantRoles.has(role) && !communityRoles.has(role)) return { ok: false, error: 'Role is invalid' };
   if (globalPlatformRoles.has(role) && (tenantId || hoaId)) return { ok: false, error: 'Platform roles must not include tenant_id or hoa_id' };
   if (tenantRoles.has(role) && hoaId) return { ok: false, error: 'Tenant staff roles must not include hoa_id' };
   if (tenantRoles.has(role) && !tenantId) return { ok: false, error: 'Tenant staff roles require tenant_id' };
-  if (hoaRoles.has(role) && !hoaId) return { ok: false, error: 'HOA roles require hoa_id' };
+  if (communityRoles.has(role) && !hoaId) return { ok: false, error: 'Community roles require hoa_id' };
 
   return {
     ok: true,
@@ -195,6 +212,7 @@ function parsePayload(payload: InviteAdminUserRequest): ParseResult {
       hoaId,
       isGlobalPlatformRole: globalPlatformRoles.has(role),
       isTenantRole: tenantRoles.has(role),
+      isCommunityRole: communityRoles.has(role),
     },
   };
 }
@@ -214,6 +232,7 @@ function inputFromInviteRow(row: InviteRow): ParsedInvite {
     hoaId: row.hoa_id,
     isGlobalPlatformRole: globalPlatformRoles.has(role),
     isTenantRole: tenantRoles.has(role),
+    isCommunityRole: communityRoles.has(role),
   };
 }
 
@@ -252,17 +271,59 @@ async function requireCallerUser(request: Request, supabaseUrl: string, anonKey:
 }
 
 async function callerCanManageInvites(supabase: SupabaseClient, userId: string) {
+  const roles = await callerGlobalPlatformRoles(supabase, userId);
+  return roles.has('platform_owner') || roles.has('platform_admin');
+}
+
+async function callerGlobalPlatformRoles(supabase: SupabaseClient, userId: string) {
   const { data: globalRoles, error: globalRoleError } = await supabase
     .from('user_global_roles')
     .select('roles!inner(code)')
     .eq('user_id', userId)
-    .in('roles.code', ['platform_owner', 'platform_admin'])
-    .limit(1);
+    .in('roles.code', ['platform_owner', 'platform_admin', 'platform_support', 'platform_sales']);
 
   if (globalRoleError) throw globalRoleError;
-  if (Array.isArray(globalRoles) && globalRoles.length > 0) return true;
+  const roles = new Set<string>();
+  if (!Array.isArray(globalRoles)) return roles;
 
-  return false;
+  for (const row of globalRoles) {
+    const role = row.roles;
+    if (Array.isArray(role)) {
+      for (const item of role) {
+        if (typeof item?.code === 'string') roles.add(item.code);
+      }
+    } else if (typeof role?.code === 'string') {
+      roles.add(role.code);
+    }
+  }
+
+  return roles;
+}
+
+async function assertCallerCanInviteGlobalPlatformRole(
+  supabase: SupabaseClient,
+  actorUserId: string,
+  roleCode: string,
+) {
+  if (roleCode === 'platform_owner') {
+    throw new Error('Platform Owner accounts must be created manually');
+  }
+
+  const actorRoles = await callerGlobalPlatformRoles(supabase, actorUserId);
+  if (actorRoles.has('platform_owner')) return;
+
+  if (
+    actorRoles.has('platform_admin') &&
+    (roleCode === 'platform_support' || roleCode === 'platform_sales')
+  ) {
+    return;
+  }
+
+  if (roleCode === 'platform_admin') {
+    throw new Error('Only platform owners may invite Platform Admin users');
+  }
+
+  throw new Error('Only platform owners or platform admins may assign global platform roles');
 }
 
 async function hoaTenantId(supabase: SupabaseClient, hoaId: string) {
@@ -274,6 +335,18 @@ async function hoaTenantId(supabase: SupabaseClient, hoaId: string) {
 
   if (error) throw error;
   return data?.tenant_id as string | null;
+}
+
+async function communityCustomerAccountForHoa(supabase: SupabaseClient, hoaId: string) {
+  const { data, error } = await supabase
+    .from('customer_accounts')
+    .select('id, tenant_id')
+    .eq('account_type', 'community')
+    .eq('external_account_ref', hoaId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data as { id: string; tenant_id: string } | null;
 }
 
 async function callerCanManageTenantScopedInvites(
@@ -288,7 +361,7 @@ async function callerCanManageTenantScopedInvites(
     .select('role_id, roles!inner(code)')
     .eq('user_id', userId)
     .eq('tenant_id', tenantId)
-    .in('roles.code', ['tenant_admin', 'tenant_manager', 'sys_admin', 'mgmt'])
+    .in('roles.code', ['tenant_owner', 'tenant_admin', 'tenant_manager', 'sys_admin', 'mgmt'])
     .limit(1);
 
   if (error) throw error;
@@ -301,7 +374,7 @@ async function callerCanManageHoaScopedInvites(
   hoaId: string,
   roleCode: string,
 ) {
-  if (roleCode !== 'hoa_board') return false;
+  if (roleCode !== 'community_admin') return false;
 
   const { data, error } = await supabase
     .from('user_hoa_memberships')
@@ -323,6 +396,7 @@ async function resolvedTenantScopeForInvite(
 ) {
   if (input.isGlobalPlatformRole) return null;
   if (input.isTenantRole) return resolvedTenantId;
+  if (input.isCommunityRole && input.hoaId) return await hoaTenantId(supabase, input.hoaId);
   if (!input.hoaId) return null;
   return await hoaTenantId(supabase, input.hoaId);
 }
@@ -334,10 +408,7 @@ async function assertInvitePermissionForParsedInput(
   resolvedTenantId: string | null,
 ) {
   if (input.isGlobalPlatformRole) {
-    const canManageGlobal = await callerCanManageInvites(supabase, actorUserId);
-    if (!canManageGlobal) {
-      throw new Error('Only platform owners or platform admins may assign global platform roles');
-    }
+    await assertCallerCanInviteGlobalPlatformRole(supabase, actorUserId, input.role);
     return;
   }
 
@@ -362,7 +433,7 @@ async function assertInvitePermissionForParsedInput(
     tenantScopeId,
   );
   if (!canManageScopedInvite) {
-    throw new Error('Only platform admins or tenant admins/managers may manage invitations for this tenant');
+    throw new Error('Only platform admins or tenant owners/admins/managers may manage invitations for this tenant');
   }
 }
 
@@ -374,10 +445,7 @@ async function assertInvitePermissionForStoredInvite(
   const roleCode = invite.role_code;
 
   if (globalPlatformRoles.has(roleCode)) {
-    const canManageGlobal = await callerCanManageInvites(supabase, actorUserId);
-    if (!canManageGlobal) {
-      throw new Error('Only platform owners or platform admins may manage global platform invites');
-    }
+    await assertCallerCanInviteGlobalPlatformRole(supabase, actorUserId, roleCode);
     return;
   }
 
@@ -402,7 +470,7 @@ async function assertInvitePermissionForStoredInvite(
     tenantScopeId,
   );
   if (!canManageScopedInvite) {
-    throw new Error('Only platform admins or tenant admins/managers may manage invitations for this tenant');
+    throw new Error('Only platform admins or tenant owners/admins/managers may manage invitations for this tenant');
   }
 }
 
@@ -537,6 +605,52 @@ async function assignRole(
       role_id: roleId,
       assigned_by: actorUserId,
     }, { onConflict: 'user_id,tenant_id,role_id' });
+    if (error) throw error;
+    return;
+  }
+
+  if (input.isCommunityRole) {
+    if (!input.hoaId) throw new Error('Community roles require hoa_id');
+    const communityAccount = await communityCustomerAccountForHoa(supabase, input.hoaId);
+    if (!communityAccount) {
+      throw new Error('Unable to find a community customer account for this HOA');
+    }
+
+    const { data: existingMembership, error: existingMembershipError } = await supabase
+      .from('customer_memberships')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('customer_account_id', communityAccount.id)
+      .is('service_location_id', null)
+      .eq('role_id', roleId)
+      .maybeSingle();
+
+    if (existingMembershipError) throw existingMembershipError;
+
+    if (existingMembership?.id) {
+      const { error } = await supabase
+        .from('customer_memberships')
+        .update({
+          tenant_id: communityAccount.tenant_id,
+          status: 'active',
+          is_primary_contact: false,
+          created_by: actorUserId,
+        })
+        .eq('id', existingMembership.id);
+      if (error) throw error;
+      return;
+    }
+
+    const { error } = await supabase.from('customer_memberships').insert({
+      tenant_id: communityAccount.tenant_id,
+      user_id: userId,
+      customer_account_id: communityAccount.id,
+      service_location_id: null,
+      role_id: roleId,
+      status: 'active',
+      is_primary_contact: false,
+      created_by: actorUserId,
+    });
     if (error) throw error;
     return;
   }
@@ -933,7 +1047,7 @@ Deno.serve(async (request) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  const redirectTo = Deno.env.get('ADMIN_INVITE_REDIRECT_URL') || undefined;
+  const redirectTo = Deno.env.get('ADMIN_INVITE_REDIRECT_URL') || defaultLocalInviteRedirect(supabaseUrl);
 
   if (!supabaseUrl || !anonKey || !serviceRoleKey) {
     return serverError('Server configuration is missing');
@@ -975,15 +1089,15 @@ Deno.serve(async (request) => {
 
     return badRequest('Unsupported invite action');
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unexpected invite failure';
+    const message = error instanceof Error ? error.message : JSON.stringify(error);
     if (
       message.includes('Only platform owners or platform admins may assign global platform roles') ||
       message.includes('Only platform owners or platform admins may manage global platform invites') ||
-      message.includes('Only platform admins or tenant admins/managers may manage invitations for this tenant')
+      message.includes('Only platform admins or tenant owners/admins/managers may manage invitations for this tenant')
     ) {
       return forbidden(message);
     }
     console.error('invite-admin-user failed', { message });
-    return serverError(message);
+    return serverError(message || 'Unexpected invite failure');
   }
 });

@@ -77,3 +77,13 @@ class TicketInternalNoteInput {
   final ServiceTicket ticket;
   final String note;
 }
+
+class TicketCustomerUpdateInput {
+  const TicketCustomerUpdateInput({
+    required this.ticket,
+    required this.note,
+  });
+
+  final ServiceTicket ticket;
+  final String note;
+}

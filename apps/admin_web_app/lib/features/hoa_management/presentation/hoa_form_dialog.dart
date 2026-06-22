@@ -70,7 +70,9 @@ class _HoaFormDialogState extends ConsumerState<HoaFormDialog> {
     );
 
     return AlertDialog(
-      title: Text(widget.title ?? (_isEditing ? 'Edit HOA' : 'Create HOA')),
+      title: Text(
+        widget.title ?? (_isEditing ? 'Edit Community' : 'Create Community'),
+      ),
       content: SizedBox(
         width: 560,
         child: Form(
@@ -81,7 +83,7 @@ class _HoaFormDialogState extends ConsumerState<HoaFormDialog> {
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(
-                  labelText: 'HOA Name',
+                  labelText: 'Community Name',
                   border: OutlineInputBorder(),
                 ),
                 validator: _required,
@@ -92,16 +94,16 @@ class _HoaFormDialogState extends ConsumerState<HoaFormDialog> {
                 initialValue: displayedCode,
                 readOnly: true,
                 decoration: InputDecoration(
-                  labelText: 'HOA Code',
+                  labelText: 'Community Code',
                   helperText: codePreview.isLoading
-                      ? 'Checking existing HOA codes...'
-                      : 'Generated from HOA name. Duplicate codes get a numeric suffix.',
+                      ? 'Checking existing community codes...'
+                      : 'Generated from community name. Duplicate codes get a numeric suffix.',
                   border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 14),
               DropdownButtonFormField<HoaCommunityStatus>(
-                value: _status,
+                initialValue: _status,
                 decoration: const InputDecoration(
                   labelText: 'Status',
                   border: OutlineInputBorder(),
@@ -124,9 +126,9 @@ class _HoaFormDialogState extends ConsumerState<HoaFormDialog> {
               ),
               const SizedBox(height: 14),
               DropdownButtonFormField<bool?>(
-                value: _residentActivationCodesRequiredOverride,
+                initialValue: _residentActivationCodesRequiredOverride,
                 decoration: const InputDecoration(
-                  labelText: 'Resident activation codes',
+                  labelText: 'Customer activation codes',
                   border: OutlineInputBorder(),
                 ),
                 items: const [
@@ -174,7 +176,7 @@ class _HoaFormDialogState extends ConsumerState<HoaFormDialog> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Icon(Icons.save_outlined),
-          label: Text(_isEditing ? 'Save changes' : 'Create HOA'),
+          label: Text(_isEditing ? 'Save changes' : 'Create Community'),
         ),
       ],
     );

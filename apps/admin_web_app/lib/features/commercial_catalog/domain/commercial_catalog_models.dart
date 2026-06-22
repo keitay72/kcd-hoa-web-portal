@@ -8,6 +8,9 @@ class SubscriptionPlan {
     this.description,
     this.includedHoaCount,
     this.includedResidentCount,
+    this.includedServiceLocationCount,
+    this.serviceLocationOverageCents,
+    this.serviceLocationGracePercent,
   });
 
   final String id;
@@ -17,6 +20,9 @@ class SubscriptionPlan {
   final String? description;
   final int? includedHoaCount;
   final int? includedResidentCount;
+  final int? includedServiceLocationCount;
+  final int? serviceLocationOverageCents;
+  final int? serviceLocationGracePercent;
   final List<SubscriptionPlanPrice> prices;
 
   String get statusLabel => _titleCase(status);
@@ -24,12 +30,18 @@ class SubscriptionPlan {
   bool get hasActivePrice => prices.any((price) => price.isActive);
   bool get hasStripeReadyPrice => prices.any((price) => price.isStripeReady);
   bool get isAssignable => isActive && hasActivePrice;
-  String get hoaLimitLabel =>
-      includedHoaCount == null ? 'Unlimited HOAs' : '${_formatCount(includedHoaCount!)} HOAs';
-  String get residentLimitLabel => includedResidentCount == null
-      ? 'Unlimited residents'
-      : '${_formatCount(includedResidentCount!)} residents';
-  String get limitLabel => '$hoaLimitLabel · $residentLimitLabel';
+  String get capacityLabel => includedServiceLocationCount == null
+      ? 'Custom customer capacity'
+      : '${_formatCount(includedServiceLocationCount!)} customer service locations';
+  String get overageLabel {
+    if (serviceLocationOverageCents == null) return 'Custom overage pricing';
+    final amount = (serviceLocationOverageCents! / 100).toStringAsFixed(2);
+    return '\$$amount per extra location/month';
+  }
+
+  String get graceLabel =>
+      '${serviceLocationGracePercent ?? 0}% usage grace before overage';
+  String get limitLabel => '$capacityLabel · $overageLabel';
 
   SubscriptionPlanPrice? get monthlyPrice => _priceForInterval('monthly');
   SubscriptionPlanPrice? get annualPrice => _priceForInterval('annual');
@@ -68,7 +80,8 @@ class SubscriptionPlanPrice {
 
   String get statusLabel => _titleCase(status);
   bool get isActive => status == 'active';
-  bool get isStripeReady => stripePriceId != null && stripePriceId!.trim().isNotEmpty;
+  bool get isStripeReady =>
+      stripePriceId != null && stripePriceId!.trim().isNotEmpty;
 }
 
 class AddonCatalogItem {
@@ -97,6 +110,9 @@ class PlanInput {
     this.description,
     this.includedHoaCount,
     this.includedResidentCount,
+    this.includedServiceLocationCount,
+    this.serviceLocationOverageCents,
+    this.serviceLocationGracePercent,
   });
 
   final String name;
@@ -104,6 +120,9 @@ class PlanInput {
   final String? description;
   final int? includedHoaCount;
   final int? includedResidentCount;
+  final int? includedServiceLocationCount;
+  final int? serviceLocationOverageCents;
+  final int? serviceLocationGracePercent;
 }
 
 class PriceInput {

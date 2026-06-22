@@ -1,5 +1,6 @@
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -34,6 +35,19 @@ class _AcceptInvitePageState extends ConsumerState<AcceptInvitePage> {
   bool _started = false;
   bool _isSavingPassword = false;
   bool _obscurePassword = true;
+  Timer? _processingTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _processingTimer = Timer(const Duration(seconds: 12), () {
+      if (!mounted || _state != _InviteAcceptState.processing) return;
+      _setState(
+        _InviteAcceptState.invalid,
+        'This invitation link could not be verified. Please return to sign in or ask an admin to resend the invite.',
+      );
+    });
+  }
 
   @override
   void didChangeDependencies() {
@@ -45,6 +59,7 @@ class _AcceptInvitePageState extends ConsumerState<AcceptInvitePage> {
 
   @override
   void dispose() {
+    _processingTimer?.cancel();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
@@ -117,9 +132,16 @@ class _AcceptInvitePageState extends ConsumerState<AcceptInvitePage> {
                               style: Theme.of(context).textTheme.bodyLarge,
                             ),
                             const SizedBox(height: 24),
-                            if (_state == _InviteAcceptState.processing)
-                              const Center(child: CircularProgressIndicator())
-                            else if (_state == _InviteAcceptState.passwordSetup)
+                            if (_state == _InviteAcceptState.processing) ...[
+                              const Center(child: CircularProgressIndicator()),
+                              const SizedBox(height: 16),
+                              TextButton(
+                                onPressed: _leaveInviteRoute,
+                                child:
+                                    const Text('Cancel and return to sign in'),
+                              ),
+                            ] else if (_state ==
+                                _InviteAcceptState.passwordSetup)
                               _PasswordSetupForm(
                                 formKey: _formKey,
                                 passwordController: _passwordController,
@@ -150,7 +172,7 @@ class _AcceptInvitePageState extends ConsumerState<AcceptInvitePage> {
                                 ),
                                 label: Text(
                                   _state == _InviteAcceptState.success
-                                      ? 'Continue to Admin Portal'
+                                      ? 'Continue to Management Portal'
                                       : 'Back to Sign In',
                                 ),
                               ),
@@ -184,6 +206,11 @@ class _AcceptInvitePageState extends ConsumerState<AcceptInvitePage> {
     final uri = Uri.base;
     final params = _combinedParams(uri);
 
+    if (uri.path != '/accept-invite') {
+      _leaveInviteRoute();
+      return;
+    }
+
     _clearSensitiveUrl();
 
     final urlError = params['error_description'] ?? params['error'];
@@ -198,22 +225,31 @@ class _AcceptInvitePageState extends ConsumerState<AcceptInvitePage> {
     final accessToken = params['access_token'];
     final refreshToken = params['refresh_token'];
 
+    if (type == 'recovery') {
+      _openPasswordReset(params);
+      return;
+    }
+
     final hasInvitePayload = (tokenHash != null && tokenHash.isNotEmpty) ||
         (code != null && code.isNotEmpty) ||
         (refreshToken != null && refreshToken.isNotEmpty);
     if (!hasInvitePayload) {
-      _leaveInviteRoute();
+      await _clearExistingSession(client);
+      _setState(
+        _InviteAcceptState.invalid,
+        'This invitation link is missing the information needed to accept it. Please ask an administrator to resend the invite.',
+      );
       return;
     }
 
     try {
-      await client.auth.signOut();
+      await _clearExistingSession(client);
 
       if (tokenHash != null && tokenHash.isNotEmpty) {
         if (type != null && type != 'invite') {
           _setState(
             _InviteAcceptState.invalid,
-            'This invite link is not valid for admin access.',
+            'This invite link is not valid for management access.',
           );
           return;
         }
@@ -228,6 +264,14 @@ class _AcceptInvitePageState extends ConsumerState<AcceptInvitePage> {
       }
 
       if (code != null && code.isNotEmpty) {
+        if (type != null && type != 'invite') {
+          _setState(
+            _InviteAcceptState.invalid,
+            'This invite link is not valid for management access.',
+          );
+          return;
+        }
+
         await client.auth.exchangeCodeForSession(code);
         await _markInviteAccepted();
         _setPasswordSetupState();
@@ -235,6 +279,14 @@ class _AcceptInvitePageState extends ConsumerState<AcceptInvitePage> {
       }
 
       if (refreshToken != null && refreshToken.isNotEmpty) {
+        if (type != null && type != 'invite') {
+          _setState(
+            _InviteAcceptState.invalid,
+            'This invite link is not valid for management access.',
+          );
+          return;
+        }
+
         await client.auth.setSession(
           refreshToken,
           accessToken: accessToken,
@@ -256,6 +308,27 @@ class _AcceptInvitePageState extends ConsumerState<AcceptInvitePage> {
         'We could not accept this invitation. Please ask your administrator to resend it.',
       );
     }
+  }
+
+  Future<void> _clearExistingSession(SupabaseClient client) async {
+    try {
+      await client.auth.signOut().timeout(const Duration(seconds: 8));
+    } catch (_) {
+      // A stale local session should not block invite handling.
+    }
+    html.window.localStorage.remove('selected_admin_context_id');
+  }
+
+  void _openPasswordReset(Map<String, String> params) {
+    final payload = Uri(queryParameters: params).query;
+    final target =
+        payload.isEmpty ? '/reset-password' : '/reset-password?$payload';
+    html.window.history.replaceState(
+      null,
+      'Reset Password',
+      '${html.window.location.origin}$target',
+    );
+    if (mounted) context.go(target);
   }
 
   Future<void> _savePassword() async {
@@ -281,7 +354,7 @@ class _AcceptInvitePageState extends ConsumerState<AcceptInvitePage> {
       await _markInviteAccepted();
       _setState(
         _InviteAcceptState.success,
-        'Your password has been saved. You can continue to the admin portal.',
+        'Your password has been saved. You can continue to the management portal.',
       );
     } on AuthException catch (error) {
       setState(() => _message = error.message);
@@ -308,7 +381,7 @@ class _AcceptInvitePageState extends ConsumerState<AcceptInvitePage> {
   void _setPasswordSetupState() {
     _setState(
       _InviteAcceptState.passwordSetup,
-      'Create a password to finish setting up your admin account.',
+      'Create a password to finish setting up your portal account.',
     );
   }
 
@@ -329,6 +402,9 @@ class _AcceptInvitePageState extends ConsumerState<AcceptInvitePage> {
 
   void _setState(_InviteAcceptState state, String message) {
     if (!mounted) return;
+    if (state != _InviteAcceptState.processing) {
+      _processingTimer?.cancel();
+    }
     setState(() {
       _state = state;
       _message = message;
@@ -369,14 +445,15 @@ class _AcceptInvitePageState extends ConsumerState<AcceptInvitePage> {
   void _leaveInviteRoute() {
     final client = ref.read(supabaseClientProvider);
     final storedContext = html.window.localStorage['selected_admin_context_id'];
-    final target = client.auth.currentUser != null &&
-            (storedContext?.startsWith('hoa:') ?? false)
-        ? '/admin/hoa/documents'
-        : '/sign-in';
+    final target = client.auth.currentUser == null
+        ? '/sign-in'
+        : (storedContext?.startsWith('hoa:') ?? false)
+            ? '/admin/hoa/documents'
+            : '/admin';
 
     html.window.history.replaceState(
       null,
-      'Customer Portal Admin',
+      'Customer Portal',
       '${html.window.location.origin}$target',
     );
 
@@ -399,7 +476,8 @@ class _AcceptInvitePageState extends ConsumerState<AcceptInvitePage> {
           iconColor: colorScheme.primary,
           backgroundColor: colorScheme.primaryContainer,
           title: 'Create your password',
-          message: 'Create a password to finish setting up your admin account.',
+          message:
+              'Create a password to finish setting up your portal account.',
         ),
       _InviteAcceptState.success => _InviteView(
           icon: Icons.check_circle_outline,

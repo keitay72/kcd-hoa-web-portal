@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/rbac/admin_context.dart';
 import '../domain/ticket.dart';
 import 'ticket_assignment_dialog.dart';
+import 'ticket_customer_update_dialog.dart';
 import 'ticket_internal_note_dialog.dart';
 import 'ticket_priority_dialog.dart';
 import 'ticket_providers.dart';
@@ -186,6 +187,11 @@ class _TicketHeader extends ConsumerWidget {
                 label: const Text('Internal Note'),
               ),
               OutlinedButton.icon(
+                onPressed: () => _openCustomerUpdateDialog(context, ticket),
+                icon: const Icon(Icons.forum_outlined),
+                label: const Text('Customer Update'),
+              ),
+              OutlinedButton.icon(
                 onPressed: () => _runAutomation(context, ref, ticket),
                 icon: const Icon(Icons.auto_fix_high),
                 label: const Text('Run Automation'),
@@ -227,6 +233,14 @@ class _TicketHeader extends ConsumerWidget {
     return showDialog<void>(
       context: context,
       builder: (_) => TicketInternalNoteDialog(ticket: ticket),
+    );
+  }
+
+  Future<void> _openCustomerUpdateDialog(
+      BuildContext context, ServiceTicket ticket) {
+    return showDialog<void>(
+      context: context,
+      builder: (_) => TicketCustomerUpdateDialog(ticket: ticket),
     );
   }
 

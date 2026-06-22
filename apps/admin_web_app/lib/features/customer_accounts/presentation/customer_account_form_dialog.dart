@@ -8,11 +8,13 @@ import 'customer_account_providers.dart';
 class CustomerAccountFormDialog extends ConsumerStatefulWidget {
   const CustomerAccountFormDialog({
     this.initialValue,
+    this.initialAccountType,
     this.tenantId,
     super.key,
   });
 
   final CustomerAccount? initialValue;
+  final CustomerAccountType? initialAccountType;
   final String? tenantId;
 
   @override
@@ -42,6 +44,9 @@ class _CustomerAccountFormDialogState
       _externalRefController.text = initialValue.externalAccountRef ?? '';
       _accountType = initialValue.accountType;
       _status = initialValue.status;
+    } else {
+      _accountType =
+          widget.initialAccountType ?? CustomerAccountType.residential;
     }
   }
 

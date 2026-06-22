@@ -328,9 +328,12 @@ class TicketAssigneeOption {
 
   bool get canDispatch =>
       roleCodes.contains('tenant_dispatch') ||
+      roleCodes.contains('tenant_owner') ||
       roleCodes.contains('tenant_admin');
   bool get canCsr =>
-      roleCodes.contains('tenant_csr') || roleCodes.contains('tenant_admin');
+      roleCodes.contains('tenant_csr') ||
+      roleCodes.contains('tenant_owner') ||
+      roleCodes.contains('tenant_admin');
 }
 
 class TicketMetrics {

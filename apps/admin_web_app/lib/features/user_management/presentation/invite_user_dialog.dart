@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/rbac/admin_access.dart';
+import '../../../core/rbac/rbac_providers.dart';
 import '../domain/role_catalog.dart';
 import '../domain/user_management_inputs.dart';
 import 'user_form_fields.dart';
@@ -47,7 +49,7 @@ class _InviteUserDialogState extends ConsumerState<InviteUserDialog> {
   @override
   void initState() {
     super.initState();
-    _category = widget.initialCategory ?? 'platform';
+    _category = _initialCategory();
     _roleCode = widget.initialRoleCode;
     _tenantId = widget.initialTenantId;
     _hoaId = widget.initialHoaId;
@@ -66,6 +68,15 @@ class _InviteUserDialogState extends ConsumerState<InviteUserDialog> {
     }
   }
 
+  String _initialCategory() {
+    final category = widget.initialCategory;
+    if (category == 'hoa') return 'community';
+    if (category == 'platform' && widget.initialTenantId != null) {
+      return 'tenant';
+    }
+    return category ?? 'platform';
+  }
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -82,6 +93,7 @@ class _InviteUserDialogState extends ConsumerState<InviteUserDialog> {
     final tenants = ref.watch(platformTenantOptionsProvider);
     final hoas = ref.watch(hoaScopeOptionsProvider);
     final commandState = ref.watch(userCommandProvider);
+    final access = ref.watch(adminAccessProvider).valueOrNull;
     final canSubmit = _hasValidFieldValues() && _hasRequiredSelections();
 
     return AlertDialog(
@@ -138,8 +150,18 @@ class _InviteUserDialogState extends ConsumerState<InviteUserDialog> {
                 if (!widget.lockScope) ...[
                   SegmentedButton<String>(
                     segments: const [
-                      ButtonSegment(value: 'platform', label: Text('Tenant Staff')),
-                      ButtonSegment(value: 'hoa', label: Text('HOA User')),
+                      ButtonSegment(
+                        value: 'platform',
+                        label: Text('Platform Staff'),
+                      ),
+                      ButtonSegment(
+                        value: 'tenant',
+                        label: Text('Tenant Staff'),
+                      ),
+                      ButtonSegment(
+                        value: 'community',
+                        label: Text('Community'),
+                      ),
                     ],
                     selected: {_category},
                     onSelectionChanged: (value) {
@@ -156,19 +178,36 @@ class _InviteUserDialogState extends ConsumerState<InviteUserDialog> {
                 ],
                 roles.when(
                   data: (items) {
-                    final availableRoles = (_category == 'platform'
-                            ? items.where((role) => role.isTenantRole)
-                            : items.where((role) => role.isHoaRole))
-                        .where((role) => widget.allowedRoleCodes == null || widget.allowedRoleCodes!.contains(role.code))
+                    final availableRoles = switch (_category) {
+                      'platform' => items.where((role) =>
+                          role.canBeInvitedAsPlatformStaff &&
+                          _canInvitePlatformRole(role.code, access)),
+                      'tenant' =>
+                        items.where((role) => role.canBeInvitedAsTenantStaff),
+                      _ => items
+                          .where((role) => role.canBeInvitedAsCommunityContact),
+                    }
+                        .where((role) =>
+                            widget.allowedRoleCodes == null ||
+                            widget.allowedRoleCodes!.contains(role.code))
                         .toList();
 
                     if (_roleCode != null &&
-                        availableRoles.every((role) => role.code != _roleCode)) {
+                        availableRoles
+                            .every((role) => role.code != _roleCode)) {
                       WidgetsBinding.instance.addPostFrameCallback((_) {
                         if (!mounted) return;
-                        setState(() => _roleCode = availableRoles.length == 1 ? availableRoles.first.code : null);
+                        setState(() => _roleCode = availableRoles.length == 1
+                            ? availableRoles.first.code
+                            : null);
                         _refreshFormState();
                       });
+                    }
+
+                    if (availableRoles.isEmpty) {
+                      return const Text(
+                        'No roles are available for your current access level.',
+                      );
                     }
 
                     if (availableRoles.length == 1) {
@@ -188,7 +227,7 @@ class _InviteUserDialogState extends ConsumerState<InviteUserDialog> {
                   error: (error, _) => Text('Unable to load roles: $error'),
                 ),
                 const SizedBox(height: 16),
-                if (_category == 'platform')
+                if (_category == 'tenant')
                   tenants.when(
                     data: (items) => _TenantSelect(
                       tenants: items,
@@ -203,7 +242,7 @@ class _InviteUserDialogState extends ConsumerState<InviteUserDialog> {
                     loading: () => const LinearProgressIndicator(),
                     error: (error, _) => Text('Unable to load tenants: $error'),
                   )
-                else if (!widget.lockScope)
+                else if (_category == 'community' && !widget.lockScope)
                   hoas.when(
                     data: (items) => _HoaSelect(
                       hoas: items,
@@ -214,13 +253,15 @@ class _InviteUserDialogState extends ConsumerState<InviteUserDialog> {
                       },
                     ),
                     loading: () => const LinearProgressIndicator(),
-                    error: (error, _) => Text('Unable to load HOAs: $error'),
+                    error: (error, _) =>
+                        Text('Unable to load communities: $error'),
                   ),
                 if (commandState.hasError) ...[
                   const SizedBox(height: 16),
                   Text(
                     commandState.error.toString(),
-                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+                    style:
+                        TextStyle(color: Theme.of(context).colorScheme.error),
                   ),
                 ],
               ],
@@ -230,7 +271,8 @@ class _InviteUserDialogState extends ConsumerState<InviteUserDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: commandState.isLoading ? null : () => Navigator.of(context).pop(),
+          onPressed:
+              commandState.isLoading ? null : () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
         FilledButton.icon(
@@ -242,12 +284,23 @@ class _InviteUserDialogState extends ConsumerState<InviteUserDialog> {
     );
   }
 
+  bool _canInvitePlatformRole(String roleCode, AdminAccess? access) {
+    if (roleCode == 'platform_owner') return false;
+    if (access?.isPlatformOwner == true) return true;
+    if (access?.isPlatformAdmin == true) {
+      return const {'platform_support', 'platform_sales'}.contains(roleCode);
+    }
+    return false;
+  }
+
   Future<void> _submit() async {
     final roleCode = _roleCode;
-    final tenantId = _tenantId ?? _primaryTenantId(ref.read(platformTenantOptionsProvider).valueOrNull ?? []);
+    final tenantId = _tenantId ??
+        _primaryTenantId(
+            ref.read(platformTenantOptionsProvider).valueOrNull ?? []);
     if (!_validateForm() || roleCode == null) return;
-    if (_category == 'platform' && tenantId == null) return;
-    if (_category == 'hoa' && _hoaId == null) return;
+    if (_category == 'tenant' && tenantId == null) return;
+    if (_category == 'community' && _hoaId == null) return;
 
     final middleName = _middleNameController.text.trim();
 
@@ -259,8 +312,8 @@ class _InviteUserDialogState extends ConsumerState<InviteUserDialog> {
             lastName: _lastNameController.text.trim(),
             phone: UserFormValidators.phoneDigits(_phoneController.text),
             roleCode: roleCode,
-            tenantId: _category == 'platform' ? tenantId : null,
-            hoaId: _category == 'hoa' ? _hoaId : null,
+            tenantId: _category == 'tenant' ? tenantId : null,
+            hoaId: _category == 'community' ? _hoaId : null,
           ),
         );
 
@@ -269,23 +322,39 @@ class _InviteUserDialogState extends ConsumerState<InviteUserDialog> {
 
   String? _primaryTenantId(List<PlatformTenantOption> tenants) {
     if (tenants.isEmpty) return null;
-    return tenants.firstWhere((tenant) => tenant.isPrimary, orElse: () => tenants.first).id;
+    return tenants
+        .firstWhere((tenant) => tenant.isPrimary, orElse: () => tenants.first)
+        .id;
   }
 
   bool _validateForm() {
-    return _formKey.currentState?.validate() == true && _hasRequiredSelections();
+    return _formKey.currentState?.validate() == true &&
+        _hasRequiredSelections();
   }
 
   bool _hasRequiredSelections() {
-    final tenantId = _tenantId ?? _primaryTenantId(ref.read(platformTenantOptionsProvider).valueOrNull ?? []);
-    return _roleCode != null && (_category == 'platform' ? tenantId != null : _hoaId != null);
+    final tenantId = _tenantId ??
+        _primaryTenantId(
+            ref.read(platformTenantOptionsProvider).valueOrNull ?? []);
+    return _roleCode != null &&
+        switch (_category) {
+          'platform' => true,
+          'tenant' => tenantId != null,
+          _ => _hoaId != null,
+        };
   }
 
   bool _hasValidFieldValues() {
     return UserFormValidators.email(_emailController.text) == null &&
-        UserFormValidators.requiredName(_firstNameController.text, 'First Name') == null &&
-        UserFormValidators.optionalName(_middleNameController.text, 'Middle Name') == null &&
-        UserFormValidators.requiredName(_lastNameController.text, 'Last Name') == null &&
+        UserFormValidators.requiredName(
+                _firstNameController.text, 'First Name') ==
+            null &&
+        UserFormValidators.optionalName(
+                _middleNameController.text, 'Middle Name') ==
+            null &&
+        UserFormValidators.requiredName(
+                _lastNameController.text, 'Last Name') ==
+            null &&
         UserFormValidators.phone(_phoneController.text) == null;
   }
 
@@ -339,7 +408,8 @@ class _NameField extends StatelessWidget {
 }
 
 class _RoleSelect extends StatelessWidget {
-  const _RoleSelect({required this.roles, required this.value, required this.onChanged});
+  const _RoleSelect(
+      {required this.roles, required this.value, required this.onChanged});
 
   final List<RoleCatalogEntry> roles;
   final String? value;
@@ -348,10 +418,14 @@ class _RoleSelect extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<String>(
-      value: value,
+      initialValue: value,
       isExpanded: true,
-      decoration: const InputDecoration(labelText: 'Role', border: OutlineInputBorder()),
-      items: roles.map((role) => DropdownMenuItem(value: role.code, child: Text(role.name))).toList(),
+      decoration: const InputDecoration(
+          labelText: 'Role', border: OutlineInputBorder()),
+      items: roles
+          .map((role) =>
+              DropdownMenuItem(value: role.code, child: Text(role.name)))
+          .toList(),
       onChanged: onChanged,
       validator: (value) => value == null ? 'Select a role.' : null,
     );
@@ -377,7 +451,8 @@ class _LockedRoleField extends StatelessWidget {
 }
 
 class _TenantSelect extends StatelessWidget {
-  const _TenantSelect({required this.tenants, required this.value, required this.onChanged});
+  const _TenantSelect(
+      {required this.tenants, required this.value, required this.onChanged});
 
   final List<PlatformTenantOption> tenants;
   final String? value;
@@ -386,17 +461,22 @@ class _TenantSelect extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<String>(
-      value: value,
+      initialValue: value,
       isExpanded: true,
-      decoration: const InputDecoration(labelText: 'Platform Tenant', border: OutlineInputBorder()),
-      items: tenants.map((tenant) => DropdownMenuItem(value: tenant.id, child: Text(tenant.name))).toList(),
+      decoration: const InputDecoration(
+          labelText: 'Platform Tenant', border: OutlineInputBorder()),
+      items: tenants
+          .map((tenant) =>
+              DropdownMenuItem(value: tenant.id, child: Text(tenant.name)))
+          .toList(),
       onChanged: onChanged,
     );
   }
 }
 
 class _HoaSelect extends StatelessWidget {
-  const _HoaSelect({required this.hoas, required this.value, required this.onChanged});
+  const _HoaSelect(
+      {required this.hoas, required this.value, required this.onChanged});
 
   final List<HoaScopeOption> hoas;
   final String? value;
@@ -405,10 +485,13 @@ class _HoaSelect extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<String>(
-      value: value,
+      initialValue: value,
       isExpanded: true,
-      decoration: const InputDecoration(labelText: 'HOA Scope', border: OutlineInputBorder()),
-      items: hoas.map((hoa) => DropdownMenuItem(value: hoa.id, child: Text(hoa.label))).toList(),
+      decoration: const InputDecoration(
+          labelText: 'Community', border: OutlineInputBorder()),
+      items: hoas
+          .map((hoa) => DropdownMenuItem(value: hoa.id, child: Text(hoa.label)))
+          .toList(),
       onChanged: onChanged,
       validator: (value) => value == null ? 'Select an HOA.' : null,
     );

@@ -341,6 +341,9 @@ class SubscriptionPlanSummary {
     this.description,
     this.includedHoaCount,
     this.includedResidentCount,
+    this.includedServiceLocationCount,
+    this.serviceLocationOverageCents,
+    this.serviceLocationGracePercent,
   });
 
   final String id;
@@ -351,19 +354,28 @@ class SubscriptionPlanSummary {
   final String? description;
   final int? includedHoaCount;
   final int? includedResidentCount;
+  final int? includedServiceLocationCount;
+  final int? serviceLocationOverageCents;
+  final int? serviceLocationGracePercent;
 
   bool get isActive => status == 'active';
 
   String get statusLabel => _titleCase(status.replaceAll('_', ' '));
 
-  String get hoaLimitLabel =>
-      includedHoaCount == null ? 'Unlimited HOAs' : '$includedHoaCount HOAs';
+  String get capacityLabel => includedServiceLocationCount == null
+      ? 'Custom customer capacity'
+      : '${_formatCount(includedServiceLocationCount!)} customer service locations';
 
-  String get residentLimitLabel => includedResidentCount == null
-      ? 'Unlimited residents'
-      : '$includedResidentCount residents';
+  String get overageLabel {
+    if (serviceLocationOverageCents == null) return 'Custom overage pricing';
+    final amount = (serviceLocationOverageCents! / 100).toStringAsFixed(2);
+    return '\$$amount per extra location/month';
+  }
 
-  String get limitLabel => '$hoaLimitLabel / $residentLimitLabel';
+  String get graceLabel =>
+      '${serviceLocationGracePercent ?? 0}% usage grace before overage';
+
+  String get limitLabel => '$capacityLabel / $overageLabel';
 
   List<SubscriptionPriceSummary> get activePrices =>
       prices.where((price) => price.isActive).toList(growable: false);
@@ -735,13 +747,13 @@ class TenantDetail {
         actionLabel: 'Review SMS',
       ),
       OnboardingChecklistItem(
-        label: 'Tenant admin assigned',
+        label: 'Tenant owner assigned',
         isComplete: tenantAdminCount > 0,
         description: tenantAdminCount > 0
-            ? '$tenantAdminCount tenant admin/manager role(s).'
-            : 'Invite or assign a tenant admin.',
-        action: 'tenant_admin',
-        actionLabel: tenantAdminCount > 0 ? 'Manage staff' : 'Assign admin',
+            ? '$tenantAdminCount tenant owner/admin/manager role(s).'
+            : 'Invite or assign a tenant owner.',
+        action: 'tenant_owner',
+        actionLabel: tenantAdminCount > 0 ? 'Manage staff' : 'Assign owner',
       ),
       OnboardingChecklistItem(
         label: 'First HOA created',
@@ -841,4 +853,15 @@ String _titleCase(String value) {
       .where((part) => part.isNotEmpty)
       .map((part) => part[0].toUpperCase() + part.substring(1))
       .join(' ');
+}
+
+String _formatCount(int value) {
+  final text = value.toString();
+  final buffer = StringBuffer();
+  for (var i = 0; i < text.length; i++) {
+    final remaining = text.length - i;
+    buffer.write(text[i]);
+    if (remaining > 1 && remaining % 3 == 1) buffer.write(',');
+  }
+  return buffer.toString();
 }

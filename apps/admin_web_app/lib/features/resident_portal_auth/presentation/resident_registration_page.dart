@@ -154,6 +154,8 @@ class _ResidentRegistrationPageState
     if (!_formKey.currentState!.validate()) return;
     html.window.localStorage['resident_pending_tenant_code'] =
         widget.tenantCode;
+    html.window.localStorage['resident_pending_email'] =
+        _emailController.text.trim();
     final result =
         await ref.read(residentPortalAuthControllerProvider.notifier).register(
               tenantCode: widget.tenantCode,
@@ -173,6 +175,7 @@ class _ResidentRegistrationPageState
       return;
     }
     html.window.localStorage.remove('resident_pending_tenant_code');
+    html.window.localStorage.remove('resident_pending_email');
   }
 
   String? _required(String? value) {

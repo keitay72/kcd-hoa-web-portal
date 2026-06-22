@@ -18,7 +18,8 @@ abstract interface class CommercialCatalogRepository {
   Future<void> saveAddon({String? addonId, required AddonInput input});
 }
 
-class SupabaseCommercialCatalogRepository implements CommercialCatalogRepository {
+class SupabaseCommercialCatalogRepository
+    implements CommercialCatalogRepository {
   const SupabaseCommercialCatalogRepository(this._client);
 
   final SupabaseClient _client;
@@ -28,10 +29,12 @@ class SupabaseCommercialCatalogRepository implements CommercialCatalogRepository
     final planRows = await _client
         .from('subscription_plans')
         .select()
+        .neq('status', 'archived')
         .order('name', ascending: true);
     final priceRows = await _client
         .from('subscription_plan_prices')
         .select()
+        .neq('status', 'archived')
         .order('billing_interval', ascending: true);
 
     final pricesByPlan = <String, List<SubscriptionPlanPrice>>{};
@@ -50,6 +53,12 @@ class SupabaseCommercialCatalogRepository implements CommercialCatalogRepository
         description: _text(row['description']),
         includedHoaCount: row['included_hoa_count'] as int?,
         includedResidentCount: row['included_resident_count'] as int?,
+        includedServiceLocationCount:
+            row['included_service_location_count'] as int?,
+        serviceLocationOverageCents:
+            row['service_location_overage_cents'] as int?,
+        serviceLocationGracePercent:
+            row['service_location_grace_percent'] as int?,
         prices: pricesByPlan[id] ?? const [],
       );
     }).toList();
@@ -63,6 +72,7 @@ class SupabaseCommercialCatalogRepository implements CommercialCatalogRepository
     final rows = await _client
         .from('addon_catalog')
         .select()
+        .neq('status', 'archived')
         .order('name', ascending: true);
 
     return rows.map((row) {
@@ -82,8 +92,11 @@ class SupabaseCommercialCatalogRepository implements CommercialCatalogRepository
       'name': input.name.trim(),
       'status': input.status,
       'description': _blankToNull(input.description),
-      'included_hoa_count': input.includedHoaCount,
-      'included_resident_count': input.includedResidentCount,
+      'included_hoa_count': null,
+      'included_resident_count': null,
+      'included_service_location_count': input.includedServiceLocationCount,
+      'service_location_overage_cents': input.serviceLocationOverageCents,
+      'service_location_grace_percent': input.serviceLocationGracePercent ?? 5,
     };
 
     if (planId == null) {
@@ -114,7 +127,10 @@ class SupabaseCommercialCatalogRepository implements CommercialCatalogRepository
     if (priceId == null) {
       await _client.from('subscription_plan_prices').insert(payload);
     } else {
-      await _client.from('subscription_plan_prices').update(payload).eq('id', priceId);
+      await _client
+          .from('subscription_plan_prices')
+          .update(payload)
+          .eq('id', priceId);
     }
   }
 
@@ -136,12 +152,12 @@ class SupabaseCommercialCatalogRepository implements CommercialCatalogRepository
     }
   }
 
-
   int _planRank(String code) {
     return switch (code) {
-      'starter' => 0,
-      'professional' => 1,
-      'enterprise' => 2,
+      'local' => 0,
+      'regional' => 1,
+      'metro' => 2,
+      'enterprise' => 3,
       _ => 99,
     };
   }

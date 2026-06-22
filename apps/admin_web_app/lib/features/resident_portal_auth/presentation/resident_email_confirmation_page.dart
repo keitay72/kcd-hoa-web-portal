@@ -35,7 +35,9 @@ class _ResidentEmailConfirmationPageState
   _ResidentEmailConfirmationState _state =
       _ResidentEmailConfirmationState.processing;
   String? _message;
+  String? _resendMessage;
   bool _started = false;
+  bool _isResending = false;
 
   @override
   void didChangeDependencies() {
@@ -48,6 +50,7 @@ class _ResidentEmailConfirmationPageState
 
   @override
   Widget build(BuildContext context) {
+    final canResend = _canResendVerification;
     return ResidentPortalScaffold(
       tenantCode: widget.tenantCode,
       title: _title,
@@ -68,6 +71,31 @@ class _ResidentEmailConfirmationPageState
               onPressed: () => context.go(_signInPath),
               child: const Text('Back to sign in'),
             ),
+            if (canResend) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _isResending ? null : _resendVerificationEmail,
+                icon: _isResending
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.mark_email_unread_outlined),
+                label: const Text('Send new verification email'),
+              ),
+            ],
+            if (_resendMessage != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                _resendMessage!,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: _resendMessage!.toLowerCase().contains('sent')
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context).colorScheme.error,
+                    ),
+              ),
+            ],
           ],
         ],
       ),
@@ -124,6 +152,7 @@ class _ResidentEmailConfirmationPageState
       final tenantCode = widget.tenantCode ??
           await repository.resolveTenantCodeForCurrentResident();
       html.window.localStorage.remove('resident_pending_tenant_code');
+      html.window.localStorage.remove('resident_pending_email');
       html.window.localStorage.remove('resident_email_callback_payload');
       _clearSensitiveUrl(tenantCode);
       if (!mounted) return;
@@ -133,7 +162,6 @@ class _ResidentEmailConfirmationPageState
         context.go('/portal/$tenantCode/setup-account');
       }
     } catch (error) {
-      html.window.localStorage.remove('resident_pending_tenant_code');
       html.window.localStorage.remove('resident_email_callback_payload');
       _clearSensitiveUrl(widget.tenantCode);
       if (!mounted) return;
@@ -174,6 +202,64 @@ class _ResidentEmailConfirmationPageState
   String get _signInPath {
     final tenantCode = widget.tenantCode;
     return tenantCode == null ? '/sign-in' : '/portal/$tenantCode/sign-in';
+  }
+
+  bool get _canResendVerification {
+    return _state != _ResidentEmailConfirmationState.processing &&
+        _pendingTenantCode != null &&
+        _pendingEmail != null;
+  }
+
+  String? get _pendingTenantCode {
+    final tenantCode = widget.tenantCode ??
+        html.window.localStorage['resident_pending_tenant_code'];
+    final normalized = tenantCode?.trim();
+    return normalized == null || normalized.isEmpty ? null : normalized;
+  }
+
+  String? get _pendingEmail {
+    final normalized =
+        html.window.localStorage['resident_pending_email']?.trim();
+    return normalized == null || normalized.isEmpty ? null : normalized;
+  }
+
+  Future<void> _resendVerificationEmail() async {
+    final tenantCode = _pendingTenantCode;
+    final email = _pendingEmail;
+    if (tenantCode == null || email == null) {
+      setState(() {
+        _resendMessage =
+            'Please register again so we know where to send the verification email.';
+      });
+      return;
+    }
+
+    setState(() {
+      _isResending = true;
+      _resendMessage = null;
+    });
+
+    final didSend = await ref
+        .read(residentPortalAuthControllerProvider.notifier)
+        .resendVerificationEmail(
+          tenantCode: tenantCode,
+          email: email,
+        );
+
+    if (!mounted) return;
+    setState(() {
+      _isResending = false;
+      _resendMessage = didSend
+          ? 'A new verification email has been sent.'
+          : _errorText(ref.read(residentPortalAuthControllerProvider).error);
+    });
+  }
+
+  String _errorText(Object? error) {
+    final message =
+        error?.toString().replaceFirst('Bad state: ', '').trim() ?? '';
+    if (message.isEmpty) return 'Unable to send a new verification email.';
+    return message;
   }
 
   void _clearSensitiveUrl(String? tenantCode) {

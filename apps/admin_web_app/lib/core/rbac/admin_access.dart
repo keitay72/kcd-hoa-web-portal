@@ -64,7 +64,8 @@ class AdminAccess {
   bool get isPlatformSales => hasGlobalRole('platform_sales');
   bool get isPlatformOperator => globalRoles.isNotEmpty;
 
-  bool get isTenantAdmin => hasTenantRole('tenant_admin');
+  bool get isTenantAdmin =>
+      hasTenantRole('tenant_owner') || hasTenantRole('tenant_admin');
   bool get isTenantManager => hasTenantRole('tenant_manager');
   bool get isTenantStaff => tenantRoles.isNotEmpty;
 

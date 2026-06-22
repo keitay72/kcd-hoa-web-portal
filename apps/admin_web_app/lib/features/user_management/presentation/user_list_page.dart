@@ -18,7 +18,9 @@ class _UserListPageState extends ConsumerState<UserListPage> {
   String? _status;
 
   UserListFilter get _filter => UserListFilter(
-        search: _searchController.text.trim().isEmpty ? null : _searchController.text.trim(),
+        search: _searchController.text.trim().isEmpty
+            ? null
+            : _searchController.text.trim(),
         status: _status,
       );
 
@@ -41,7 +43,8 @@ class _UserListPageState extends ConsumerState<UserListPage> {
           Row(
             children: [
               Expanded(
-                child: Text('User & Role Management', style: Theme.of(context).textTheme.headlineMedium),
+                child: Text('User & Role Management',
+                    style: Theme.of(context).textTheme.headlineMedium),
               ),
               FilledButton.icon(
                 onPressed: _openInviteDialog,
@@ -53,7 +56,8 @@ class _UserListPageState extends ConsumerState<UserListPage> {
           const SizedBox(height: 16),
           metrics.when(
             data: (item) => _InviteMetricCards(metrics: item),
-            loading: () => const SizedBox(height: 88, child: Center(child: LinearProgressIndicator())),
+            loading: () => const SizedBox(
+                height: 88, child: Center(child: LinearProgressIndicator())),
             error: (error, _) => Text('Unable to load invite counters: $error'),
           ),
           const SizedBox(height: 16),
@@ -73,19 +77,30 @@ class _UserListPageState extends ConsumerState<UserListPage> {
                     onSubmitted: (_) => setState(() {}),
                   );
                   final status = DropdownButtonFormField<String>(
-                    value: _status ?? 'all',
+                    initialValue: _status ?? 'all',
                     isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Status', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(
+                        labelText: 'Status', border: OutlineInputBorder()),
                     items: const [
-                      DropdownMenuItem(value: 'all', child: Text('All Statuses')),
+                      DropdownMenuItem(
+                          value: 'all', child: Text('All Statuses')),
                       DropdownMenuItem(value: 'active', child: Text('Active')),
-                      DropdownMenuItem(value: 'invite_pending', child: Text('Pending Invite')),
-                      DropdownMenuItem(value: 'invite_expired', child: Text('Invite Expired')),
-                      DropdownMenuItem(value: 'invite_failed', child: Text('Failed Invite')),
-                      DropdownMenuItem(value: 'invite_cancelled', child: Text('Cancelled Invite')),
-                      DropdownMenuItem(value: 'disabled', child: Text('Disabled')),
+                      DropdownMenuItem(
+                          value: 'invite_pending',
+                          child: Text('Pending Invite')),
+                      DropdownMenuItem(
+                          value: 'invite_expired',
+                          child: Text('Invite Expired')),
+                      DropdownMenuItem(
+                          value: 'invite_failed', child: Text('Failed Invite')),
+                      DropdownMenuItem(
+                          value: 'invite_cancelled',
+                          child: Text('Cancelled Invite')),
+                      DropdownMenuItem(
+                          value: 'disabled', child: Text('Disabled')),
                     ],
-                    onChanged: (value) => setState(() => _status = value == 'all' ? null : value),
+                    onChanged: (value) =>
+                        setState(() => _status = value == 'all' ? null : value),
                   );
                   final actions = SizedBox(
                     height: 56,
@@ -128,7 +143,11 @@ class _UserListPageState extends ConsumerState<UserListPage> {
                     runSpacing: 12,
                     children: [
                       SizedBox(width: constraints.maxWidth, child: search),
-                      SizedBox(width: constraints.maxWidth < 480 ? constraints.maxWidth : 220, child: status),
+                      SizedBox(
+                          width: constraints.maxWidth < 480
+                              ? constraints.maxWidth
+                              : 220,
+                          child: status),
                       actions,
                     ],
                   );
@@ -141,7 +160,8 @@ class _UserListPageState extends ConsumerState<UserListPage> {
             child: users.when(
               data: (items) => _UserTable(users: items),
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, _) => Center(child: Text('Unable to load users: $error')),
+              error: (error, _) =>
+                  Center(child: Text('Unable to load users: $error')),
             ),
           ),
         ],
@@ -158,7 +178,6 @@ class _UserListPageState extends ConsumerState<UserListPage> {
 
     if (result == true) ref.invalidate(userListProvider);
   }
-
 }
 
 class _InviteMetricCards extends StatelessWidget {
@@ -172,16 +191,26 @@ class _InviteMetricCards extends StatelessWidget {
       spacing: 12,
       runSpacing: 12,
       children: [
-        _MetricCard(label: 'Pending Invites', value: metrics.pending, icon: Icons.schedule_send_outlined),
-        _MetricCard(label: 'Failed Invites', value: metrics.failed, icon: Icons.error_outline),
-        _MetricCard(label: 'Accepted Invites', value: metrics.accepted, icon: Icons.mark_email_read_outlined),
+        _MetricCard(
+            label: 'Pending Invites',
+            value: metrics.pending,
+            icon: Icons.schedule_send_outlined),
+        _MetricCard(
+            label: 'Failed Invites',
+            value: metrics.failed,
+            icon: Icons.error_outline),
+        _MetricCard(
+            label: 'Accepted Invites',
+            value: metrics.accepted,
+            icon: Icons.mark_email_read_outlined),
       ],
     );
   }
 }
 
 class _MetricCard extends StatelessWidget {
-  const _MetricCard({required this.label, required this.value, required this.icon});
+  const _MetricCard(
+      {required this.label, required this.value, required this.icon});
 
   final String label;
   final int value;
@@ -202,7 +231,8 @@ class _MetricCard extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(value.toString(), style: Theme.of(context).textTheme.headlineSmall),
+                  Text(value.toString(),
+                      style: Theme.of(context).textTheme.headlineSmall),
                   Text(label),
                 ],
               ),

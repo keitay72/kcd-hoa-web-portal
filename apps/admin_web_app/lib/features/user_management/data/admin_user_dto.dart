@@ -32,6 +32,7 @@ class AdminUserDto {
   }
 
   AdminUser toDomain({
+    required List<UserGlobalRoleAssignment> globalRoles,
     required List<UserPlatformRoleAssignment> platformRoles,
     required List<UserHoaRoleAssignment> hoaRoles,
     AdminUserInvite? latestInvite,
@@ -44,6 +45,7 @@ class AdminUserDto {
       status: status,
       createdAt: createdAt,
       updatedAt: updatedAt,
+      globalRoles: globalRoles,
       platformRoles: platformRoles,
       hoaRoles: hoaRoles,
       latestInvite: latestInvite,

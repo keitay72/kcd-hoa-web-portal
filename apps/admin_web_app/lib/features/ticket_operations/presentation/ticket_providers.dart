@@ -140,6 +140,22 @@ class TicketCommandController extends AutoDisposeAsyncNotifier<void> {
     return true;
   }
 
+  Future<bool> addCustomerUpdate(TicketCustomerUpdateInput input) async {
+    state = const AsyncLoading();
+    final result = await AsyncValue.guard(() {
+      return ref.read(ticketRepositoryProvider).addCustomerUpdate(input);
+    });
+
+    if (result.hasError) {
+      state = AsyncError<void>(result.error!, result.stackTrace!);
+      return false;
+    }
+
+    state = const AsyncData(null);
+    _invalidateTicketViews(input.ticket.id);
+    return true;
+  }
+
   Future<ServiceTicket?> runWorkflowAutomation(ServiceTicket ticket) async {
     state = const AsyncLoading();
     final result = await AsyncValue.guard(() {

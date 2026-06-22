@@ -234,7 +234,8 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
         .from('user_platform_roles')
         .select('tenant_id, roles!inner(code)')
         .inFilter('tenant_id', tenantIds)
-        .inFilter('roles.code', ['tenant_admin', 'tenant_manager']);
+        .inFilter(
+            'roles.code', ['tenant_owner', 'tenant_admin', 'tenant_manager']);
     final counts = <String, int>{};
     for (final row in rows) {
       final tenantId = row['tenant_id'] as String?;
@@ -330,8 +331,11 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
     final assignableUsers = await _listAssignableUsers();
     final tenantHoas = await _listTenantHoas(tenantId);
     final tenantAdminCount = tenantStaff
-        .where((staff) =>
-            const {'tenant_admin', 'tenant_manager'}.contains(staff.roleCode))
+        .where((staff) => const {
+              'tenant_owner',
+              'tenant_admin',
+              'tenant_manager',
+            }.contains(staff.roleCode))
         .length;
     final hoaCount = tenantHoas.length;
     final residentCount =
@@ -718,10 +722,12 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
     final planRows = await _client
         .from('subscription_plans')
         .select()
+        .neq('status', 'archived')
         .order('name', ascending: true);
     final priceRows = await _client
         .from('subscription_plan_prices')
         .select()
+        .neq('status', 'archived')
         .order('billing_interval', ascending: true);
 
     final pricesByPlan = <String, List<SubscriptionPriceSummary>>{};
@@ -754,6 +760,12 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
         description: _text(row['description']),
         includedHoaCount: row['included_hoa_count'] as int?,
         includedResidentCount: row['included_resident_count'] as int?,
+        includedServiceLocationCount:
+            row['included_service_location_count'] as int?,
+        serviceLocationOverageCents:
+            row['service_location_overage_cents'] as int?,
+        serviceLocationGracePercent:
+            row['service_location_grace_percent'] as int?,
         prices: pricesByPlan[id] ?? const [],
       );
     }).toList();
@@ -764,9 +776,10 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
 
   int _planRank(String code) {
     return switch (code) {
-      'starter' => 0,
-      'professional' => 1,
-      'enterprise' => 2,
+      'local' => 0,
+      'regional' => 1,
+      'metro' => 2,
+      'enterprise' => 3,
       _ => 99,
     };
   }
@@ -947,6 +960,7 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
             'user_id, tenant_id, role_id, created_at, roles!inner(code, name)')
         .eq('tenant_id', tenantId)
         .inFilter('roles.code', [
+      'tenant_owner',
       'tenant_admin',
       'tenant_manager',
       'tenant_csr',
@@ -1023,7 +1037,8 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
         .from('user_platform_roles')
         .select('role_id, roles!inner(code)')
         .eq('tenant_id', tenantId)
-        .inFilter('roles.code', ['tenant_admin', 'tenant_manager']);
+        .inFilter(
+            'roles.code', ['tenant_owner', 'tenant_admin', 'tenant_manager']);
     return rows.length;
   }
 

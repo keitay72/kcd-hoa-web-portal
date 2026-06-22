@@ -11,7 +11,8 @@ class AssignHoaRoleDialog extends ConsumerStatefulWidget {
   final AdminUser user;
 
   @override
-  ConsumerState<AssignHoaRoleDialog> createState() => _AssignHoaRoleDialogState();
+  ConsumerState<AssignHoaRoleDialog> createState() =>
+      _AssignHoaRoleDialogState();
 }
 
 class _AssignHoaRoleDialogState extends ConsumerState<AssignHoaRoleDialog> {
@@ -25,7 +26,7 @@ class _AssignHoaRoleDialogState extends ConsumerState<AssignHoaRoleDialog> {
     final commandState = ref.watch(userCommandProvider);
 
     return AlertDialog(
-      title: const Text('Assign HOA Role'),
+      title: const Text('Assign Community Role'),
       content: SizedBox(
         width: 520,
         child: Column(
@@ -35,10 +36,12 @@ class _AssignHoaRoleDialogState extends ConsumerState<AssignHoaRoleDialog> {
               data: (items) => DropdownButtonFormField<int>(
                 value: _roleId,
                 isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Role', border: OutlineInputBorder()),
+                decoration: const InputDecoration(
+                    labelText: 'Role', border: OutlineInputBorder()),
                 items: items
-                    .where((role) => role.isHoaRole)
-                    .map((role) => DropdownMenuItem(value: role.id, child: Text(role.name)))
+                    .where((role) => role.isCommunityRole)
+                    .map((role) => DropdownMenuItem(
+                        value: role.id, child: Text(role.name)))
                     .toList(),
                 onChanged: (value) => setState(() => _roleId = value),
               ),
@@ -50,14 +53,18 @@ class _AssignHoaRoleDialogState extends ConsumerState<AssignHoaRoleDialog> {
               data: (items) => DropdownButtonFormField<String>(
                 value: _hoaId,
                 isExpanded: true,
-                decoration: const InputDecoration(labelText: 'HOA', border: OutlineInputBorder()),
+                decoration: const InputDecoration(
+                  labelText: 'Community',
+                  border: OutlineInputBorder(),
+                ),
                 items: items
-                    .map((hoa) => DropdownMenuItem(value: hoa.id, child: Text(hoa.label)))
+                    .map((hoa) =>
+                        DropdownMenuItem(value: hoa.id, child: Text(hoa.label)))
                     .toList(),
                 onChanged: (value) => setState(() => _hoaId = value),
               ),
               loading: () => const LinearProgressIndicator(),
-              error: (error, _) => Text('Unable to load HOAs: $error'),
+              error: (error, _) => Text('Unable to load communities: $error'),
             ),
             if (commandState.hasError) ...[
               const SizedBox(height: 12),
@@ -71,7 +78,8 @@ class _AssignHoaRoleDialogState extends ConsumerState<AssignHoaRoleDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: commandState.isLoading ? null : () => Navigator.of(context).pop(),
+          onPressed:
+              commandState.isLoading ? null : () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
         FilledButton(
@@ -87,13 +95,14 @@ class _AssignHoaRoleDialogState extends ConsumerState<AssignHoaRoleDialog> {
     final roleId = _roleId;
     if (hoaId == null || roleId == null) return;
 
-    final didAssign = await ref.read(userCommandProvider.notifier).assignHoaRole(
-          AssignHoaRoleInput(
-            userId: widget.user.id,
-            hoaId: hoaId,
-            roleId: roleId,
-          ),
-        );
+    final didAssign =
+        await ref.read(userCommandProvider.notifier).assignHoaRole(
+              AssignHoaRoleInput(
+                userId: widget.user.id,
+                hoaId: hoaId,
+                roleId: roleId,
+              ),
+            );
 
     if (didAssign && mounted) Navigator.of(context).pop(true);
   }

@@ -77,7 +77,8 @@ class _TenantListPageState extends ConsumerState<TenantListPage> {
             child: tenants.when(
               data: (items) {
                 if (items.isEmpty) {
-                  return const Center(child: Text('No platform tenants found.'));
+                  return const Center(
+                      child: Text('No platform tenants found.'));
                 }
                 return Card(
                   margin: EdgeInsets.zero,
@@ -104,12 +105,12 @@ class _TenantListPageState extends ConsumerState<TenantListPage> {
 
   void _applyFilters() {
     ref.read(tenantListFiltersProvider.notifier).state = TenantListFilters(
-          search: _searchController.text,
-          status: _status,
-          readiness: _readiness,
-          subscriptionHealth: _subscriptionHealth,
-          billingReadiness: _billingReadiness,
-        );
+      search: _searchController.text,
+      status: _status,
+      readiness: _readiness,
+      subscriptionHealth: _subscriptionHealth,
+      billingReadiness: _billingReadiness,
+    );
   }
 
   void _resetFilters() {
@@ -120,7 +121,8 @@ class _TenantListPageState extends ConsumerState<TenantListPage> {
       _subscriptionHealth = null;
       _billingReadiness = null;
     });
-    ref.read(tenantListFiltersProvider.notifier).state = const TenantListFilters();
+    ref.read(tenantListFiltersProvider.notifier).state =
+        const TenantListFilters();
   }
 
   Future<void> _openCreateDialog(BuildContext context) async {
@@ -134,7 +136,6 @@ class _TenantListPageState extends ConsumerState<TenantListPage> {
     }
   }
 }
-
 
 class _TenantListItem extends StatelessWidget {
   const _TenantListItem({required this.tenant});
@@ -159,7 +160,9 @@ class _TenantListItem extends StatelessWidget {
                   ? colorScheme.onPrimaryContainer
                   : colorScheme.onSecondaryContainer,
               child: Icon(
-                tenant.isPrimary ? Icons.verified_outlined : Icons.business_outlined,
+                tenant.isPrimary
+                    ? Icons.verified_outlined
+                    : Icons.business_outlined,
               ),
             ),
             const SizedBox(width: 16),
@@ -204,7 +207,9 @@ class _TenantHeader extends StatelessWidget {
         if (tenant.isPrimary) const _MiniStatusPill(label: 'Primary'),
         if (tenant.isFreeBeta)
           _MiniStatusPill(
-            label: tenant.betaStatus == 'active_beta' ? 'Active Beta' : 'Free Beta',
+            label: tenant.betaStatus == 'active_beta'
+                ? 'Active Beta'
+                : 'Free Beta',
             icon: Icons.science_outlined,
           ),
         if (tenant.readyForHoaOnboarding)
@@ -270,15 +275,19 @@ class _TenantMetricsWrap extends StatelessWidget {
             label: tenant.readyForHoaOnboarding
                 ? 'HOA onboarding ready'
                 : 'Beta ${tenant.betaStatusLabel}',
-            isReady: tenant.readyForHoaOnboarding || tenant.betaStatus == 'active_beta',
-            warning: tenant.betaStatus == 'configuring' || tenant.betaStatus == 'tenant_review',
+            isReady: tenant.readyForHoaOnboarding ||
+                tenant.betaStatus == 'active_beta',
+            warning: tenant.betaStatus == 'configuring' ||
+                tenant.betaStatus == 'tenant_review',
           ),
         if (tenant.isFreeBeta)
           _CompactInfoChip(
             icon: Icons.table_chart_outlined,
             label: 'Data ${tenant.hoaDataStatusLabel}',
             isReady: tenant.hoaDataStatus == 'imported',
-            warning: tenant.hoaDataStatus == 'requested' || tenant.hoaDataStatus == 'received' || tenant.hoaDataStatus == 'importing',
+            warning: tenant.hoaDataStatus == 'requested' ||
+                tenant.hoaDataStatus == 'received' ||
+                tenant.hoaDataStatus == 'importing',
             isError: tenant.hoaDataStatus == 'needs_cleanup',
           ),
         _CompactInfoChip(
@@ -296,7 +305,8 @@ class _TenantMetricsWrap extends StatelessWidget {
         ),
         _CompactInfoChip(
           icon: Icons.groups_outlined,
-          label: 'Residents ${_usageText(tenant.residentCount, tenant.includedResidentCount)}',
+          label:
+              'Residents ${_usageText(tenant.residentCount, tenant.includedResidentCount)}',
           isReady: !tenant.isResidentOverIncluded,
           warning: tenant.isResidentApproachingLimit,
           isError: tenant.isResidentOverIncluded,
@@ -522,12 +532,14 @@ class _TenantFilters extends StatelessWidget {
                 value: status,
                 decoration: const InputDecoration(labelText: 'Status'),
                 items: const [
-                  DropdownMenuItem(value: null, child: Text('All Tenant Statuses')),
+                  DropdownMenuItem(
+                      value: null, child: Text('All Tenant Statuses')),
                   DropdownMenuItem(value: 'trialing', child: Text('Trialing')),
                   DropdownMenuItem(value: 'active', child: Text('Active')),
                   DropdownMenuItem(value: 'past_due', child: Text('Past Due')),
                   DropdownMenuItem(value: 'paused', child: Text('Paused')),
-                  DropdownMenuItem(value: 'cancelled', child: Text('Cancelled')),
+                  DropdownMenuItem(
+                      value: 'cancelled', child: Text('Cancelled')),
                 ],
                 onChanged: onStatusChanged,
               ),
@@ -539,13 +551,20 @@ class _TenantFilters extends StatelessWidget {
                 decoration: const InputDecoration(labelText: 'Readiness'),
                 items: const [
                   DropdownMenuItem(value: null, child: Text('All Readiness')),
-                  DropdownMenuItem(value: 'needs_setup', child: Text('Needs Setup')),
-                  DropdownMenuItem(value: 'ready_to_launch', child: Text('Ready to Launch')),
+                  DropdownMenuItem(
+                      value: 'needs_setup', child: Text('Needs Setup')),
+                  DropdownMenuItem(
+                      value: 'ready_to_launch', child: Text('Ready to Launch')),
                   DropdownMenuItem(value: 'launched', child: Text('Launched')),
                   DropdownMenuItem(value: 'blocked', child: Text('Blocked')),
-                  DropdownMenuItem(value: 'missing_subscription', child: Text('Missing Subscription')),
-                  DropdownMenuItem(value: 'missing_admin', child: Text('Missing Tenant Admin')),
-                  DropdownMenuItem(value: 'missing_hoa', child: Text('Missing HOA')),
+                  DropdownMenuItem(
+                      value: 'missing_subscription',
+                      child: Text('Missing Subscription')),
+                  DropdownMenuItem(
+                      value: 'missing_admin',
+                      child: Text('Missing Tenant Owner')),
+                  DropdownMenuItem(
+                      value: 'missing_hoa', child: Text('Missing HOA')),
                 ],
                 onChanged: onReadinessChanged,
               ),
@@ -554,13 +573,22 @@ class _TenantFilters extends StatelessWidget {
               width: 250,
               child: DropdownButtonFormField<String?>(
                 value: subscriptionHealth,
-                decoration: const InputDecoration(labelText: 'Subscription Health'),
+                decoration:
+                    const InputDecoration(labelText: 'Subscription Health'),
                 items: const [
-                  DropdownMenuItem(value: null, child: Text('All Subscription Health')),
-                  DropdownMenuItem(value: 'missing_subscription', child: Text('No Subscription')),
-                  DropdownMenuItem(value: 'over_limits', child: Text('Over Included Limits')),
-                  DropdownMenuItem(value: 'approaching_limits', child: Text('Approaching Limits')),
-                  DropdownMenuItem(value: 'stripe_pending', child: Text('Stripe Pending')),
+                  DropdownMenuItem(
+                      value: null, child: Text('All Subscription Health')),
+                  DropdownMenuItem(
+                      value: 'missing_subscription',
+                      child: Text('No Subscription')),
+                  DropdownMenuItem(
+                      value: 'over_limits',
+                      child: Text('Over Included Limits')),
+                  DropdownMenuItem(
+                      value: 'approaching_limits',
+                      child: Text('Approaching Limits')),
+                  DropdownMenuItem(
+                      value: 'stripe_pending', child: Text('Stripe Pending')),
                 ],
                 onChanged: onSubscriptionHealthChanged,
               ),
@@ -569,13 +597,22 @@ class _TenantFilters extends StatelessWidget {
               width: 250,
               child: DropdownButtonFormField<String?>(
                 value: billingReadiness,
-                decoration: const InputDecoration(labelText: 'Billing Readiness'),
+                decoration:
+                    const InputDecoration(labelText: 'Billing Readiness'),
                 items: const [
-                  DropdownMenuItem(value: null, child: Text('All Billing Readiness')),
-                  DropdownMenuItem(value: 'missing_subscription', child: Text('No Plan Assigned')),
-                  DropdownMenuItem(value: 'missing_billing_contact', child: Text('No Billing Contact')),
-                  DropdownMenuItem(value: 'over_limits', child: Text('Over Included Limits')),
-                  DropdownMenuItem(value: 'stripe_pending', child: Text('Stripe Pending')),
+                  DropdownMenuItem(
+                      value: null, child: Text('All Billing Readiness')),
+                  DropdownMenuItem(
+                      value: 'missing_subscription',
+                      child: Text('No Plan Assigned')),
+                  DropdownMenuItem(
+                      value: 'missing_billing_contact',
+                      child: Text('No Billing Contact')),
+                  DropdownMenuItem(
+                      value: 'over_limits',
+                      child: Text('Over Included Limits')),
+                  DropdownMenuItem(
+                      value: 'stripe_pending', child: Text('Stripe Pending')),
                 ],
                 onChanged: onBillingReadinessChanged,
               ),

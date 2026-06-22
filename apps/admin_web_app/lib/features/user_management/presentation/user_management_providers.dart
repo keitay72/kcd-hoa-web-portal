@@ -25,15 +25,23 @@ final userListProvider = FutureProvider.autoDispose
       );
 });
 
-final userDetailProvider = FutureProvider.autoDispose.family<AdminUser, String>((ref, id) {
+final userDetailProvider =
+    FutureProvider.autoDispose.family<AdminUser, String>((ref, id) {
   return ref.watch(userRepositoryProvider).getById(id);
 });
 
-final hoaStaffProvider = FutureProvider.autoDispose.family<List<AdminUser>, String>((ref, hoaId) {
+final userAccountActivityProvider = FutureProvider.autoDispose
+    .family<List<UserAccountActivity>, String>((ref, id) {
+  return ref.watch(userRepositoryProvider).activityForUser(id);
+});
+
+final hoaStaffProvider =
+    FutureProvider.autoDispose.family<List<AdminUser>, String>((ref, hoaId) {
   return ref.watch(userRepositoryProvider).listByHoa(hoaId);
 });
 
-final inviteMetricsProvider = FutureProvider.autoDispose<InviteMetrics>((ref) async {
+final inviteMetricsProvider =
+    FutureProvider.autoDispose<InviteMetrics>((ref) async {
   final users = await ref.watch(userRepositoryProvider).list();
   var pending = 0;
   var failed = 0;
@@ -49,23 +57,28 @@ final inviteMetricsProvider = FutureProvider.autoDispose<InviteMetrics>((ref) as
   return InviteMetrics(pending: pending, failed: failed, accepted: accepted);
 });
 
-final roleCatalogProvider = FutureProvider.autoDispose<List<RoleCatalogEntry>>((ref) {
+final roleCatalogProvider =
+    FutureProvider.autoDispose<List<RoleCatalogEntry>>((ref) {
   return ref.watch(roleRepositoryProvider).roles();
 });
 
-final permissionCatalogProvider = FutureProvider.autoDispose<List<PermissionCatalogEntry>>((ref) {
+final permissionCatalogProvider =
+    FutureProvider.autoDispose<List<PermissionCatalogEntry>>((ref) {
   return ref.watch(roleRepositoryProvider).permissions();
 });
 
-final platformTenantOptionsProvider = FutureProvider.autoDispose<List<PlatformTenantOption>>((ref) {
+final platformTenantOptionsProvider =
+    FutureProvider.autoDispose<List<PlatformTenantOption>>((ref) {
   return ref.watch(roleRepositoryProvider).platformTenants();
 });
 
-final hoaScopeOptionsProvider = FutureProvider.autoDispose<List<HoaScopeOption>>((ref) {
+final hoaScopeOptionsProvider =
+    FutureProvider.autoDispose<List<HoaScopeOption>>((ref) {
   return ref.watch(roleRepositoryProvider).hoaCommunities();
 });
 
-final userCommandProvider = AsyncNotifierProvider.autoDispose<UserCommandController, void>(
+final userCommandProvider =
+    AsyncNotifierProvider.autoDispose<UserCommandController, void>(
   UserCommandController.new,
 );
 
@@ -89,7 +102,9 @@ class UserListFilter {
 
   @override
   bool operator ==(Object other) {
-    return other is UserListFilter && other.search == search && other.status == status;
+    return other is UserListFilter &&
+        other.search == search &&
+        other.status == status;
   }
 
   @override
@@ -116,7 +131,8 @@ class UserCommandController extends AutoDisposeAsyncNotifier<void> {
     return true;
   }
 
-  Future<bool> resendInvite({required String userId, required String inviteId}) async {
+  Future<bool> resendInvite(
+      {required String userId, required String inviteId}) async {
     state = const AsyncLoading();
     final result = await AsyncValue.guard(() {
       return ref.read(userRepositoryProvider).resendInvite(
@@ -127,7 +143,8 @@ class UserCommandController extends AutoDisposeAsyncNotifier<void> {
     return _finishVoidCommand(result, userId);
   }
 
-  Future<bool> cancelInvite({required String userId, required String inviteId}) async {
+  Future<bool> cancelInvite(
+      {required String userId, required String inviteId}) async {
     state = const AsyncLoading();
     final result = await AsyncValue.guard(() {
       return ref.read(userRepositoryProvider).cancelInvite(
@@ -157,6 +174,26 @@ class UserCommandController extends AutoDisposeAsyncNotifier<void> {
     });
 
     return _finishUserCommand(result, id);
+  }
+
+  Future<AdminUser?> reactivateUser(String id) async {
+    state = const AsyncLoading();
+    final result = await AsyncValue.guard(() {
+      return ref.read(userRepositoryProvider).reactivate(id);
+    });
+
+    return _finishUserCommand(result, id);
+  }
+
+  Future<bool> updateCurrentUserPassword(String password, String userId) async {
+    state = const AsyncLoading();
+    final result = await AsyncValue.guard(() {
+      return ref
+          .read(userRepositoryProvider)
+          .updateCurrentUserPassword(password);
+    });
+
+    return _finishVoidCommand(result, userId);
   }
 
   Future<bool> assignPlatformRole(AssignPlatformRoleInput input) async {
@@ -220,6 +257,9 @@ class UserCommandController extends AutoDisposeAsyncNotifier<void> {
   void _invalidateUsers([String? userId]) {
     ref.invalidate(userListProvider);
     ref.invalidate(inviteMetricsProvider);
-    if (userId != null) ref.invalidate(userDetailProvider(userId));
+    if (userId != null) {
+      ref.invalidate(userDetailProvider(userId));
+      ref.invalidate(userAccountActivityProvider(userId));
+    }
   }
 }

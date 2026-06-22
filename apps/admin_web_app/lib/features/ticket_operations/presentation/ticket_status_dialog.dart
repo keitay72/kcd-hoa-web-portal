@@ -42,7 +42,7 @@ class _TicketStatusDialogState extends ConsumerState<TicketStatusDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             DropdownButtonFormField<TicketStatus>(
-              value: _status,
+              initialValue: _status,
               isExpanded: true,
               decoration: const InputDecoration(
                 labelText: 'Status',
@@ -66,7 +66,9 @@ class _TicketStatusDialogState extends ConsumerState<TicketStatusDialog> {
               minLines: 3,
               maxLines: 5,
               decoration: const InputDecoration(
-                labelText: 'Timeline Note',
+                labelText: 'Customer-visible timeline note',
+                helperText:
+                    'Shown to the customer with this status change. Leave blank to use the default note.',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -82,7 +84,8 @@ class _TicketStatusDialogState extends ConsumerState<TicketStatusDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: commandState.isLoading ? null : () => Navigator.of(context).pop(),
+          onPressed:
+              commandState.isLoading ? null : () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
         FilledButton(

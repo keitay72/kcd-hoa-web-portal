@@ -86,6 +86,7 @@ class HoaFormController extends AutoDisposeAsyncNotifier<void> {
     }
 
     state = const AsyncData(null);
+    ref.invalidate(activeHoaIdsProvider);
     ref.invalidate(hoaListProvider);
     return result.value;
   }

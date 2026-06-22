@@ -47,7 +47,7 @@ class UnauthorizedPage extends ConsumerWidget {
                   const SizedBox(height: 12),
                   Text(
                     message ??
-                        'Your account does not have permission to access this admin area.',
+                        'Your account does not have permission to access this management area.',
                   ),
                   if (requiredPermissions.isNotEmpty) ...[
                     const SizedBox(height: 16),

@@ -829,11 +829,11 @@ class _LaunchReadinessCard extends ConsumerWidget {
                       width: tileWidth,
                       label: 'Tenant Staff',
                       value: tenantAdminReady
-                          ? '${detail.tenantAdminCount} admin/manager role(s)'
-                          : 'No tenant admin assigned',
+                          ? '${detail.tenantAdminCount} owner/admin/manager role(s)'
+                          : 'No tenant owner assigned',
                       isReady: tenantAdminReady,
                       actionLabel:
-                          tenantAdminReady ? 'Manage Staff' : 'Invite Admin',
+                          tenantAdminReady ? 'Manage Staff' : 'Invite Owner',
                       onPressed: () => _openTenantStaff(context, ref),
                     ),
                     _ReadinessTile(
@@ -919,9 +919,9 @@ class _LaunchReadinessCard extends ConsumerWidget {
       context,
       ref,
       InviteUserDialog(
-        title: 'Invite Tenant Admin',
+        title: 'Invite Tenant Owner',
         initialCategory: 'platform',
-        initialRoleCode: 'tenant_admin',
+        initialRoleCode: 'tenant_owner',
         initialTenantId: detail.tenant.id,
         lockScope: true,
       ),
@@ -1075,11 +1075,11 @@ class _BetaTenantPlaybookCard extends ConsumerWidget {
                       width: tileWidth,
                       label: 'Tenant staff',
                       value: staffReady
-                          ? '${detail.tenantAdminCount} tenant admin/manager role(s) assigned.'
-                          : 'Invite at least one tenant admin before handoff.',
+                          ? '${detail.tenantAdminCount} tenant owner/admin/manager role(s) assigned.'
+                          : 'Invite at least one tenant owner before handoff.',
                       isReady: staffReady,
                       icon: Icons.admin_panel_settings_outlined,
-                      actionLabel: staffReady ? 'Manage staff' : 'Invite admin',
+                      actionLabel: staffReady ? 'Manage staff' : 'Invite owner',
                       onPressed: () => _openTenantStaff(context, ref),
                     ),
                     _BetaPlaybookTile(
@@ -1153,9 +1153,9 @@ class _BetaTenantPlaybookCard extends ConsumerWidget {
       context,
       ref,
       InviteUserDialog(
-        title: 'Invite Tenant Admin',
+        title: 'Invite Tenant Owner',
         initialCategory: 'platform',
-        initialRoleCode: 'tenant_admin',
+        initialRoleCode: 'tenant_owner',
         initialTenantId: detail.tenant.id,
         lockScope: true,
       ),
@@ -1598,15 +1598,15 @@ class _OnboardingCard extends ConsumerWidget {
           ),
         );
         return;
-      case 'tenant_admin':
+      case 'tenant_owner':
         if (detail.assignableUsers.isEmpty) {
           await _showAndRefresh(
             context,
             ref,
             InviteUserDialog(
-              title: 'Invite Tenant Admin',
+              title: 'Invite Tenant Owner',
               initialCategory: 'platform',
-              initialRoleCode: 'tenant_admin',
+              initialRoleCode: 'tenant_owner',
               initialTenantId: detail.tenant.id,
               lockScope: true,
             ),
@@ -3393,8 +3393,8 @@ class _TenantStaffCard extends ConsumerWidget {
                 icon: Icons.admin_panel_settings_outlined,
                 title: 'No tenant staff assigned',
                 message:
-                    'Invite or assign a tenant admin before launch so the customer has an owner.',
-                actionLabel: 'Invite Tenant Admin',
+                    'Invite or assign a tenant owner before launch so the customer has an owner.',
+                actionLabel: 'Invite Tenant Owner',
                 onPressed: () => _openInviteTenantAdmin(context, ref),
               )
             else
@@ -3439,9 +3439,9 @@ class _TenantStaffCard extends ConsumerWidget {
       context: context,
       barrierDismissible: false,
       builder: (_) => InviteUserDialog(
-        title: 'Invite Tenant Admin',
+        title: 'Invite Tenant Owner',
         initialCategory: 'platform',
-        initialRoleCode: 'tenant_admin',
+        initialRoleCode: 'tenant_owner',
         initialTenantId: detail.tenant.id,
         lockScope: true,
       ),

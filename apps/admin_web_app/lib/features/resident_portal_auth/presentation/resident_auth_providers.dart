@@ -71,6 +71,29 @@ class ResidentPortalAuthController extends AutoDisposeAsyncNotifier<void> {
     return true;
   }
 
+  Future<bool> resendVerificationEmail({
+    required String tenantCode,
+    required String email,
+  }) async {
+    state = const AsyncLoading();
+    final result = await AsyncValue.guard(() {
+      return ref
+          .read(residentPortalAuthRepositoryProvider)
+          .resendVerificationEmail(
+            tenantCode: tenantCode,
+            email: email,
+          );
+    });
+
+    if (result.hasError) {
+      state = AsyncError<void>(result.error!, result.stackTrace!);
+      return false;
+    }
+
+    state = const AsyncData(null);
+    return true;
+  }
+
   Future<bool> beginPasswordRecovery(Uri uri) async {
     state = const AsyncLoading();
     final result = await AsyncValue.guard(() {

@@ -30,7 +30,13 @@ class RoleCatalogEntry {
 
   bool get isTenantRole {
     if (roleScope != null) return roleScope == 'tenant' && isActive;
-    return const {'tenant_admin', 'tenant_manager', 'tenant_csr', 'tenant_dispatch'}.contains(code);
+    return const {
+      'tenant_owner',
+      'tenant_admin',
+      'tenant_manager',
+      'tenant_csr',
+      'tenant_dispatch'
+    }.contains(code);
   }
 
   bool get isHoaRole {
@@ -38,9 +44,33 @@ class RoleCatalogEntry {
     return const {'hoa_manager', 'hoa_board'}.contains(code);
   }
 
+  bool get isCommunityRole {
+    if (roleScope != null) return roleScope == 'community' && isActive;
+    return code == 'community_admin';
+  }
+
   bool get isResidentRole {
     if (roleScope != null) return roleScope == 'resident' && isActive;
     return code == 'hoa_resident';
+  }
+
+  bool get canBeInvitedAsPlatformStaff {
+    return isGlobalPlatformRole && code != 'platform_owner';
+  }
+
+  bool get canBeInvitedAsTenantStaff {
+    return isTenantRole &&
+        const {
+          'tenant_owner',
+          'tenant_admin',
+          'tenant_manager',
+          'tenant_csr',
+          'tenant_dispatch',
+        }.contains(code);
+  }
+
+  bool get canBeInvitedAsCommunityContact {
+    return isCommunityRole && code == 'community_admin';
   }
 }
 

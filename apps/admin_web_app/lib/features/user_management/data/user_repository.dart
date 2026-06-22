@@ -9,11 +9,15 @@ abstract interface class UserRepository {
   Future<List<AdminUser>> list({String? search, String? status});
   Future<List<AdminUser>> listByHoa(String hoaId);
   Future<AdminUser> getById(String id);
+  Future<List<UserAccountActivity>> activityForUser(String id);
   Future<void> invite(InviteAdminUserInput input);
   Future<void> resendInvite(InviteLifecycleActionInput input);
   Future<void> cancelInvite(InviteLifecycleActionInput input);
-  Future<AdminUser> update({required String id, required UpdateAdminUserInput input});
+  Future<AdminUser> update(
+      {required String id, required UpdateAdminUserInput input});
   Future<AdminUser> deactivate(String id);
+  Future<AdminUser> reactivate(String id);
+  Future<void> updateCurrentUserPassword(String password);
   Future<void> assignPlatformRole(AssignPlatformRoleInput input);
   Future<void> assignHoaRole(AssignHoaRoleInput input);
   Future<void> removePlatformRole(UserPlatformRoleAssignment assignment);
@@ -39,7 +43,8 @@ class SupabaseUserRepository implements UserRepository {
 
   AdminAuditLogger get _audit => AdminAuditLogger(_client);
 
-  static const _profileSelect = 'id, email, full_name, phone, status, created_at, updated_at';
+  static const _profileSelect =
+      'id, email, full_name, phone, status, created_at, updated_at';
   static const _inviteSelect = '''
     id,
     user_id,
@@ -55,14 +60,6 @@ class SupabaseUserRepository implements UserRepository {
     failure_message,
     failure_reason,
     failure_timestamp
-  ''';
-  static const _platformRoleSelect = '''
-    user_id,
-    tenant_id,
-    role_id,
-    created_at,
-    roles(code, name),
-    platform_tenants(name)
   ''';
   static const _hoaRoleSelect = '''
     user_id,
@@ -91,7 +88,8 @@ class SupabaseUserRepository implements UserRepository {
     for (final row in profileRows) {
       final dto = AdminUserDto.fromJson(row);
       final user = await _hydrate(dto);
-      if (_matchesUserFilter(user, needle) && _matchesStatusFilter(user, status)) {
+      if (_matchesUserFilter(user, needle) &&
+          _matchesStatusFilter(user, status)) {
         users.add(user);
       }
     }
@@ -128,7 +126,8 @@ class SupabaseUserRepository implements UserRepository {
           .maybeSingle();
       if (profileRow == null) continue;
       final user = await _hydrate(AdminUserDto.fromJson(profileRow));
-      if (user.hoaRoles.any((role) => role.hoaId == hoaId && role.status == 'active')) {
+      if (user.hoaRoles
+          .any((role) => role.hoaId == hoaId && role.status == 'active')) {
         users.add(user);
       }
     }
@@ -173,6 +172,46 @@ class SupabaseUserRepository implements UserRepository {
         .single();
 
     return _hydrate(AdminUserDto.fromJson(row));
+  }
+
+  @override
+  Future<List<UserAccountActivity>> activityForUser(String id) async {
+    if (id.startsWith('invite:')) return const [];
+
+    final rows = await _client
+        .from('admin_audit_logs')
+        .select('''
+          id,
+          actor_user_id,
+          action,
+          entity_type,
+          entity_id,
+          before_json,
+          after_json,
+          created_at
+        ''')
+        .or('entity_id.eq.$id,entity_id.like.$id:%')
+        .order('created_at', ascending: false)
+        .limit(50);
+
+    final actorIds = rows
+        .map((row) => row['actor_user_id'] as String?)
+        .whereType<String>()
+        .toSet();
+    final actors = await _profileLabelsById(actorIds);
+
+    return rows.map((row) {
+      final actorId = row['actor_user_id'] as String?;
+      return UserAccountActivity(
+        id: row['id'] as String,
+        action: row['action'] as String? ?? 'unknown',
+        entityType: row['entity_type'] as String? ?? 'unknown',
+        createdAt: DateTime.parse(row['created_at'] as String),
+        actorLabel: actorId == null ? 'System' : actors[actorId] ?? actorId,
+        beforeJson: _jsonMap(row['before_json']),
+        afterJson: _jsonMap(row['after_json']),
+      );
+    }).toList();
   }
 
   @override
@@ -221,6 +260,15 @@ class SupabaseUserRepository implements UserRepository {
 
   @override
   Future<AdminUser> deactivate(String id) async {
+    final user = await getById(id);
+    if (user.isPlatformOwner) {
+      throw StateError('Platform Owner accounts cannot be deactivated here.');
+    }
+    if (_client.auth.currentUser?.id == id) {
+      throw StateError('You cannot deactivate your own signed-in account.');
+    }
+    await _assertCurrentUserCanManageTarget(user);
+
     final before = await _client
         .from('profiles')
         .select(_profileSelect)
@@ -239,6 +287,12 @@ class SupabaseUserRepository implements UserRepository {
         .eq('user_id', id)
         .eq('status', 'active');
 
+    await _client
+        .from('customer_memberships')
+        .update({'status': 'inactive'})
+        .eq('user_id', id)
+        .eq('status', 'active');
+
     await _audit.log(
       action: 'user.deactivated',
       entityType: 'profile',
@@ -248,6 +302,66 @@ class SupabaseUserRepository implements UserRepository {
     );
 
     return _hydrate(AdminUserDto.fromJson(row));
+  }
+
+  @override
+  Future<AdminUser> reactivate(String id) async {
+    final user = await getById(id);
+    if (user.status != 'disabled') {
+      throw StateError('Only disabled users can be reactivated.');
+    }
+    await _assertCurrentUserCanManageTarget(user);
+
+    final before = await _client
+        .from('profiles')
+        .select(_profileSelect)
+        .eq('id', id)
+        .maybeSingle();
+    final row = await _client
+        .from('profiles')
+        .update({'status': 'active'})
+        .eq('id', id)
+        .select(_profileSelect)
+        .single();
+
+    await _client
+        .from('user_hoa_memberships')
+        .update({'status': 'active'})
+        .eq('user_id', id)
+        .eq('status', 'inactive');
+
+    await _client
+        .from('customer_memberships')
+        .update({'status': 'active'})
+        .eq('user_id', id)
+        .eq('status', 'inactive');
+
+    await _audit.log(
+      action: 'user.reactivated',
+      entityType: 'profile',
+      entityId: id,
+      beforeJson: before == null ? null : Map<String, dynamic>.from(before),
+      afterJson: Map<String, dynamic>.from(row),
+    );
+
+    return _hydrate(AdminUserDto.fromJson(row));
+  }
+
+  @override
+  Future<void> updateCurrentUserPassword(String password) async {
+    await _client.auth.updateUser(UserAttributes(password: password));
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return;
+
+    await _client.from('profiles').update({
+      'password_set_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', userId);
+
+    await _audit.log(
+      action: 'user.password_updated',
+      entityType: 'profile',
+      entityId: userId,
+    );
   }
 
   @override
@@ -305,7 +419,8 @@ class SupabaseUserRepository implements UserRepository {
     await _audit.log(
       action: 'role.tenant_removed',
       entityType: 'user_platform_role',
-      entityId: '${assignment.userId}:${assignment.tenantId}:${assignment.roleId}',
+      entityId:
+          '${assignment.userId}:${assignment.tenantId}:${assignment.roleId}',
       tenantId: assignment.tenantId,
       beforeJson: before,
     );
@@ -355,9 +470,12 @@ class SupabaseUserRepository implements UserRepository {
 
     final inviteStatus = user.latestInvite?.status;
     return switch (status) {
-      'invite_pending' => user.status == 'invite_pending' || inviteStatus == 'pending',
-      'invite_expired' => user.status == 'invite_expired' || inviteStatus == 'expired',
-      'invite_failed' => user.status == 'invite_failed' || inviteStatus == 'failed',
+      'invite_pending' =>
+        user.status == 'invite_pending' || inviteStatus == 'pending',
+      'invite_expired' =>
+        user.status == 'invite_expired' || inviteStatus == 'expired',
+      'invite_failed' =>
+        user.status == 'invite_failed' || inviteStatus == 'failed',
       'invite_cancelled' => inviteStatus == 'cancelled',
       _ => user.status == status,
     };
@@ -388,7 +506,8 @@ class SupabaseUserRepository implements UserRepository {
     final rows = await query.order('created_at', ascending: false);
 
     return rows
-        .map((row) => _inviteOnlyUser(AdminUserInviteDto.fromJson(row).toDomain()))
+        .map((row) =>
+            _inviteOnlyUser(AdminUserInviteDto.fromJson(row).toDomain()))
         .toList();
   }
 
@@ -401,6 +520,7 @@ class SupabaseUserRepository implements UserRepository {
       status: 'invite_${invite.status}',
       createdAt: invite.invitedAt,
       updatedAt: invite.failureTimestamp ?? invite.invitedAt,
+      globalRoles: const [],
       platformRoles: const [],
       hoaRoles: const [],
       latestInvite: invite,
@@ -440,7 +560,9 @@ class SupabaseUserRepository implements UserRepository {
   }
 
   String? _messageFromResponse(Object? data) {
-    if (data is Map && data['message'] != null) return data['message'].toString();
+    if (data is Map && data['message'] != null) {
+      return data['message'].toString();
+    }
     if (data is Map && data['error'] != null) return data['error'].toString();
     return null;
   }
@@ -451,10 +573,14 @@ class SupabaseUserRepository implements UserRepository {
     } on PostgrestException catch (error) {
       final message = error.message.toLowerCase();
       final isExpectedPermissionFailure = error.code == 'P0001' &&
-          (message.contains('only platform administrators may sync admin invite acceptances') ||
-              message.contains('only platform owners or platform admins may sync admin invite acceptances') ||
-              message.contains('only platform admins or tenant admins/managers may manage invitations for this tenant') ||
-              message.contains('do not have permission to manage invitations for this scope') ||
+          (message.contains(
+                  'only platform administrators may sync admin invite acceptances') ||
+              message.contains(
+                  'only platform owners or platform admins may sync admin invite acceptances') ||
+              message.contains(
+                  'only platform admins or tenant owners/admins/managers may manage invitations for this tenant') ||
+              message.contains(
+                  'do not have permission to manage invitations for this scope') ||
               message.contains('only platform owners') ||
               message.contains('permission denied'));
 
@@ -467,10 +593,12 @@ class SupabaseUserRepository implements UserRepository {
   }
 
   Future<AdminUser> _hydrate(AdminUserDto dto) async {
+    final globalRoles = await _globalRoles(dto.id);
     final platformRoles = await _platformRoles(dto.id);
     final hoaRoles = await _hoaRoles(dto.id);
     final invite = await _latestInvite(dto.id);
     return dto.toDomain(
+      globalRoles: globalRoles,
       platformRoles: platformRoles,
       hoaRoles: hoaRoles,
       latestInvite: invite,
@@ -519,6 +647,30 @@ class SupabaseUserRepository implements UserRepository {
     }).toList();
   }
 
+  Future<List<UserGlobalRoleAssignment>> _globalRoles(String userId) async {
+    final rows = await _client
+        .from('user_global_roles')
+        .select('user_id, role_id, created_at')
+        .eq('user_id', userId)
+        .order('created_at', ascending: false);
+
+    final roles = await _roleDetailsById(
+      rows.map((row) => row['role_id'] as int),
+    );
+
+    return rows.map((row) {
+      final roleId = row['role_id'] as int;
+      final role = roles[roleId];
+      return UserGlobalRoleAssignment(
+        userId: row['user_id'] as String,
+        roleId: roleId,
+        roleCode: role?.code ?? 'unknown',
+        roleName: role?.name ?? 'Unknown role',
+        createdAt: DateTime.parse(row['created_at'] as String),
+      );
+    }).toList();
+  }
+
   Future<Map<int, _RoleDetails>> _roleDetailsById(Iterable<int> roleIds) async {
     final ids = roleIds.toSet();
     if (ids.isEmpty) return const {};
@@ -532,12 +684,15 @@ class SupabaseUserRepository implements UserRepository {
       for (final row in rows)
         row['id'] as int: _RoleDetails(
           code: row['code'] as String? ?? 'unknown',
-          name: row['name'] as String? ?? row['code'] as String? ?? 'Unknown role',
+          name: row['name'] as String? ??
+              row['code'] as String? ??
+              'Unknown role',
         ),
     };
   }
 
-  Future<Map<String, String>> _tenantNamesById(Iterable<String> tenantIds) async {
+  Future<Map<String, String>> _tenantNamesById(
+      Iterable<String> tenantIds) async {
     final ids = tenantIds.toSet();
     if (ids.isEmpty) return const {};
 
@@ -562,6 +717,53 @@ class SupabaseUserRepository implements UserRepository {
     return rows
         .map((row) => UserHoaRoleAssignmentDto.fromJson(row).toDomain())
         .toList();
+  }
+
+  Future<Map<String, String>> _profileLabelsById(Iterable<String> ids) async {
+    final uniqueIds = ids.toSet();
+    if (uniqueIds.isEmpty) return const {};
+
+    final rows = await _client
+        .from('profiles')
+        .select('id, full_name, email')
+        .filter('id', 'in', '(${uniqueIds.join(',')})');
+
+    return {
+      for (final row in rows)
+        row['id'] as String: _profileLabel(
+          fullName: row['full_name'] as String?,
+          email: row['email'] as String?,
+        ),
+    };
+  }
+
+  String _profileLabel({String? fullName, String? email}) {
+    if (fullName != null && fullName.trim().isNotEmpty) return fullName;
+    if (email != null && email.trim().isNotEmpty) return email;
+    return 'Unknown user';
+  }
+
+  Map<String, dynamic>? _jsonMap(Object? value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) return value.cast<String, dynamic>();
+    return null;
+  }
+
+  Future<void> _assertCurrentUserCanManageTarget(AdminUser target) async {
+    final currentUserId = _client.auth.currentUser?.id;
+    if (currentUserId == null) {
+      throw StateError('You must be signed in to manage users.');
+    }
+
+    final currentUser = await getById(currentUserId);
+    if (currentUser.isPlatformOwner) return;
+    if (currentUser.isPlatformAdmin &&
+        !target.isPlatformOwner &&
+        !target.isPlatformAdmin) {
+      return;
+    }
+
+    throw StateError('You do not have permission to manage this user.');
   }
 }
 

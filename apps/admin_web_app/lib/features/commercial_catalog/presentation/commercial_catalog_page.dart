@@ -400,7 +400,8 @@ class _FeaturePlanCard extends StatelessWidget {
           _MatrixLine(
               label: 'Monthly', value: monthly?.priceLabel ?? 'Not set'),
           _MatrixLine(label: 'Annual', value: annual?.priceLabel ?? 'Not set'),
-          _MatrixLine(label: 'Limits', value: plan.limitLabel),
+          _MatrixLine(label: 'Capacity', value: plan.capacityLabel),
+          _MatrixLine(label: 'Overage', value: plan.overageLabel),
           _MatrixLine(
             label: 'Stripe',
             value: plan.hasStripeReadyPrice
@@ -512,9 +513,10 @@ TenantFeature? _featureForAddon(String addonCode) {
 
 int _planRank(String code) {
   return switch (code) {
-    'starter' => 0,
-    'professional' => 1,
-    'enterprise' => 2,
+    'local' => 0,
+    'regional' => 1,
+    'metro' => 2,
+    'enterprise' => 3,
     _ => 99,
   };
 }
@@ -643,8 +645,13 @@ class _PlanTile extends StatelessWidget {
           Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              'Includes: ${plan.limitLabel}',
+              'Includes: ${plan.capacityLabel}',
             ),
+          ),
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text('${plan.overageLabel} · ${plan.graceLabel}'),
           ),
           const SizedBox(height: 12),
           Row(
@@ -903,8 +910,9 @@ class _PlanDialogState extends ConsumerState<PlanDialog> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _name;
   late final TextEditingController _description;
-  late final TextEditingController _hoaCount;
-  late final TextEditingController _residentCount;
+  late final TextEditingController _serviceLocationCount;
+  late final TextEditingController _overageCents;
+  late final TextEditingController _gracePercent;
   late String _status;
 
   @override
@@ -913,10 +921,12 @@ class _PlanDialogState extends ConsumerState<PlanDialog> {
     final plan = widget.plan;
     _name = TextEditingController(text: plan?.name ?? '');
     _description = TextEditingController(text: plan?.description ?? '');
-    _hoaCount =
-        TextEditingController(text: plan?.includedHoaCount?.toString() ?? '');
-    _residentCount = TextEditingController(
-        text: plan?.includedResidentCount?.toString() ?? '');
+    _serviceLocationCount = TextEditingController(
+        text: plan?.includedServiceLocationCount?.toString() ?? '');
+    _overageCents = TextEditingController(
+        text: plan?.serviceLocationOverageCents?.toString() ?? '');
+    _gracePercent = TextEditingController(
+        text: plan?.serviceLocationGracePercent?.toString() ?? '5');
     _status = plan?.status ?? 'draft';
   }
 
@@ -924,8 +934,9 @@ class _PlanDialogState extends ConsumerState<PlanDialog> {
   void dispose() {
     _name.dispose();
     _description.dispose();
-    _hoaCount.dispose();
-    _residentCount.dispose();
+    _serviceLocationCount.dispose();
+    _overageCents.dispose();
+    _gracePercent.dispose();
     super.dispose();
   }
 
@@ -953,13 +964,33 @@ class _PlanDialogState extends ConsumerState<PlanDialog> {
                 maxLines: 3,
               ),
               const SizedBox(height: 16),
+              TextFormField(
+                controller: _serviceLocationCount,
+                decoration: const InputDecoration(
+                  labelText: 'Included customer service locations',
+                  helperText: 'Leave blank for custom enterprise capacity.',
+                ),
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              ),
+              const SizedBox(height: 16),
               Row(
                 children: [
-                  Expanded(child: _numberField(_hoaCount, 'Included HOAs')),
+                  Expanded(
+                    child: _numberField(
+                      _overageCents,
+                      'Overage cents',
+                      'Per extra location/month. Leave blank for custom.',
+                    ),
+                  ),
                   const SizedBox(width: 16),
                   Expanded(
-                      child:
-                          _numberField(_residentCount, 'Included residents')),
+                    child: _numberField(
+                      _gracePercent,
+                      'Grace percent',
+                      'Usage grace before overage.',
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
@@ -998,12 +1029,16 @@ class _PlanDialogState extends ConsumerState<PlanDialog> {
     );
   }
 
-  Widget _numberField(TextEditingController controller, String label) {
+  Widget _numberField(
+    TextEditingController controller,
+    String label,
+    String helperText,
+  ) {
     return TextFormField(
       controller: controller,
       decoration: InputDecoration(
         labelText: label,
-        helperText: 'Leave blank for unlimited.',
+        helperText: helperText,
       ),
       keyboardType: TextInputType.number,
       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -1022,8 +1057,10 @@ class _PlanDialogState extends ConsumerState<PlanDialog> {
               input: PlanInput(
                 name: _name.text,
                 description: _description.text,
-                includedHoaCount: int.tryParse(_hoaCount.text),
-                includedResidentCount: int.tryParse(_residentCount.text),
+                includedServiceLocationCount:
+                    int.tryParse(_serviceLocationCount.text),
+                serviceLocationOverageCents: int.tryParse(_overageCents.text),
+                serviceLocationGracePercent: int.tryParse(_gracePercent.text),
                 status: _status,
               ),
             );

@@ -23,6 +23,7 @@ abstract interface class TicketRepository {
   Future<ServiceTicket> assignTicket(TicketAssignmentInput input);
   Future<ServiceTicket> updatePriority(TicketPriorityUpdateInput input);
   Future<void> addInternalNote(TicketInternalNoteInput input);
+  Future<void> addCustomerUpdate(TicketCustomerUpdateInput input);
   Future<ServiceTicket> runWorkflowAutomation(ServiceTicket ticket);
   Future<String> createAttachmentUrl(TicketAttachment attachment);
 }
@@ -211,8 +212,13 @@ class SupabaseTicketRepository implements TicketRepository {
 
     for (final row in rows) {
       final roleCode = roleCodes[row['role_id'] as int];
-      if (!{'tenant_csr', 'tenant_dispatch', 'tenant_admin', 'tenant_manager'}
-          .contains(roleCode)) {
+      if (!{
+        'tenant_owner',
+        'tenant_csr',
+        'tenant_dispatch',
+        'tenant_admin',
+        'tenant_manager',
+      }.contains(roleCode)) {
         continue;
       }
 
@@ -374,6 +380,17 @@ class SupabaseTicketRepository implements TicketRepository {
       'old_status': input.ticket.status.databaseValue,
       'new_status': input.ticket.status.databaseValue,
       'note': '[INTERNAL] ${input.note.trim()}',
+    });
+  }
+
+  @override
+  Future<void> addCustomerUpdate(TicketCustomerUpdateInput input) async {
+    await _client.from('ticket_events').insert({
+      'ticket_id': input.ticket.id,
+      'actor_user_id': _client.auth.currentUser?.id,
+      'old_status': input.ticket.status.databaseValue,
+      'new_status': input.ticket.status.databaseValue,
+      'note': input.note.trim(),
     });
   }
 

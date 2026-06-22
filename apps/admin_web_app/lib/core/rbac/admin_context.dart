@@ -181,7 +181,7 @@ List<AdminContext> _contextsForAccess(AdminAccess access) {
       AdminContext(
         id: 'tenant:$tenantId',
         kind: AdminContextKind.tenant,
-        label: 'Admin of $tenantName',
+        label: '${_tenantContextPrefix(roles)} of $tenantName',
         roles: roles,
         scopeId: tenantId,
         scopeName: tenantName,
@@ -217,6 +217,19 @@ List<AdminContext> _contextsForAccess(AdminAccess access) {
   }
 
   return contexts;
+}
+
+String _tenantContextPrefix(List<AdminRoleAssignment> roles) {
+  if (roles.any((role) => role.code == 'tenant_owner')) return 'Tenant Owner';
+  if (roles.any((role) => role.code == 'tenant_admin')) return 'Tenant Admin';
+  if (roles.any((role) => role.code == 'tenant_manager')) {
+    return 'Tenant Manager';
+  }
+  if (roles.any((role) => role.code == 'tenant_csr')) {
+    return 'Customer Service';
+  }
+  if (roles.any((role) => role.code == 'tenant_dispatch')) return 'Dispatch';
+  return 'Tenant Staff';
 }
 
 String _hoaContextPrefix(List<AdminRoleAssignment> roles) {

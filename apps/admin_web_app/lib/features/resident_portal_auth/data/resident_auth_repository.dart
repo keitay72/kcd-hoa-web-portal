@@ -18,6 +18,10 @@ abstract interface class ResidentPortalAuthRepository {
     required String tenantCode,
     required String email,
   });
+  Future<void> resendVerificationEmail({
+    required String tenantCode,
+    required String email,
+  });
   Future<void> beginPasswordRecoveryFromUri(Uri uri);
   Future<void> updatePassword(
     String password, {
@@ -81,6 +85,20 @@ class SupabaseResidentPortalAuthRepository
     await _client.auth.resetPasswordForEmail(
       email.trim(),
       redirectTo: emailRedirectTo,
+    );
+  }
+
+  @override
+  Future<void> resendVerificationEmail({
+    required String tenantCode,
+    required String email,
+  }) async {
+    final emailRedirectTo =
+        await _resolveResidentEmailRedirectUrl(tenantCode, 'confirm-email');
+    await _client.auth.resend(
+      email: email.trim(),
+      type: OtpType.signup,
+      emailRedirectTo: emailRedirectTo,
     );
   }
 

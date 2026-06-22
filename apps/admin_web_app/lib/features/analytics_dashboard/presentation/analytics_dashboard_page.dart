@@ -67,43 +67,47 @@ class _AnalyticsDashboardContent extends ConsumerWidget {
               ),
               const SizedBox(height: 20),
               _SectionHeader(
-                title: isTenantScoped ? 'Tenant Metrics' : 'Platform Metrics',
+                title: isTenantScoped ? 'Portal Metrics' : 'Platform Metrics',
                 subtitle: isTenantScoped
-                    ? 'Current HOA operations health for your organization.'
-                    : 'Current HOA platform health at a glance.',
+                    ? 'Current customer portal activity for your organization.'
+                    : 'Current customer portal health across tenant operations.',
               ),
               const SizedBox(height: 12),
               _MetricGrid(
                 cards: [
                   _MetricCardData(
-                    label: 'Total HOAs',
+                    label:
+                        isTenantScoped ? 'Community Accounts' : 'Communities',
                     value: snapshot.platformMetrics.totalHoas,
                     icon: Icons.domain_outlined,
                     color: Colors.teal,
                     onTapPath: '/admin/hoas',
                   ),
                   _MetricCardData(
-                    label: 'Active Residents',
+                    label: isTenantScoped
+                        ? 'Active Customer Users'
+                        : 'Active Customers',
                     value: snapshot.platformMetrics.activeResidents,
                     icon: Icons.people_outline,
                     color: Colors.green,
                     onTapPath: '/admin/resident-verification',
                   ),
                   _MetricCardData(
-                    label: 'Pending Verifications',
+                    label: 'Pending Customer Verifications',
                     value:
                         snapshot.platformMetrics.pendingResidentVerifications,
                     icon: Icons.verified_user_outlined,
                     color: Colors.orange,
                     onTapPath: '/admin/resident-verification',
                   ),
-                  _MetricCardData(
-                    label: 'Active Activation Codes',
-                    value: snapshot.platformMetrics.activeActivationCodes,
-                    icon: Icons.password_outlined,
-                    color: Colors.indigo,
-                    onTapPath: '/admin/activation-codes',
-                  ),
+                  if (!isTenantScoped)
+                    _MetricCardData(
+                      label: 'Active Activation Codes',
+                      value: snapshot.platformMetrics.activeActivationCodes,
+                      icon: Icons.password_outlined,
+                      color: Colors.indigo,
+                      onTapPath: '/admin/activation-codes',
+                    ),
                   _MetricCardData(
                     label: 'Documents',
                     value: snapshot.platformMetrics.documentsCount,
@@ -127,10 +131,10 @@ class _AnalyticsDashboardContent extends ConsumerWidget {
                       0) ...[
                 _SectionHeader(
                   title: isTenantScoped
-                      ? 'Launch Readiness'
+                      ? 'Portal Readiness'
                       : 'Tenant Launch Readiness',
                   subtitle: isTenantScoped
-                      ? 'Subscription, billing, staffing, and onboarding status for your tenant.'
+                      ? 'Billing, staffing, and onboarding items for this portal.'
                       : 'Subscription, billing, staffing, and onboarding blockers across SaaS tenants.',
                 ),
                 const SizedBox(height: 12),
@@ -174,7 +178,7 @@ class _AnalyticsDashboardContent extends ConsumerWidget {
               _SectionHeader(
                 title: 'Recent Activity',
                 subtitle: isTenantScoped
-                    ? 'Latest operational events from your tenant data set.'
+                    ? 'Latest activity for this management portal.'
                     : 'Latest operational events from the live Supabase data set.',
               ),
               const SizedBox(height: 12),
@@ -209,15 +213,15 @@ class _DashboardHeader extends StatelessWidget {
           children: [
             Text(
               isTenantScoped
-                  ? 'Tenant Operations Dashboard'
+                  ? 'Management Dashboard'
                   : 'Analytics & Operations Dashboard',
               style: Theme.of(context).textTheme.headlineMedium,
             ),
             const SizedBox(height: 6),
             Text(
               isTenantScoped
-                  ? 'HOA, ticket, staffing, and activity metrics for your organization.'
-                  : 'Platform, ticket, staffing, and activity metrics across tenant HOA operations.',
+                  ? 'Customer accounts, tickets, content, and readiness for your organization.'
+                  : 'Platform, ticket, staffing, and activity metrics across tenant portal operations.',
               style: Theme.of(context).textTheme.bodyLarge,
             ),
           ],
@@ -370,13 +374,13 @@ class _TenantLaunchReadinessPanel extends StatelessWidget {
         color: Colors.deepOrange,
       ),
       _ReadinessCounterData(
-        label: 'Missing Tenant Admin',
+        label: 'Missing Tenant Owner',
         value: metrics.missingTenantAdmin,
         icon: Icons.admin_panel_settings_outlined,
         color: Colors.indigo,
       ),
       _ReadinessCounterData(
-        label: 'Missing HOA',
+        label: 'Missing Community',
         value: metrics.missingHoa,
         icon: Icons.domain_disabled_outlined,
         color: Colors.blueGrey,
@@ -455,8 +459,8 @@ class _TenantLaunchReadinessPanel extends StatelessWidget {
                   ),
                   label: Text(
                     tenantVisibleAttentionCount == 0
-                        ? 'No launch blockers'
-                        : '$tenantVisibleAttentionCount setup item(s) need attention',
+                        ? 'No onboarding blockers'
+                        : '$tenantVisibleAttentionCount onboarding item(s) need attention',
                   ),
                 ),
               ],
@@ -517,7 +521,10 @@ class _TenantLaunchReadinessPanel extends StatelessWidget {
     if (metrics.launched > 0) return 'Launched';
     if (metrics.readyToLaunch > 0) return 'Ready to launch';
     if (metrics.blocked > 0) return 'Launch blocked';
-    return 'Setup in progress';
+    if (_tenantVisibleAttentionCount(metrics) > 0) {
+      return 'Onboarding needs attention';
+    }
+    return 'Onboarding in progress';
   }
 
   String _tenantReadinessSubtitle(
@@ -535,11 +542,11 @@ class _TenantLaunchReadinessPanel extends StatelessWidget {
     if (attentionCount == 1) {
       return metrics.launched > 0
           ? '1 operational item needs attention.'
-          : '1 setup item needs attention before launch.';
+          : '1 onboarding item needs attention before launch.';
     }
     return metrics.launched > 0
         ? '$attentionCount operational items need attention.'
-        : '$attentionCount setup items need attention before launch.';
+        : '$attentionCount onboarding items need attention before launch.';
   }
 }
 
@@ -658,17 +665,17 @@ class _OperationalMetricsPanel extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Operational Metrics',
+            Text('Team Coverage',
                 style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 4),
-            const Text('Role coverage across HOA and tenant staff users.'),
+            const Text('Assigned tenant staff and community contacts.'),
             const SizedBox(height: 18),
             _CompactMetric(
-                label: 'HOA Managers',
+                label: 'Community Managers',
                 value: metrics.hoaManagers,
                 icon: Icons.supervisor_account_outlined),
             _CompactMetric(
-                label: 'HOA Board Members',
+                label: 'Board Contacts',
                 value: metrics.hoaBoardMembers,
                 icon: Icons.groups_outlined),
             _CompactMetric(
@@ -782,9 +789,9 @@ class _RecentActivityGrid extends StatelessWidget {
             }).toList(),
           ),
           _RecentActivityCard(
-            title: 'Recent Resident Registrations',
+            title: 'Recent Customer Registrations',
             icon: Icons.person_add_alt_outlined,
-            emptyText: 'No recent resident registrations.',
+            emptyText: 'No recent customer registrations.',
             children: snapshot.recentResidentRegistrations.map((registration) {
               return _ActivityTile(
                 title: registration.residentName,
@@ -796,9 +803,9 @@ class _RecentActivityGrid extends StatelessWidget {
             }).toList(),
           ),
           _RecentActivityCard(
-            title: 'Recent HOA Creation',
+            title: 'Recent Community Creation',
             icon: Icons.domain_add_outlined,
-            emptyText: 'No recent HOAs.',
+            emptyText: 'No recent communities.',
             children: snapshot.recentHoaCreations.map((hoa) {
               return _ActivityTile(
                 title: hoa.name,
