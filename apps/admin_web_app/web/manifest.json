@@ -1,6 +1,6 @@
 {
-    "name": "admin_web_app",
-    "short_name": "admin_web_app",
+    "name": "Customer Portal",
+    "short_name": "Customer Portal",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

@@ -4,6 +4,9 @@ Date: 2026-06-10
 Status: Proposed
 Owner: KC Disposal HOA Portal Project
 
+> Superseded in part by ADR 0002: Customer Portal SaaS Product Direction.
+> This ADR remains useful for SaaS tenant isolation, RBAC, billing, and operational foundation work. Where this ADR frames the product as an HOA Portal SaaS, ADR 0002 is the current product direction.
+
 ## Decision
 
 Pause net-new feature development and correct the platform foundation before onboarding additional waste-management companies.
@@ -1101,7 +1104,9 @@ Implementation notes:
 
 # 10. Immediate Next Prompt
 
-Recommended next implementation prompt:
+This prompt is retained for historical context. Before using it, apply ADR 0002 and adjust naming, signup, roles, and billing limits to the customer portal model.
+
+Recommended historical implementation prompt:
 
 ```text
 Implement Phase 1 of the SaaS Foundation Correction Plan.

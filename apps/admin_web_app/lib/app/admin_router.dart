@@ -26,6 +26,7 @@ import '../features/announcements_cms/presentation/announcement_list_page.dart';
 import '../features/audit_logs/presentation/audit_log_list_page.dart';
 import '../features/auth_admin/presentation/accept_invite_page.dart';
 import '../features/auth_admin/presentation/sign_in_page.dart';
+import '../features/customer_accounts/presentation/customer_account_list_page.dart';
 import '../features/documents_cms/presentation/document_detail_page.dart';
 import '../features/documents_cms/presentation/document_list_page.dart';
 import '../features/commercial_catalog/presentation/commercial_catalog_page.dart';
@@ -41,10 +42,16 @@ import '../features/hoa_manager_experience/presentation/hoa_tickets_page.dart';
 import '../features/schedules_admin/presentation/service_schedule_detail_page.dart';
 import '../features/schedules_admin/presentation/service_schedule_list_page.dart';
 import '../features/resident_portal_auth/presentation/activation_code_verification_page.dart';
+import '../features/resident_portal_auth/presentation/customer_portal_home_page.dart';
+import '../features/resident_portal_auth/presentation/customer_service_issue_page.dart';
+import '../features/resident_portal_auth/presentation/customer_ticket_detail_page.dart';
 import '../features/resident_portal_auth/presentation/email_verification_pending_page.dart';
 import '../features/resident_portal_auth/presentation/registration_success_page.dart';
+import '../features/resident_portal_auth/presentation/resident_account_setup_page.dart';
 import '../features/resident_portal_auth/presentation/resident_email_confirmation_page.dart';
+import '../features/resident_portal_auth/presentation/resident_forgot_password_page.dart';
 import '../features/resident_portal_auth/presentation/resident_registration_page.dart';
+import '../features/resident_portal_auth/presentation/resident_reset_password_page.dart';
 import '../features/resident_portal_auth/presentation/resident_sign_in_page.dart';
 import '../features/ticket_operations/domain/ticket.dart';
 import '../features/ticket_operations/presentation/ticket_dashboard_page.dart';
@@ -169,7 +176,14 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
           final tenantCode = segments[1];
           final leaf = segments[2];
 
-          if (user == null && leaf == 'activation-code') {
+          const protectedPortalLeaves = {
+            'activation-code',
+            'home',
+            'service-issue',
+            'service-issues',
+            'setup-account',
+          };
+          if (user == null && protectedPortalLeaves.contains(leaf)) {
             return '/portal/$tenantCode/sign-in';
           }
         }
@@ -223,6 +237,49 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
         name: 'residentPortalSignIn',
         builder: (context, state) => ResidentSignInPage(
           tenantCode: state.pathParameters['tenantCode']!,
+        ),
+      ),
+      GoRoute(
+        path: '/portal/:tenantCode/forgot-password',
+        name: 'residentPortalForgotPassword',
+        builder: (context, state) => ResidentForgotPasswordPage(
+          tenantCode: state.pathParameters['tenantCode']!,
+        ),
+      ),
+      GoRoute(
+        path: '/portal/:tenantCode/reset-password',
+        name: 'residentPortalResetPassword',
+        builder: (context, state) => ResidentResetPasswordPage(
+          tenantCode: state.pathParameters['tenantCode']!,
+        ),
+      ),
+      GoRoute(
+        path: '/portal/:tenantCode/setup-account',
+        name: 'residentPortalSetupAccount',
+        builder: (context, state) => ResidentAccountSetupPage(
+          tenantCode: state.pathParameters['tenantCode']!,
+        ),
+      ),
+      GoRoute(
+        path: '/portal/:tenantCode/home',
+        name: 'customerPortalHome',
+        builder: (context, state) => CustomerPortalHomePage(
+          tenantCode: state.pathParameters['tenantCode']!,
+        ),
+      ),
+      GoRoute(
+        path: '/portal/:tenantCode/service-issue',
+        name: 'customerPortalServiceIssue',
+        builder: (context, state) => CustomerServiceIssuePage(
+          tenantCode: state.pathParameters['tenantCode']!,
+        ),
+      ),
+      GoRoute(
+        path: '/portal/:tenantCode/service-issues/:ticketId',
+        name: 'customerPortalTicketDetail',
+        builder: (context, state) => CustomerTicketDetailPage(
+          tenantCode: state.pathParameters['tenantCode']!,
+          ticketId: state.pathParameters['ticketId']!,
         ),
       ),
       GoRoute(
@@ -346,6 +403,12 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
             name: 'hoaList',
             builder: (context, state) =>
                 const HoaListPage().protectedBy(AdminPermissions.hoaRead),
+          ),
+          GoRoute(
+            path: '/admin/customer-accounts',
+            name: 'customerAccountList',
+            builder: (context, state) => const CustomerAccountListPage()
+                .protectedBy(AdminPermissions.customerAccountsRead),
           ),
           GoRoute(
             path: '/admin/hoas/:hoaId',
@@ -561,10 +624,9 @@ Future<void> forceAdminSignOut(WidgetRef ref) async {
     ref.invalidate(activeAdminAccessProvider);
     html.window.history.replaceState(
       null,
-      'HOA Portal Admin',
-      '${html.window.location.origin}/#/admin',
+      'Customer Portal Admin',
+      '${html.window.location.origin}/admin',
     );
-    html.window.location.hash = '/admin';
     return;
   }
 
@@ -580,10 +642,9 @@ Future<void> forceAdminSignOut(WidgetRef ref) async {
   ref.invalidate(activeAdminAccessProvider);
   html.window.history.replaceState(
     null,
-    'HOA Portal Admin',
-    '${html.window.location.origin}/#/sign-in',
+    'Customer Portal Admin',
+    '${html.window.location.origin}/sign-in',
   );
-  html.window.location.hash = '/sign-in';
 }
 
 class AdminNavigationShell extends ConsumerStatefulWidget {
@@ -627,7 +688,7 @@ class _AdminNavigationShellState extends ConsumerState<AdminNavigationShell> {
     if (isCompact) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('HOA Portal Admin'),
+          title: const Text('Customer Portal Admin'),
           actions: [
             IconButton(
               tooltip: 'Sign out',
@@ -689,7 +750,7 @@ class _SidebarHeader extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Tooltip(
-              message: 'HOA Portal Admin',
+              message: 'Customer Portal Admin',
               child: CircleAvatar(
                 radius: 20,
                 child: Icon(Icons.delete_outline),
@@ -718,7 +779,7 @@ class _SidebarHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'HOA Portal',
+                  'Customer Portal',
                   style: TextStyle(fontWeight: FontWeight.w800),
                 ),
                 Text('Admin Portal'),
@@ -854,6 +915,13 @@ class _AdminSidebar extends ConsumerWidget {
       activePrefixes: ['/admin/tenants'],
     ),
     _AdminNavItem(
+      label: 'Customer Accounts',
+      permissionRule: AdminPermissions.customerAccountsRead,
+      path: '/admin/customer-accounts',
+      icon: Icons.account_tree_outlined,
+      activePrefixes: ['/admin/customer-accounts'],
+    ),
+    _AdminNavItem(
       label: 'HOA Management',
       permissionRule: AdminPermissions.hoaRead,
       path: '/admin/hoas',
@@ -927,6 +995,13 @@ class _AdminSidebar extends ConsumerWidget {
   ];
 
   static const _tenantItems = [
+    _AdminNavItem(
+      label: 'Customer Accounts',
+      permissionRule: AdminPermissions.customerAccountsRead,
+      path: '/admin/customer-accounts',
+      icon: Icons.account_tree_outlined,
+      activePrefixes: ['/admin/customer-accounts'],
+    ),
     _AdminNavItem(
       label: 'HOA Management',
       permissionRule: AdminPermissions.hoaRead,

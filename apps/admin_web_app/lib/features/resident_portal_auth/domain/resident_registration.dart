@@ -2,15 +2,11 @@ import 'resident_address.dart';
 
 class ResidentRegistrationInput {
   const ResidentRegistrationInput({
-    required this.fullName,
     required this.email,
-    required this.password,
     required this.address,
   });
 
-  final String fullName;
   final String email;
-  final String password;
   final ResidentAddressInput address;
 }
 

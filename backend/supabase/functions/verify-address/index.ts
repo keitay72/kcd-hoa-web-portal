@@ -98,11 +98,11 @@ Deno.serve(async (request) => {
   }
 
   const { data, error } = await supabase
-    .from('hoa_addresses')
-    .select('id, hoa_id, line1, line2, city, state, postal_code, is_active, hoa_communities!inner(name, code, tenant_id)')
+    .from('service_locations')
+    .select('id, customer_account_id, line1, line2, city, state, postal_code, status, customer_accounts!inner(name, account_number, account_type, tenant_id)')
     .in('normalized_key', normalizedKeys)
-    .eq('is_active', true)
-    .eq('hoa_communities.tenant_id', tenant.id)
+    .eq('status', 'active')
+    .eq('customer_accounts.tenant_id', tenant.id)
     .limit(1)
     .maybeSingle();
 
@@ -118,14 +118,19 @@ Deno.serve(async (request) => {
     verified: true,
     address: {
       id: data.id,
-      hoaId: data.hoa_id,
+      hoaId: data.customer_account_id,
+      serviceLocationId: data.id,
+      customerAccountId: data.customer_account_id,
       line1: data.line1,
       line2: data.line2,
       city: data.city,
       state: data.state,
       postalCode: data.postal_code,
-      hoaName: data.hoa_communities?.name ?? null,
-      hoaCode: data.hoa_communities?.code ?? null,
+      hoaName: data.customer_accounts?.name ?? null,
+      hoaCode: data.customer_accounts?.account_number ?? null,
+      customerAccountName: data.customer_accounts?.name ?? null,
+      customerAccountNumber: data.customer_accounts?.account_number ?? null,
+      customerAccountType: data.customer_accounts?.account_type ?? null,
       tenantName: tenant.name,
       tenantCode: tenant.code,
     },

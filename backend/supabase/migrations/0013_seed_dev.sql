@@ -217,11 +217,8 @@ insert into public.service_schedules (
   address_id,
   service_type,
   service_day,
-  schedule_rule,
-  route_name,
-  effective_date,
+  start_date,
   end_date,
-  status,
   notes
 )
 values
@@ -231,11 +228,8 @@ values
     null,
     'trash',
     2,
-    'Tuesday',
-    'Oak Meadows Trash Route',
     current_date,
     null,
-    'active',
     'Oak Meadows HOA-wide weekly trash pickup'
   ),
   (
@@ -244,11 +238,8 @@ values
     null,
     'recycling',
     4,
-    'Thursday',
-    'Oak Meadows Recycling Route',
     current_date,
     null,
-    'active',
     'Oak Meadows HOA-wide weekly recycling pickup'
   ),
   (
@@ -257,11 +248,8 @@ values
     null,
     'trash',
     3,
-    'Wednesday',
-    'Lakeside Trash Route',
     current_date,
     null,
-    'active',
     'Lakeside HOA-wide weekly trash pickup'
   ),
   (
@@ -269,12 +257,9 @@ values
     '22222222-2222-2222-2222-222222222222',
     null,
     'bulk',
-    null,
-    'First Saturday',
-    'Lakeside Bulk Pickup Route',
+    6,
     current_date,
     null,
-    'active',
     'Lakeside HOA-wide monthly bulk pickup'
   )
 on conflict (id) do update
@@ -283,11 +268,8 @@ set
   address_id = excluded.address_id,
   service_type = excluded.service_type,
   service_day = excluded.service_day,
-  schedule_rule = excluded.schedule_rule,
-  route_name = excluded.route_name,
-  effective_date = excluded.effective_date,
+  start_date = excluded.start_date,
   end_date = excluded.end_date,
-  status = excluded.status,
   notes = excluded.notes;
 
 commit;

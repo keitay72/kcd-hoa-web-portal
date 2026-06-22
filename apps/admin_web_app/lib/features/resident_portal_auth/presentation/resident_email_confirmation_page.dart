@@ -86,7 +86,7 @@ class _ResidentEmailConfirmationPageState
   String get _subtitle {
     return switch (_state) {
       _ResidentEmailConfirmationState.processing =>
-        'Please give us a moment while we confirm your email and prepare your resident portal access.',
+        'Please give us a moment while we confirm your email and prepare your customer portal access.',
       _ResidentEmailConfirmationState.expired =>
         'That email verification link has expired. Head back to sign in or register again to request a fresh email.',
       _ResidentEmailConfirmationState.invalid =>
@@ -130,7 +130,7 @@ class _ResidentEmailConfirmationPageState
       if (result.activationCodeRequired && !result.verified) {
         context.go('/portal/$tenantCode/activation-code');
       } else {
-        context.go('/portal/$tenantCode/success');
+        context.go('/portal/$tenantCode/setup-account');
       }
     } catch (error) {
       html.window.localStorage.remove('resident_pending_tenant_code');
@@ -178,8 +178,8 @@ class _ResidentEmailConfirmationPageState
 
   void _clearSensitiveUrl(String? tenantCode) {
     final cleanedPath = tenantCode == null
-        ? '/#/portal/confirm-email'
-        : '/#/portal/$tenantCode/confirm-email';
+        ? '/portal/confirm-email'
+        : '/portal/$tenantCode/confirm-email';
     html.window.history.replaceState(null, '', cleanedPath);
   }
 }

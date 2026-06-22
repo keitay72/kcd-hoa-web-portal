@@ -23,9 +23,7 @@ class ResidentRegistrationPage extends ConsumerStatefulWidget {
 class _ResidentRegistrationPageState
     extends ConsumerState<ResidentRegistrationPage> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
   final _line1Controller = TextEditingController();
   final _line2Controller = TextEditingController();
   final _cityController = TextEditingController();
@@ -44,9 +42,7 @@ class _ResidentRegistrationPageState
 
   @override
   void dispose() {
-    _nameController.dispose();
     _emailController.dispose();
-    _passwordController.dispose();
     _line1Controller.dispose();
     _line2Controller.dispose();
     _cityController.dispose();
@@ -61,32 +57,20 @@ class _ResidentRegistrationPageState
 
     return ResidentPortalScaffold(
       tenantCode: widget.tenantCode,
-      title: 'Create your resident account',
+      title: 'Create your customer account',
       subtitle:
-          'Enter your HOA service address. We will match you to the correct HOA automatically.',
+          'Enter your email and service address. We will verify your email before asking for account details.',
       child: Form(
         key: _formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             TextFormField(
-              controller: _nameController,
-              decoration: const InputDecoration(labelText: 'Full Name'),
-              validator: _required,
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
+              autofillHints: const [AutofillHints.email],
               decoration: const InputDecoration(labelText: 'Email'),
               validator: _email,
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _passwordController,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: 'Password'),
-              validator: _password,
             ),
             const SizedBox(height: 24),
             Text(
@@ -146,7 +130,7 @@ class _ResidentRegistrationPageState
                       dimension: 18,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Create account'),
+                  : const Text('Continue'),
             ),
             const SizedBox(height: 12),
             TextButton(
@@ -174,9 +158,7 @@ class _ResidentRegistrationPageState
         await ref.read(residentPortalAuthControllerProvider.notifier).register(
               tenantCode: widget.tenantCode,
               input: ResidentRegistrationInput(
-                fullName: _nameController.text,
                 email: _emailController.text,
-                password: _passwordController.text,
                 address: ResidentAddressInput(
                   line1: _line1Controller.text,
                   line2: _line2Controller.text,
@@ -203,11 +185,6 @@ class _ResidentRegistrationPageState
     if (!input.contains('@') || !input.contains('.')) {
       return 'Enter a valid email';
     }
-    return null;
-  }
-
-  String? _password(String? value) {
-    if (value == null || value.length < 8) return 'Use at least 8 characters';
     return null;
   }
 

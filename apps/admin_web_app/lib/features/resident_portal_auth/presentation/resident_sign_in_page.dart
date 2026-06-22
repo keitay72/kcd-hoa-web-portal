@@ -5,8 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/rbac/admin_context.dart';
-import '../../../core/rbac/rbac_providers.dart';
 import '../../../core/supabase/supabase_provider.dart';
 import 'resident_auth_providers.dart';
 import 'resident_portal_scaffold.dart';
@@ -39,9 +37,8 @@ class _ResidentSignInPageState extends ConsumerState<ResidentSignInPage> {
 
     return ResidentPortalScaffold(
       tenantCode: widget.tenantCode,
-      title: 'Resident sign in',
-      subtitle:
-          'Sign in after you verify your email to access your resident portal.',
+      title: 'Customer sign in',
+      subtitle: null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -94,6 +91,11 @@ class _ResidentSignInPageState extends ConsumerState<ResidentSignInPage> {
                 context.go('/portal/${widget.tenantCode}/register'),
             child: const Text('Need an account? Register here'),
           ),
+          TextButton(
+            onPressed: () =>
+                context.go('/portal/${widget.tenantCode}/forgot-password'),
+            child: const Text('Forgot password?'),
+          ),
         ],
       ),
     );
@@ -115,59 +117,48 @@ class _ResidentSignInPageState extends ConsumerState<ResidentSignInPage> {
       return;
     }
 
-    setState(() => _postSignInStatus = 'Checking resident access...');
+    setState(() => _postSignInStatus = 'Checking customer access...');
 
     final repository = ref.read(residentPortalAuthRepositoryProvider);
-    final String? residentHoaId;
+    final String? serviceLocationId;
     try {
-      residentHoaId = await repository
-          .currentUserResidentHoaId()
+      serviceLocationId = await repository
+          .currentUserCustomerServiceLocationId()
           .timeout(const Duration(seconds: 8));
     } catch (error) {
       if (!mounted) return;
       setState(() {
         _postSignInStatus = null;
-        _postSignInError = 'Signed in, but resident access check failed: '
+        _postSignInError = 'Signed in, but customer access check failed: '
             '${_errorText(error)}';
       });
       return;
     }
 
     if (!mounted) return;
-    if (residentHoaId == null || residentHoaId.isEmpty) {
+    if (serviceLocationId == null || serviceLocationId.isEmpty) {
       setState(() {
         _postSignInStatus = null;
         _postSignInError =
-            'Signed in, but this account does not have an active resident HOA role yet.';
+            'Signed in, but this account does not have verified customer access yet.';
       });
       return;
     }
 
-    setState(() => _postSignInStatus = 'Opening resident portal...');
-    setSelectedAdminContextId(ref, 'hoa:$residentHoaId');
+    setState(() => _postSignInStatus = 'Opening customer portal...');
     ref.invalidate(authStateProvider);
     ref.invalidate(currentUserProvider);
-    ref.invalidate(adminAccessProvider);
-    ref.invalidate(availableAdminContextsProvider);
-    ref.invalidate(activeAdminContextProvider);
-    ref.invalidate(activeAdminAccessProvider);
     _openResidentPortal();
   }
 
   void _openResidentPortal() {
-    const target = '/admin/hoa/documents';
+    final target = '/portal/${widget.tenantCode}/home';
     html.window.history.replaceState(
       null,
-      'HOA Portal Admin',
-      '${html.window.location.origin}/#$target',
+      'Customer Portal',
+      '${html.window.location.origin}$target',
     );
     context.go(target);
-    Future<void>.delayed(const Duration(milliseconds: 500), () {
-      if (!mounted) return;
-      if (html.window.location.hash != '#$target') {
-        html.window.location.hash = target;
-      }
-    });
   }
 
   String _errorText(Object? error) {

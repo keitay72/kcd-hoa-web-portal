@@ -1,6 +1,6 @@
 const devSecurityBypassEnabled = bool.fromEnvironment(
   'KCD_DEV_SECURITY_BYPASS',
-  defaultValue: true,
+  defaultValue: false,
 );
 
 const devUserId = 'dev-user';
@@ -18,6 +18,8 @@ const devPermissionCodes = {
   'announcements.read',
   'audit.read',
   'billing.manage',
+  'customer_accounts.manage',
+  'customer_accounts.read',
   'dashboard.read',
   'documents.manage',
   'documents.read',
@@ -26,6 +28,8 @@ const devPermissionCodes = {
   'roles.manage',
   'schedules.manage',
   'schedules.read',
+  'service_locations.manage',
+  'service_locations.read',
   'tenants.manage',
   'tenants.read',
   'tickets.manage',

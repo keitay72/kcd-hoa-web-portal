@@ -1,21 +1,46 @@
-# HOA Portal SaaS Platform
+# Waste Hauler Customer Portal SaaS
 
-Multi-tenant HOA portal platform for waste-management companies that provide residential HOA services.
+Multi-tenant customer portal platform for waste-management companies.
 
-KC Disposal is the first tenant/customer implementation. The product is being refactored into a SaaS platform that can support additional waste-management companies such as Mountain High Disposal and future subscribers without cloning the application or database.
+The product is a SaaS platform sold to trash companies around the country so they can offer a branded customer portal to residential, HOA/community, commercial, and future roll-off customers without cloning the application or database.
+
+KC Disposal and Mountain High Disposal are expected to be the first tenant/customer implementations. Each subscribed trash company is a tenant of the SaaS platform.
 
 ## Product Direction
 
-The platform is designed around four scopes:
+The platform is being repositioned from an HOA portal into a white-label customer portal for waste haulers.
+
+The target product has two public surfaces:
+
+- Platform marketing site: the SaaS sales website, for example `portal.com`.
+- Tenant customer portal: the branded portal for each trash company, for example `portal.olathewasteinc.com`.
+
+The platform is designed around these scopes:
 
 - Platform: SaaS owner/operator team that manages tenants, subscriptions, global support, pricing, and platform operations.
-- Tenant: Waste-management company subscriber, such as KC Disposal.
-- HOA: HOA communities managed under a tenant.
-- Resident: Verified resident users associated with HOA addresses.
+- Tenant: Waste-management company subscriber, such as KC Disposal, Mountain High Disposal, or Olathe Disposal.
+- Customer account or service context: a tenant-owned account, HOA/community, city/service area, commercial account, roll-off account, or other grouping that controls what portal users see.
+- Service location: an address or serviced location associated with a customer account/context.
+- Customer user: a person who signs in through the shared login system and sees only the tenant/account/location contexts their roles and memberships allow.
 
-The immediate priority is the Flutter Web Admin App in `apps/admin_web_app` and the Supabase backend in `backend/supabase`.
+The immediate priority is the Flutter Web Admin App in `apps/admin_web_app` and the Supabase backend in `backend/supabase`, with new work aligned to the broader customer portal model.
 
-The resident mobile app remains planned, but `apps/mobile_app` is deferred until the Admin Web App and SaaS tenant foundation are stable.
+The native mobile app remains deferred. The near-term mobile strategy is a responsive web portal with PWA support; do not expand `apps/mobile_app` until the web/PWA portal is stable.
+
+## Current Product Decision
+
+See `docs/adr/0002-customer-portal-saas-product-direction.md`.
+
+This ADR supersedes the HOA-centered product direction in `docs/adr/0001-saas-foundation-correction-plan.md`. ADR 0001 remains useful for historical context and for the tenant/RBAC/billing foundation, but new product work should follow ADR 0002.
+
+Supporting planning docs:
+
+- `docs/prd/customer-portal-domain-model.md`
+- `docs/srs/customer-portal-data-model.md`
+- `docs/srs/customer-portal-migration-plan.md`
+- `docs/srs/routing-auth-clean-url-plan.md`
+- `docs/srs/pwa-mobile-strategy.md`
+- `docs/srs/ui-ux-redesign-plan.md`
 
 ## Current Stack
 
@@ -120,17 +145,17 @@ Important app folders:
 
 ## SaaS Tenancy Model
 
-The platform is moving from a KC-only architecture to a true multi-tenant SaaS model.
+The platform is moving from a KC-only HOA architecture to a true multi-tenant customer portal SaaS model.
 
 Recommended hierarchy:
 
 - Platform owns the SaaS product and manages tenant subscribers.
 - Tenant represents a waste-management company subscriber.
-- HOA communities belong to exactly one tenant.
-- HOA addresses belong to HOA communities.
-- Residents verify against tenant-owned HOA addresses.
+- Customer accounts, service contexts, and service locations belong to exactly one tenant.
+- HOA/community records are one supported customer/service context type, not the center of the product.
+- Customers verify against tenant-owned service locations.
 - Tenant staff can operate only within their assigned tenant scope.
-- HOA users can operate only within their HOA scope.
+- Community/customer users can operate only within their assigned customer account, service context, or service location scope.
 
 Key tables involved:
 
@@ -153,6 +178,10 @@ Key tables involved:
 - `user_hoa_memberships`
 - `user_address_memberships`
 
+Current implementation note:
+
+The deployed schema still uses HOA-centered tables such as `hoa_communities`, `hoa_addresses`, `user_hoa_memberships`, and `user_address_memberships`. These are legacy/current implementation names. New design work should introduce or migrate toward customer-account/service-location language instead of expanding the HOA model.
+
 ## Role Model
 
 Canonical role scopes:
@@ -171,14 +200,16 @@ Tenant roles:
 - `tenant_csr`: Tenant customer service user.
 - `tenant_dispatch`: Tenant dispatch/operations user.
 
-HOA roles:
+Community roles:
 
-- `hoa_manager`: HOA-scoped management user.
-- `hoa_board`: HOA-scoped board member user.
+- `community_admin`: Target future role for HOA board members, property managers, or community-level customer admins.
+- `hoa_board`: Existing compatibility role for HOA-scoped board access.
+- `hoa_manager`: Existing compatibility role. Avoid adding new workflows that depend on a separate HOA manager role unless it has distinct permissions.
 
-Resident role:
+Customer role:
 
-- `hoa_resident`: Verified HOA resident.
+- `customer_user`: Target future role for residential, HOA/community, commercial, and roll-off portal users.
+- `hoa_resident`: Existing compatibility role for verified HOA residents.
 
 Deprecated compatibility roles may still exist in historical data and compatibility migrations:
 
@@ -210,7 +241,7 @@ Behavior:
 - Unauthorized users see an unauthorized page instead of requested content.
 - Platform/global roles can access platform-wide features.
 - Tenant roles are scoped to tenant records.
-- HOA roles are scoped to HOA records.
+- Community/customer roles are scoped to account, service context, or service location records.
 - RLS remains the final enforcement layer in Supabase.
 
 ## Supabase Backend
@@ -241,6 +272,15 @@ Important migration groups:
 - `0026_admin_invite_platform_role_access.sql`: Invite lifecycle access for canonical platform roles.
 - `0027_invite_acceptance_self_service.sql`: Self-service invite acceptance tracking.
 - `0028_profile_password_setup_tracking.sql`: Profile password setup tracking for invited users.
+- `0029_admin_audit_tenant_scope.sql`: Tenant-scoped audit log support.
+- `0030_seed_saas_subscription_catalog.sql`: Original SaaS subscription catalog seed.
+- `0031_free_beta_subscription_mode.sql`: Free beta subscription mode.
+- `0032_tenant_beta_tracking.sql`: Tenant beta tracking fields.
+- `0033_resident_activation_code_settings.sql`: Resident activation code settings.
+- `0034_submit_resident_service_issue_rpc.sql`: Resident service issue RPC.
+- `0035_customer_portal_foundation.sql`: Generalized customer account, service location, membership, verification, and usage snapshot foundation.
+- `0036_backfill_customer_portal_from_hoa.sql`: Backfill generalized customer portal tables from current HOA data.
+- `0037_customer_portal_subscription_catalog.sql`: Capacity-based Local, Regional, Metro, and Enterprise customer portal plan catalog.
 
 The deployed Supabase schema is treated as the source of truth for application queries.
 
@@ -273,7 +313,7 @@ npx supabase functions deploy stripe-webhook
 
 ## Billing And Add-Ons
 
-The platform is being prepared for subscription billing.
+The platform is being prepared for subscription billing. Subscription tiers should control customer/service-location capacity, not core feature access.
 
 Planned billing provider:
 
@@ -296,6 +336,26 @@ Commercial features being prepared:
 - Tenant email settings for production sender configuration.
 - Stripe checkout session creation.
 - Stripe webhook status synchronization.
+
+Target subscription philosophy:
+
+- Every paid tier includes the complete core customer portal feature set.
+- Tier differences are based on the number of active customer accounts or service locations loaded into the portal.
+- Avoid feature-gated plans for core portal functionality.
+- Use add-ons only for real external cost or heavier operational support, such as SMS messaging, custom email sending domains, advanced integrations/API access, premium support, or white-glove onboarding/import.
+
+Target public plan bands:
+
+- Local: up to 10,000 active customers/service locations.
+- Regional: up to 30,000 active customers/service locations.
+- Metro: up to 75,000 active customers/service locations.
+- Enterprise: 75,000+ active customers/service locations, custom pricing.
+
+Target overage policy:
+
+- Include a small grace buffer so tenants are not penalized for minor growth.
+- Bill modest per-customer/service-location overages above the grace buffer.
+- Require a plan upgrade when usage stays materially above plan capacity for multiple billing cycles.
 
 Stripe account credentials are not required for continued non-billing development. Until credentials are configured, Stripe-related functions should fail safely with clear `stripe_not_configured` style responses.
 
@@ -335,10 +395,10 @@ The Tenant Detail page displays onboarding progress based on real configuration 
 - Email sender configured
 - SMS decision recorded
 - Tenant admin assigned
-- First HOA created
+- First customer account/service context created
 - Marked ready to launch
 
-Checklist items are actionable. Selecting an item opens the relevant workflow, such as subscription assignment, billing contact setup, tenant settings, email settings, SMS settings, tenant admin assignment, HOA creation, or onboarding status updates.
+Checklist items are actionable. Selecting an item opens the relevant workflow, such as subscription assignment, billing contact setup, tenant settings, email settings, SMS settings, tenant admin assignment, customer account/service context creation, or onboarding status updates.
 
 Launch-readiness behavior:
 
@@ -399,17 +459,37 @@ Security note:
 
 Internal notes are currently represented through tagged ticket events. Before resident-facing ticket timelines are exposed, private internal notes should be moved to a dedicated table or protected with a stricter visibility field and RLS policy.
 
-## Activation Code Security
+## Customer Signup And Verification
 
-Activation codes use hash-based verification.
+The preferred customer signup flow does not require mailed activation codes.
 
-Current model:
+Target customer signup flow:
+
+1. Customer visits the tenant-branded portal, such as `portal.olathewasteinc.com`.
+2. Customer enters service address and email.
+3. The system checks whether the service address exists for that tenant.
+4. If eligible, the system creates a pending registration and sends a verification email.
+5. Customer clicks the verification email.
+6. Customer sets up password, name, phone, and profile details.
+7. The account becomes active and linked to the verified service location.
+
+Design notes:
+
+- Use one login page for every user type.
+- Authentication identifies the user; roles, tenant membership, customer account membership, and service-location membership determine what they can see.
+- Email verification proves email ownership. Address matching proves the service location exists in the tenant registry.
+- Multiple users may be associated with the same service location.
+- Sensitive future features, such as billing or payment history, may require stronger verification.
+
+Activation codes remain a compatibility or stricter-verification option.
+
+Current activation-code model:
 
 - `activation_codes.code_hash` stores the hash.
 - Plaintext codes are not stored in the base table.
 - Admin visibility for plaintext activation codes requires a separate secure design if needed.
 
-Recommended future production design:
+If activation codes are retained for strict-mode tenants:
 
 - Keep `code_hash` for verification.
 - Store encrypted activation code values only when business requirements demand admin re-display.
@@ -423,7 +503,7 @@ Admin invitations use Supabase Auth invite links plus the custom Admin Web App a
 Local invite acceptance URL:
 
 ```text
-http://192.168.0.141:8080/#/accept-invite?token_hash={{ .TokenHash }}&type=invite
+http://192.168.0.141:8080/accept-invite?token_hash={{ .TokenHash }}&type=invite
 ```
 
 Important behavior:
@@ -439,7 +519,7 @@ Supabase Auth URL configuration should include the local admin URL during develo
 
 ```text
 http://192.168.0.141:8080/
-http://192.168.0.141:8080/#/accept-invite
+http://192.168.0.141:8080/accept-invite
 ```
 
 For production, replace these with the deployed admin domain.
@@ -558,9 +638,11 @@ Current focus:
 
 - Continue development in `apps/admin_web_app`.
 - Continue Supabase backend work under `backend/supabase`.
-- Do not modify `apps/mobile_app` until the resident/mobile phase resumes.
+- Do not modify `apps/mobile_app` until the responsive web/PWA portal is stable and a native shell is intentionally planned.
 - Keep KC Disposal as a tenant, not the platform owner/operator concept.
 - Prefer tenant-aware data models and RLS for all new work.
+- Prefer customer-account, service-context, and service-location language for new product work.
+- Treat HOA/community functionality as one supported customer segment, not the product's top-level identity.
 - Do not expose Supabase service role keys in Flutter.
 - Use Edge Functions for privileged Auth Admin and billing workflows.
 
@@ -568,13 +650,13 @@ Current focus:
 
 Recommended next steps:
 
-1. Continue tenant management polish for settings, email, SMS, billing contacts, add-ons, and onboarding edge cases.
-2. Add platform audit visibility for tenant onboarding, billing changes, invite lifecycle events, and role assignments.
-3. Configure Stripe once the owner creates the Stripe account.
-4. Deploy and verify Stripe webhooks in test mode.
-5. Build production tenant email configuration workflow.
-6. Build Twilio/SMS add-on configuration workflow.
-7. Harden private ticket notes before resident ticket visibility ships.
-8. Add user-facing tenant launch checklist reports for platform sales/support handoff.
-9. Continue replacing internal compatibility names, such as `platformRoles` wrappers around tenant-scoped staff assignments, when it is safe to do a larger naming migration.
-10. Resume resident portal/mobile development only after the admin SaaS foundation is stable.
+1. Create the customer-portal product architecture plan from ADR 0002 before adding more HOA-specific workflows.
+2. Add tenant portal-domain resolution so a hostname such as `portal.olathewasteinc.com` resolves tenant branding and configuration.
+3. Consolidate toward one login experience for all users, with post-login routing based on roles and memberships.
+4. Replace activation-code-first signup with address match plus email verification for customer account creation.
+5. Design the customer account/service location schema that can support residential, HOA/community, commercial, and roll-off contexts.
+6. Simplify HOA/community roles so future work uses one community admin role unless distinct permissions are required.
+7. Update subscription plans so all tiers include the full core feature set and differ by active customer/service-location limits.
+8. Add usage/overage tracking for active customer accounts or service locations.
+9. Continue tenant management polish for settings, email, SMS, billing contacts, onboarding, and audit visibility.
+10. Configure Stripe once the owner creates the Stripe account, then deploy and verify Stripe webhooks in test mode.

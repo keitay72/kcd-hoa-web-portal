@@ -13,33 +13,33 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-async function activateResidentMembership(
+async function activateCustomerMembership(
   serviceClient: any,
   verification: {
     id: string;
-    hoa_id: string;
-    address_id: string;
+    tenant_id: string;
+    customer_account_id: string;
+    service_location_id: string;
   },
   userId: string,
 ) {
-  const { data: residentRole, error: roleError } = await serviceClient
+  const { data: customerRole, error: roleError } = await serviceClient
     .from("roles")
     .select("id")
-    .eq("code", "hoa_resident")
+    .eq("code", "customer_user")
     .single();
 
-  if (roleError || !residentRole) {
-    return roleError?.message ?? "Resident role is not configured";
+  if (roleError || !customerRole) {
+    return roleError?.message ?? "Customer user role is not configured";
   }
 
   const now = new Date().toISOString();
 
   const { error: verificationUpdateError } = await serviceClient
-    .from("residency_verifications")
+    .from("customer_verifications")
     .update({
-      address_verified: true,
+      address_matched: true,
       email_verified: true,
-      activation_code_verified: true,
       status: "verified",
       verified_at: now,
     })
@@ -49,37 +49,45 @@ async function activateResidentMembership(
     return verificationUpdateError.message;
   }
 
-  const { error: hoaMembershipError } = await serviceClient
-    .from("user_hoa_memberships")
-    .upsert({
-      user_id: userId,
-      hoa_id: verification.hoa_id,
-      role_id: residentRole.id,
-      status: "active",
-      assigned_by: userId,
-    }, { onConflict: "user_id,hoa_id,role_id" });
+  const membershipPayload = {
+    tenant_id: verification.tenant_id,
+    user_id: userId,
+    customer_account_id: verification.customer_account_id,
+    service_location_id: verification.service_location_id,
+    role_id: customerRole.id,
+    status: "active",
+    is_primary_contact: true,
+    created_by: userId,
+  };
 
-  if (hoaMembershipError) {
-    return hoaMembershipError.message;
+  const { data: existingMembership, error: existingMembershipError } =
+    await serviceClient
+      .from("customer_memberships")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("customer_account_id", verification.customer_account_id)
+      .eq("service_location_id", verification.service_location_id)
+      .eq("role_id", customerRole.id)
+      .in("status", ["pending", "active"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+  if (existingMembershipError) {
+    return existingMembershipError.message;
   }
 
-  const { error: addressMembershipError } = await serviceClient
-    .from("user_address_memberships")
-    .insert({
-      user_id: userId,
-      hoa_id: verification.hoa_id,
-      address_id: verification.address_id,
-      occupancy_type: "resident",
-      is_primary: true,
-      is_current: true,
-      created_by: userId,
-    });
+  const { error: membershipError } = existingMembership
+    ? await serviceClient
+      .from("customer_memberships")
+      .update(membershipPayload)
+      .eq("id", existingMembership.id)
+    : await serviceClient
+      .from("customer_memberships")
+      .insert(membershipPayload);
 
-  if (
-    addressMembershipError &&
-    !addressMembershipError.message.includes("duplicate key")
-  ) {
-    return addressMembershipError.message;
+  if (membershipError) {
+    return membershipError.message;
   }
 
   return null;
@@ -121,8 +129,10 @@ Deno.serve(async (request) => {
   }
 
   const { data: verification, error: verificationError } = await serviceClient
-    .from("residency_verifications")
-    .select("id, user_id, hoa_id, address_id, status")
+    .from("customer_verifications")
+    .select(
+      "id, user_id, tenant_id, customer_account_id, service_location_id, status",
+    )
     .eq("user_id", userData.user.id)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -134,7 +144,7 @@ Deno.serve(async (request) => {
 
   if (!verification) {
     return jsonResponse(
-      { error: "Resident verification record not found" },
+      { error: "Customer verification record not found" },
       404,
     );
   }
@@ -143,27 +153,17 @@ Deno.serve(async (request) => {
     return jsonResponse({ verified: true, activationCodeRequired: false });
   }
 
-  if (!verification.address_id) {
+  if (!verification.customer_account_id || !verification.service_location_id) {
     return jsonResponse({
-      error: "Resident verification is missing an address",
+      error: "Customer verification is missing a service location",
     }, 400);
   }
 
-  const { data: activationRequired, error: activationSettingError } =
-    await serviceClient
-      .rpc("resident_activation_code_required", {
-        _hoa_id: verification.hoa_id,
-      });
-
-  if (activationSettingError) {
-    return jsonResponse({ error: activationSettingError.message }, 500);
-  }
-
-  const activationCodeRequired = activationRequired !== false;
+  const activationCodeRequired = false;
 
   if (activationCodeRequired) {
     const { error: updateError } = await serviceClient
-      .from("residency_verifications")
+      .from("customer_verifications")
       .update({ email_verified: true })
       .eq("id", verification.id);
 
@@ -174,12 +174,13 @@ Deno.serve(async (request) => {
     return jsonResponse({ verified: false, activationCodeRequired: true });
   }
 
-  const membershipError = await activateResidentMembership(
+  const membershipError = await activateCustomerMembership(
     serviceClient,
     {
       id: verification.id,
-      hoa_id: verification.hoa_id,
-      address_id: verification.address_id,
+      tenant_id: verification.tenant_id,
+      customer_account_id: verification.customer_account_id,
+      service_location_id: verification.service_location_id,
     },
     userData.user.id,
   );

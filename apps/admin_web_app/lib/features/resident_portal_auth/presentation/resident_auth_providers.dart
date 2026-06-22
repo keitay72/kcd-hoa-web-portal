@@ -7,14 +7,17 @@ import '../data/resident_auth_repository.dart';
 import '../domain/resident_address.dart';
 import '../domain/resident_registration.dart';
 
-final residentPortalAuthRepositoryProvider = Provider<ResidentPortalAuthRepository>((ref) {
-  return SupabaseResidentPortalAuthRepository(ref.watch(supabaseClientProvider));
+final residentPortalAuthRepositoryProvider =
+    Provider<ResidentPortalAuthRepository>((ref) {
+  return SupabaseResidentPortalAuthRepository(
+      ref.watch(supabaseClientProvider));
 });
 
 final residentRegistrationStateProvider =
     StateProvider<ResidentRegistrationResult?>((ref) => null);
 
-final verifiedResidentAddressProvider = StateProvider<VerifiedResidentAddress?>((ref) {
+final verifiedResidentAddressProvider =
+    StateProvider<VerifiedResidentAddress?>((ref) {
   return ref.watch(residentRegistrationStateProvider)?.address;
 });
 
@@ -33,6 +36,69 @@ class ResidentPortalAuthController extends AutoDisposeAsyncNotifier<void> {
       return ref.read(residentPortalAuthRepositoryProvider).signIn(
             email: email,
             password: password,
+          );
+    });
+
+    if (result.hasError) {
+      state = AsyncError<void>(result.error!, result.stackTrace!);
+      return false;
+    }
+
+    state = const AsyncData(null);
+    return true;
+  }
+
+  Future<bool> sendPasswordResetEmail({
+    required String tenantCode,
+    required String email,
+  }) async {
+    state = const AsyncLoading();
+    final result = await AsyncValue.guard(() {
+      return ref
+          .read(residentPortalAuthRepositoryProvider)
+          .sendPasswordResetEmail(
+            tenantCode: tenantCode,
+            email: email,
+          );
+    });
+
+    if (result.hasError) {
+      state = AsyncError<void>(result.error!, result.stackTrace!);
+      return false;
+    }
+
+    state = const AsyncData(null);
+    return true;
+  }
+
+  Future<bool> beginPasswordRecovery(Uri uri) async {
+    state = const AsyncLoading();
+    final result = await AsyncValue.guard(() {
+      return ref
+          .read(residentPortalAuthRepositoryProvider)
+          .beginPasswordRecoveryFromUri(uri);
+    });
+
+    if (result.hasError) {
+      state = AsyncError<void>(result.error!, result.stackTrace!);
+      return false;
+    }
+
+    state = const AsyncData(null);
+    return true;
+  }
+
+  Future<bool> updatePassword(
+    String password, {
+    String? fullName,
+    String? phone,
+  }) async {
+    state = const AsyncLoading();
+    final result = await AsyncValue.guard(() {
+      return ref.read(residentPortalAuthRepositoryProvider).updatePassword(
+            password,
+            fullName: fullName,
+            phone: phone,
           );
     });
 
@@ -85,7 +151,8 @@ class ResidentPortalAuthController extends AutoDisposeAsyncNotifier<void> {
     }
 
     ref.read(residentRegistrationStateProvider.notifier).state = result.value;
-    ref.read(verifiedResidentAddressProvider.notifier).state = result.value?.address;
+    ref.read(verifiedResidentAddressProvider.notifier).state =
+        result.value?.address;
     state = const AsyncData(null);
     return result.value;
   }
@@ -100,7 +167,9 @@ class ResidentPortalAuthController extends AutoDisposeAsyncNotifier<void> {
             .verifyActivationCodeForCurrentUser(code);
       }
 
-      return ref.read(residentPortalAuthRepositoryProvider).verifyActivationCode(
+      return ref
+          .read(residentPortalAuthRepositoryProvider)
+          .verifyActivationCode(
             verificationId: registration.verificationId,
             addressId: registration.address.id,
             code: code,

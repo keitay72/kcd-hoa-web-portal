@@ -3,12 +3,14 @@ import 'dart:html' as html;
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'admin_app.dart';
 
 Future<void> bootstrapAdminApp() async {
   WidgetsFlutterBinding.ensureInitialized();
+  usePathUrlStrategy();
   _clearStaleAdminInviteCallback();
   _normalizeResidentEmailCallback();
 
@@ -45,8 +47,8 @@ void _clearStaleAdminInviteCallback() {
 
   html.window.history.replaceState(
     null,
-    'HOA Portal Admin',
-    '${uri.origin}/#/',
+    'Customer Portal Admin',
+    '${uri.origin}/',
   );
 }
 
@@ -76,7 +78,7 @@ void _normalizeResidentEmailCallback() {
   html.window.history.replaceState(
     null,
     'Resident Email Confirmation',
-    '${uri.origin}/#$callbackFragment',
+    '${uri.origin}$callbackFragment',
   );
 }
 

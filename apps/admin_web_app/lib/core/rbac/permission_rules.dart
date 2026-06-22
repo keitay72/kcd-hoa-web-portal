@@ -34,6 +34,10 @@ class AdminPermissions {
   );
   static const hoaRead = AdminPermissionRule.any({'hoa.read'});
   static const addressRead = AdminPermissionRule.any({'addresses.read'});
+  static const customerAccountsRead = AdminPermissionRule.any({
+    'customer_accounts.read',
+    'hoa.read',
+  });
   static const activationCodes =
       AdminPermissionRule.any({'verification.manage'});
   static const verificationRead =

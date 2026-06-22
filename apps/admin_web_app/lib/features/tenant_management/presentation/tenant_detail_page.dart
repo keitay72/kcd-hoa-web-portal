@@ -37,7 +37,6 @@ class TenantDetailPage extends ConsumerWidget {
   }
 }
 
-
 typedef _TenantDialogHelper = Future<void> Function(
   BuildContext context,
   WidgetRef ref,
@@ -76,12 +75,14 @@ TenantSubscriptionEntitlements _entitlementsForDetail(TenantDetail detail) {
 TenantEntitlementResult _brandingEntitlementFor(
   TenantSubscriptionEntitlements entitlements,
 ) {
-  final customBranding = entitlements.entitlementFor(TenantFeature.customBranding);
+  final customBranding =
+      entitlements.entitlementFor(TenantFeature.customBranding);
   if (customBranding.isEnabled) return customBranding;
   return entitlements.entitlementFor(TenantFeature.whiteLabelBranding);
 }
 
-Future<bool> _confirmHoaOverageAllowsCreate(BuildContext context, TenantDetail detail) async {
+Future<bool> _confirmHoaOverageAllowsCreate(
+    BuildContext context, TenantDetail detail) async {
   if (!detail.isHoaLimitReached) return true;
 
   final planName = detail.currentPlan?.name ?? 'the current plan';
@@ -114,7 +115,6 @@ Future<bool> _confirmHoaOverageAllowsCreate(BuildContext context, TenantDetail d
   return confirmed == true;
 }
 
-
 class _BetaTrackingCard extends ConsumerWidget {
   const _BetaTrackingCard({required this.detail});
 
@@ -124,8 +124,10 @@ class _BetaTrackingCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final status = detail.onboardingStatus;
     final colorScheme = Theme.of(context).colorScheme;
-    final knownIssues = _fallbackText(status?.knownIssues, 'No known beta issues recorded.');
-    final notes = _fallbackText(status?.notes, 'No internal onboarding notes recorded.');
+    final knownIssues =
+        _fallbackText(status?.knownIssues, 'No known beta issues recorded.');
+    final notes =
+        _fallbackText(status?.notes, 'No internal onboarding notes recorded.');
 
     return Card(
       margin: EdgeInsets.zero,
@@ -157,7 +159,8 @@ class _BetaTrackingCard extends ConsumerWidget {
                 ),
                 _StatusPill(
                   label: status?.betaStatusLabel ?? 'Not Started',
-                  isPositive: status?.betaStatus == 'active_beta' || status?.betaStatus == 'completed',
+                  isPositive: status?.betaStatus == 'active_beta' ||
+                      status?.betaStatus == 'completed',
                 ),
                 const SizedBox(width: 8),
                 TextButton.icon(
@@ -206,7 +209,9 @@ class _BetaTrackingCard extends ConsumerWidget {
                     _BetaStatusTile(
                       width: cardWidth,
                       label: 'HOA onboarding',
-                      value: status?.readyForHoaOnboarding == true ? 'Ready' : 'Not ready yet',
+                      value: status?.readyForHoaOnboarding == true
+                          ? 'Ready'
+                          : 'Not ready yet',
                       icon: status?.readyForHoaOnboarding == true
                           ? Icons.check_circle_outline
                           : Icons.pending_actions_outlined,
@@ -232,11 +237,13 @@ class _BetaTrackingCard extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Known beta issues', style: Theme.of(context).textTheme.titleSmall),
+                  Text('Known beta issues',
+                      style: Theme.of(context).textTheme.titleSmall),
                   const SizedBox(height: 6),
                   Text(knownIssues),
                   const SizedBox(height: 14),
-                  Text('Internal notes', style: Theme.of(context).textTheme.titleSmall),
+                  Text('Internal notes',
+                      style: Theme.of(context).textTheme.titleSmall),
                   const SizedBox(height: 6),
                   Text(notes),
                 ],
@@ -248,7 +255,8 @@ class _BetaTrackingCard extends ConsumerWidget {
     );
   }
 
-  Future<void> _openOnboardingStatus(BuildContext context, WidgetRef ref) async {
+  Future<void> _openOnboardingStatus(
+      BuildContext context, WidgetRef ref) async {
     await showDialog<Object?>(
       context: context,
       barrierDismissible: false,
@@ -360,7 +368,8 @@ class _TenantUsageCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Plan Usage', style: Theme.of(context).textTheme.titleLarge),
+                      Text('Plan Usage',
+                          style: Theme.of(context).textTheme.titleLarge),
                       const SizedBox(height: 4),
                       Text(
                         plan == null
@@ -390,7 +399,8 @@ class _TenantUsageCard extends StatelessWidget {
                       limit: detail.hoaLimit,
                       ratio: detail.hoaUsageRatio,
                       isWarning: detail.isHoaUsageWarning,
-                      isAtLimit: detail.isHoaLimitReached && !detail.isHoaOverLimit,
+                      isAtLimit:
+                          detail.isHoaLimitReached && !detail.isHoaOverLimit,
                       isOverLimit: detail.isHoaOverLimit,
                       overageCount: detail.hoaOverageCount,
                       overageMonthlyCents: detail.hoaOverageMonthlyCents,
@@ -402,7 +412,8 @@ class _TenantUsageCard extends StatelessWidget {
                       limit: detail.residentLimit,
                       ratio: detail.residentUsageRatio,
                       isWarning: detail.isResidentUsageWarning,
-                      isAtLimit: detail.isResidentLimitReached && !detail.isResidentOverLimit,
+                      isAtLimit: detail.isResidentLimitReached &&
+                          !detail.isResidentOverLimit,
                       isOverLimit: detail.isResidentOverLimit,
                       overageCount: detail.residentOverageCount,
                       overageMonthlyCents: detail.residentOverageMonthlyCents,
@@ -464,7 +475,9 @@ class _UsageMeter extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isOverLimit || isWarning ? color.withOpacity(0.45) : colorScheme.outlineVariant,
+            color: isOverLimit || isWarning
+                ? color.withOpacity(0.45)
+                : colorScheme.outlineVariant,
           ),
           color: isOverLimit
               ? colorScheme.errorContainer.withOpacity(0.25)
@@ -478,7 +491,8 @@ class _UsageMeter extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
+                  child: Text(label,
+                      style: const TextStyle(fontWeight: FontWeight.w800)),
                 ),
                 if (isOverLimit)
                   const Chip(label: Text('Over Included Limit'))
@@ -492,7 +506,8 @@ class _UsageMeter extends StatelessWidget {
             Text(valueText, style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             if (limit == null)
-              Text('Plan limit: $limitText', style: Theme.of(context).textTheme.bodySmall)
+              Text('Plan limit: $limitText',
+                  style: Theme.of(context).textTheme.bodySmall)
             else ...[
               LinearProgressIndicator(
                 value: progress,
@@ -500,7 +515,8 @@ class _UsageMeter extends StatelessWidget {
                 backgroundColor: colorScheme.surfaceContainerHighest,
               ),
               const SizedBox(height: 6),
-              Text('Plan limit: $limitText', style: Theme.of(context).textTheme.bodySmall),
+              Text('Plan limit: $limitText',
+                  style: Theme.of(context).textTheme.bodySmall),
               if (overageCount > 0) ...[
                 const SizedBox(height: 6),
                 Text(
@@ -593,7 +609,8 @@ class _TenantDetailView extends ConsumerWidget {
                             children: [
                               Chip(label: Text(tenant.code)),
                               Chip(label: Text(tenant.statusLabel)),
-                              if (tenant.isPrimary) const Chip(label: Text('Primary tenant')),
+                              if (tenant.isPrimary)
+                                const Chip(label: Text('Primary tenant')),
                             ],
                           ),
                         ],
@@ -614,7 +631,8 @@ class _TenantDetailView extends ConsumerWidget {
                     children: [
                       titleBlock,
                       const SizedBox(height: 12),
-                      Align(alignment: Alignment.centerRight, child: editButton),
+                      Align(
+                          alignment: Alignment.centerRight, child: editButton),
                     ],
                   );
                 }
@@ -651,7 +669,8 @@ class _TenantDetailView extends ConsumerWidget {
               const SizedBox(height: 16),
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final cardWidth = _tenantSummaryCardWidth(constraints.maxWidth);
+                  final cardWidth =
+                      _tenantSummaryCardWidth(constraints.maxWidth);
                   return Wrap(
                     spacing: 16,
                     runSpacing: 16,
@@ -688,7 +707,6 @@ class _TenantDetailView extends ConsumerWidget {
   }
 }
 
-
 class _LaunchReadinessCard extends ConsumerWidget {
   const _LaunchReadinessCard({required this.detail});
 
@@ -708,7 +726,8 @@ class _LaunchReadinessCard extends ConsumerWidget {
         detail.onboardingStatus?.launchReadyAt != null;
     final incompleteCount = [
       currentSubscription?.planId != null &&
-          (currentSubscription?.priceId != null || currentSubscription?.isFreeBeta == true),
+          (currentSubscription?.priceId != null ||
+              currentSubscription?.isFreeBeta == true),
       billingReady,
       emailReady,
       tenantAdminReady,
@@ -730,7 +749,9 @@ class _LaunchReadinessCard extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(
-                  readyForLaunch ? Icons.verified_outlined : Icons.task_alt_outlined,
+                  readyForLaunch
+                      ? Icons.verified_outlined
+                      : Icons.task_alt_outlined,
                   color: readyForLaunch ? colorScheme.primary : null,
                 ),
                 const SizedBox(width: 12),
@@ -773,24 +794,33 @@ class _LaunchReadinessCard extends ConsumerWidget {
                     _ReadinessTile(
                       width: tileWidth,
                       label: 'Subscription',
-                      value: currentSubscription?.planName ?? 'No plan assigned',
+                      value:
+                          currentSubscription?.planName ?? 'No plan assigned',
                       isReady: currentSubscription?.planId != null &&
-                          (currentSubscription?.priceId != null || currentSubscription?.isFreeBeta == true),
-                      actionLabel: currentSubscription == null ? 'Assign Plan' : 'Review Plan',
-                      onPressed: () => _openSubscription(context, ref, currentSubscription),
+                          (currentSubscription?.priceId != null ||
+                              currentSubscription?.isFreeBeta == true),
+                      actionLabel: currentSubscription == null
+                          ? 'Assign Plan'
+                          : 'Review Plan',
+                      onPressed: () =>
+                          _openSubscription(context, ref, currentSubscription),
                     ),
                     _ReadinessTile(
                       width: tileWidth,
                       label: 'Billing Contact',
-                      value: billingReady ? detail.billingContacts.first.email : 'Missing billing contact',
+                      value: billingReady
+                          ? detail.billingContacts.first.email
+                          : 'Missing billing contact',
                       isReady: billingReady,
-                      actionLabel: billingReady ? 'Review Contact' : 'Add Contact',
+                      actionLabel:
+                          billingReady ? 'Review Contact' : 'Add Contact',
                       onPressed: () => _openBillingContact(context, ref),
                     ),
                     _ReadinessTile(
                       width: tileWidth,
                       label: 'Email Sender',
-                      value: detail.emailSettings?.providerLabel ?? 'Platform Managed',
+                      value: detail.emailSettings?.providerLabel ??
+                          'Platform Managed',
                       isReady: emailReady,
                       actionLabel: 'Configure Email',
                       onPressed: () => _openEmailSettings(context, ref),
@@ -802,13 +832,16 @@ class _LaunchReadinessCard extends ConsumerWidget {
                           ? '${detail.tenantAdminCount} admin/manager role(s)'
                           : 'No tenant admin assigned',
                       isReady: tenantAdminReady,
-                      actionLabel: tenantAdminReady ? 'Manage Staff' : 'Invite Admin',
+                      actionLabel:
+                          tenantAdminReady ? 'Manage Staff' : 'Invite Admin',
                       onPressed: () => _openTenantStaff(context, ref),
                     ),
                     _ReadinessTile(
                       width: tileWidth,
                       label: 'HOA Setup',
-                      value: hoaReady ? '${detail.hoaCount} HOA community record(s)' : 'No HOA created',
+                      value: hoaReady
+                          ? '${detail.hoaCount} HOA community record(s)'
+                          : 'No HOA created',
                       isReady: hoaReady,
                       actionLabel: hoaReady ? 'View HOAs' : 'Create HOA',
                       onPressed: () => _openHoaSetup(context, ref),
@@ -816,7 +849,8 @@ class _LaunchReadinessCard extends ConsumerWidget {
                     _ReadinessTile(
                       width: tileWidth,
                       label: 'Launch Status',
-                      value: detail.onboardingStatus?.statusLabel ?? 'Not Started',
+                      value:
+                          detail.onboardingStatus?.statusLabel ?? 'Not Started',
                       isReady: launchReady,
                       actionLabel: launchReady ? 'Review Status' : 'Mark Ready',
                       onPressed: () => _openOnboardingStatus(context, ref),
@@ -853,7 +887,9 @@ class _LaunchReadinessCard extends ConsumerWidget {
       ref,
       BillingContactDialog(
         tenantId: detail.tenant.id,
-        contact: detail.billingContacts.isEmpty ? null : detail.billingContacts.first,
+        contact: detail.billingContacts.isEmpty
+            ? null
+            : detail.billingContacts.first,
       ),
     );
   }
@@ -907,7 +943,8 @@ class _LaunchReadinessCard extends ConsumerWidget {
     );
   }
 
-  Future<void> _openOnboardingStatus(BuildContext context, WidgetRef ref) async {
+  Future<void> _openOnboardingStatus(
+      BuildContext context, WidgetRef ref) async {
     await _showAndRefresh(
       context,
       ref,
@@ -933,8 +970,6 @@ class _LaunchReadinessCard extends ConsumerWidget {
     ref.invalidate(tenantListProvider);
   }
 }
-
-
 
 String _betaUsageText(int current, int? limit) {
   if (limit == null) return '${_formatCount(current)} / Unlimited';
@@ -1066,7 +1101,8 @@ class _BetaTenantPlaybookCard extends ConsumerWidget {
                           : 'Set support contact and confirm email sender behavior before external users rely on it.',
                       isReady: supportReady && emailReady,
                       icon: Icons.contact_mail_outlined,
-                      actionLabel: supportReady ? 'Review email' : 'Edit support',
+                      actionLabel:
+                          supportReady ? 'Review email' : 'Edit support',
                       onPressed: supportReady
                           ? () => _openEmailSettings(context, ref)
                           : () => _openSettings(context, ref),
@@ -1079,7 +1115,9 @@ class _BetaTenantPlaybookCard extends ConsumerWidget {
                           : 'Optional during free beta, but useful before conversion to paid.',
                       isReady: billingContactReady,
                       icon: Icons.receipt_long_outlined,
-                      actionLabel: billingContactReady ? 'Review contact' : 'Add contact',
+                      actionLabel: billingContactReady
+                          ? 'Review contact'
+                          : 'Add contact',
                       onPressed: () => _openBillingContact(context, ref),
                     ),
                   ],
@@ -1106,7 +1144,8 @@ class _BetaTenantPlaybookCard extends ConsumerWidget {
 
   Future<void> _openTenantStaff(BuildContext context, WidgetRef ref) async {
     if (detail.tenantAdminCount > 0) {
-      await _showAndRefresh(context, ref, TenantStaffAssignmentDialog(detail: detail));
+      await _showAndRefresh(
+          context, ref, TenantStaffAssignmentDialog(detail: detail));
       return;
     }
 
@@ -1141,7 +1180,8 @@ class _BetaTenantPlaybookCard extends ConsumerWidget {
   Future<void> _openSettings(BuildContext context, WidgetRef ref) async {
     final entitlements = _entitlementsForDetail(detail);
     final branding = _brandingEntitlementFor(entitlements);
-    final customDomain = entitlements.entitlementFor(TenantFeature.customDomain);
+    final customDomain =
+        entitlements.entitlementFor(TenantFeature.customDomain);
     await _showAndRefresh(
       context,
       ref,
@@ -1173,7 +1213,9 @@ class _BetaTenantPlaybookCard extends ConsumerWidget {
       ref,
       BillingContactDialog(
         tenantId: detail.tenant.id,
-        contact: detail.billingContacts.isEmpty ? null : detail.billingContacts.first,
+        contact: detail.billingContacts.isEmpty
+            ? null
+            : detail.billingContacts.first,
       ),
     );
   }
@@ -1236,7 +1278,9 @@ class _BetaPlaybookTile extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(icon, size: 20, color: isReady ? colorScheme.primary : colorScheme.outline),
+                Icon(icon,
+                    size: 20,
+                    color: isReady ? colorScheme.primary : colorScheme.outline),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -1292,7 +1336,9 @@ class _ReadinessTile extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isReady ? colorScheme.primary.withOpacity(0.35) : colorScheme.outlineVariant,
+            color: isReady
+                ? colorScheme.primary.withOpacity(0.35)
+                : colorScheme.outlineVariant,
           ),
           color: isReady
               ? colorScheme.primaryContainer.withOpacity(0.20)
@@ -1302,7 +1348,9 @@ class _ReadinessTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Icon(
-              isReady ? Icons.check_circle_outline : Icons.radio_button_unchecked,
+              isReady
+                  ? Icons.check_circle_outline
+                  : Icons.radio_button_unchecked,
               color: isReady ? colorScheme.primary : colorScheme.outline,
               size: 20,
             ),
@@ -1311,7 +1359,8 @@ class _ReadinessTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+                  Text(label,
+                      style: const TextStyle(fontWeight: FontWeight.w700)),
                   const SizedBox(height: 4),
                   Tooltip(
                     message: value,
@@ -1364,13 +1413,13 @@ class _StatusPill extends StatelessWidget {
         label,
         style: TextStyle(
           fontWeight: FontWeight.w700,
-          color: isPositive ? colorScheme.primary : colorScheme.onSurfaceVariant,
+          color:
+              isPositive ? colorScheme.primary : colorScheme.onSurfaceVariant,
         ),
       ),
     );
   }
 }
-
 
 class _OnboardingCard extends ConsumerWidget {
   const _OnboardingCard({required this.detail});
@@ -1453,7 +1502,8 @@ class _OnboardingCard extends ConsumerWidget {
                           width: cardWidth,
                           child: _ChecklistTile(
                             item: item,
-                            onTap: () => _handleChecklistAction(context, ref, item),
+                            onTap: () =>
+                                _handleChecklistAction(context, ref, item),
                           ),
                         ),
                       )
@@ -1497,14 +1547,17 @@ class _OnboardingCard extends ConsumerWidget {
           ref,
           BillingContactDialog(
             tenantId: detail.tenant.id,
-            contact: detail.billingContacts.isEmpty ? null : detail.billingContacts.first,
+            contact: detail.billingContacts.isEmpty
+                ? null
+                : detail.billingContacts.first,
           ),
         );
         return;
       case 'settings':
         final entitlements = _entitlementsForDetail(detail);
         final branding = _brandingEntitlementFor(entitlements);
-        final customDomain = entitlements.entitlementFor(TenantFeature.customDomain);
+        final customDomain =
+            entitlements.entitlementFor(TenantFeature.customDomain);
         await _showAndRefresh(
           context,
           ref,
@@ -1587,7 +1640,8 @@ class _OnboardingCard extends ConsumerWidget {
     }
   }
 
-  Future<void> _openOnboardingStatus(BuildContext context, WidgetRef ref) async {
+  Future<void> _openOnboardingStatus(
+      BuildContext context, WidgetRef ref) async {
     await _showAndRefresh(
       context,
       ref,
@@ -1649,8 +1703,12 @@ class _ChecklistTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(
-                    item.isComplete ? Icons.check_circle : Icons.radio_button_unchecked,
-                    color: item.isComplete ? colorScheme.primary : colorScheme.outline,
+                    item.isComplete
+                        ? Icons.check_circle
+                        : Icons.radio_button_unchecked,
+                    color: item.isComplete
+                        ? colorScheme.primary
+                        : colorScheme.outline,
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -1678,7 +1736,9 @@ class _ChecklistTile extends StatelessWidget {
                 alignment: Alignment.centerRight,
                 child: TextButton.icon(
                   onPressed: onTap,
-                  icon: Icon(item.isComplete ? Icons.visibility_outlined : Icons.arrow_forward),
+                  icon: Icon(item.isComplete
+                      ? Icons.visibility_outlined
+                      : Icons.arrow_forward),
                   label: Text(item.actionLabel),
                 ),
               ),
@@ -1733,7 +1793,6 @@ class _WarningPanel extends StatelessWidget {
   }
 }
 
-
 double _tenantSummaryCardWidth(double availableWidth) {
   if (availableWidth >= 1320) return (availableWidth - 32) / 3;
   if (availableWidth >= 760) return (availableWidth - 16) / 2;
@@ -1751,13 +1810,15 @@ class _SettingsCard extends ConsumerWidget {
     final settings = detail.settings;
     final entitlements = _entitlementsForDetail(detail);
     final branding = _brandingEntitlementFor(entitlements);
-    final customDomain = entitlements.entitlementFor(TenantFeature.customDomain);
+    final customDomain =
+        entitlements.entitlementFor(TenantFeature.customDomain);
     return _TenantCard(
       title: 'Branding & Support',
       icon: Icons.tune_outlined,
       width: width,
       action: TextButton.icon(
-        onPressed: () => _open(context, branding: branding, customDomain: customDomain),
+        onPressed: () =>
+            _open(context, branding: branding, customDomain: customDomain),
         icon: const Icon(Icons.edit_outlined),
         label: const Text('Edit'),
       ),
@@ -1770,12 +1831,19 @@ class _SettingsCard extends ConsumerWidget {
           _FeatureLockBanner(result: customDomain),
           const SizedBox(height: 10),
         ],
-        _InfoLine(label: 'Support email', value: settings?.supportEmail ?? 'Not set'),
-        _InfoLine(label: 'Support phone', value: settings?.supportPhone ?? 'Not set'),
-        _InfoLine(label: 'Portal hostname', value: settings?.portalHostname ?? 'Not set'),
-        _InfoLine(label: 'From name', value: settings?.emailFromName ?? 'Not set'),
-        _InfoLine(label: 'Reply-to', value: settings?.emailReplyTo ?? 'Not set'),
-        _InfoLine(label: 'Timezone', value: settings?.timezone ?? 'America/Chicago'),
+        _InfoLine(
+            label: 'Support email', value: settings?.supportEmail ?? 'Not set'),
+        _InfoLine(
+            label: 'Support phone', value: settings?.supportPhone ?? 'Not set'),
+        _InfoLine(
+            label: 'Portal hostname',
+            value: settings?.portalHostname ?? 'Not set'),
+        _InfoLine(
+            label: 'From name', value: settings?.emailFromName ?? 'Not set'),
+        _InfoLine(
+            label: 'Reply-to', value: settings?.emailReplyTo ?? 'Not set'),
+        _InfoLine(
+            label: 'Timezone', value: settings?.timezone ?? 'America/Chicago'),
       ],
     );
   }
@@ -1828,11 +1896,18 @@ class _EmailSettingsCard extends StatelessWidget {
       children: [
         _EmailReadinessBanner(settings: settings),
         const SizedBox(height: 10),
-        _InfoLine(label: 'Provider', value: settings?.providerLabel ?? 'Platform Managed'),
-        _InfoLine(label: 'Verification', value: settings?.verificationStatusLabel ?? 'Not Configured'),
-        _InfoLine(label: 'Sender domain', value: settings?.senderDomain ?? 'Not set'),
-        _InfoLine(label: 'Sender email', value: settings?.senderEmail ?? 'Not set'),
-        _InfoLine(label: 'Reply-to', value: settings?.replyToEmail ?? 'Not set'),
+        _InfoLine(
+            label: 'Provider',
+            value: settings?.providerLabel ?? 'Platform Managed'),
+        _InfoLine(
+            label: 'Verification',
+            value: settings?.verificationStatusLabel ?? 'Not Configured'),
+        _InfoLine(
+            label: 'Sender domain', value: settings?.senderDomain ?? 'Not set'),
+        _InfoLine(
+            label: 'Sender email', value: settings?.senderEmail ?? 'Not set'),
+        _InfoLine(
+            label: 'Reply-to', value: settings?.replyToEmail ?? 'Not set'),
       ],
     );
   }
@@ -1846,7 +1921,8 @@ class _EmailReadinessBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final isPlatformManaged = settings == null || settings!.provider == 'platform_managed';
+    final isPlatformManaged =
+        settings == null || settings!.provider == 'platform_managed';
     final isVerified = settings?.verificationStatus == 'verified';
     final isReady = isPlatformManaged || isVerified;
     final message = isPlatformManaged
@@ -1927,17 +2003,32 @@ class _SmsSettingsCard extends StatelessWidget {
           addonStatus: addon?.status,
         ),
         const SizedBox(height: 12),
-        _InfoLine(label: 'Provider', value: settings?.providerLabel ?? 'Twilio'),
-        _InfoLine(label: 'SMS setting', value: settings?.statusLabel ?? 'Disabled'),
-        _InfoLine(label: 'Add-on status', value: addon?.statusLabel ?? 'Disabled'),
-        _InfoLine(label: 'Phone number', value: settings?.formattedSendingPhoneNumber ?? 'Not set'),
-        _InfoLine(label: 'Message limit', value: settings?.monthlyMessageLimit?.toString() ?? 'Not set'),
-        _InfoLine(label: 'Twilio subaccount', value: settings?.twilioSubaccountSid ?? 'Not set'),
-        _InfoLine(label: 'Messaging service', value: settings?.twilioMessagingServiceSid ?? 'Not set'),
+        _InfoLine(
+            label: 'Provider', value: settings?.providerLabel ?? 'Twilio'),
+        _InfoLine(
+            label: 'SMS setting', value: settings?.statusLabel ?? 'Disabled'),
+        _InfoLine(
+            label: 'Add-on status', value: addon?.statusLabel ?? 'Disabled'),
+        _InfoLine(
+            label: 'Phone number',
+            value: settings?.formattedSendingPhoneNumber ?? 'Not set'),
+        _InfoLine(
+            label: 'Message limit',
+            value: settings?.monthlyMessageLimit?.toString() ?? 'Not set'),
+        _InfoLine(
+            label: 'Twilio subaccount',
+            value: settings?.twilioSubaccountSid ?? 'Not set'),
+        _InfoLine(
+            label: 'Messaging service',
+            value: settings?.twilioMessagingServiceSid ?? 'Not set'),
         const SizedBox(height: 8),
-        _MiniChecklistRow(label: 'Tenant wants SMS', complete: status == 'pending' || status == 'active'),
+        _MiniChecklistRow(
+            label: 'Tenant wants SMS',
+            complete: status == 'pending' || status == 'active'),
         _MiniChecklistRow(label: 'Sending number assigned', complete: hasPhone),
-        _MiniChecklistRow(label: 'Messaging service connected', complete: hasMessagingService),
+        _MiniChecklistRow(
+            label: 'Messaging service connected',
+            complete: hasMessagingService),
       ],
     );
   }
@@ -1977,11 +2068,14 @@ class _SmsStatusBanner extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final isPositive = canSend || status == 'pending';
     final message = switch (status) {
-      'active' when canSend => 'SMS is active and ready for tenant notifications.',
-      'active' => 'SMS is marked active but setup is incomplete. Confirm phone number and messaging service.',
+      'active' when canSend =>
+        'SMS is active and ready for tenant notifications.',
+      'active' =>
+        'SMS is marked active but setup is incomplete. Confirm phone number and messaging service.',
       'pending' => 'Tenant wants SMS. Finish Twilio setup before launch.',
       'suspended' => 'SMS is suspended. Tenant messages should not be sent.',
-      _ => 'SMS is disabled. Enable when the tenant approves the texting add-on.',
+      _ =>
+        'SMS is disabled. Enable when the tenant approves the texting add-on.',
     };
 
     return Container(
@@ -2028,7 +2122,9 @@ class _MiniChecklistRow extends StatelessWidget {
       child: Row(
         children: [
           Icon(
-            complete ? Icons.check_circle_outline : Icons.radio_button_unchecked,
+            complete
+                ? Icons.check_circle_outline
+                : Icons.radio_button_unchecked,
             size: 18,
             color: complete ? Theme.of(context).colorScheme.primary : null,
           ),
@@ -2039,7 +2135,6 @@ class _MiniChecklistRow extends StatelessWidget {
     );
   }
 }
-
 
 class _SubscriptionSetupBanner extends StatelessWidget {
   const _SubscriptionSetupBanner({
@@ -2077,7 +2172,8 @@ class _SubscriptionSetupBanner extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+                Text(title,
+                    style: const TextStyle(fontWeight: FontWeight.w800)),
                 const SizedBox(height: 2),
                 Text(message),
               ],
@@ -2111,7 +2207,8 @@ class _TenantAddonOverview extends StatelessWidget {
               (addon) => _AddonLine(
                 addon: addon,
                 enabledAddon: _enabledAddon(addon),
-                enterpriseIncluded: enterpriseIncluded && addon.code == 'api_access',
+                enterpriseIncluded:
+                    enterpriseIncluded && addon.code == 'api_access',
               ),
             ),
       ],
@@ -2120,7 +2217,8 @@ class _TenantAddonOverview extends StatelessWidget {
 
   TenantAddonSummary? _enabledAddon(AddonCatalogEntry addon) {
     for (final enabled in enabledAddons) {
-      if (enabled.addonId == addon.id || enabled.addonCode == addon.code) return enabled;
+      if (enabled.addonId == addon.id || enabled.addonCode == addon.code)
+        return enabled;
     }
     return null;
   }
@@ -2141,7 +2239,9 @@ class _AddonLine extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final enabled = enabledAddon != null || enterpriseIncluded;
-    final status = enterpriseIncluded ? 'Included' : enabledAddon?.statusLabel ?? 'Available';
+    final status = enterpriseIncluded
+        ? 'Included'
+        : enabledAddon?.statusLabel ?? 'Available';
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
@@ -2157,7 +2257,8 @@ class _AddonLine extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(addon.name, style: const TextStyle(fontWeight: FontWeight.w700)),
+                Text(addon.name,
+                    style: const TextStyle(fontWeight: FontWeight.w700)),
                 if (addon.description != null)
                   Text(
                     addon.description!,
@@ -2178,7 +2279,6 @@ class _AddonLine extends StatelessWidget {
     );
   }
 }
-
 
 class _TenantBillingSummary extends StatelessWidget {
   const _TenantBillingSummary({
@@ -2224,7 +2324,8 @@ class _TenantBillingSummary extends StatelessWidget {
           _InfoLine(label: 'Base plan', value: estimate.basePlanLabel),
           _InfoLine(label: 'Add-ons', value: estimate.addonLabel),
           _InfoLine(label: 'HOA overage', value: estimate.hoaOverageLabel),
-          _InfoLine(label: 'Resident overage', value: estimate.residentOverageLabel),
+          _InfoLine(
+              label: 'Resident overage', value: estimate.residentOverageLabel),
           const Divider(height: 20),
           _InfoLine(
             label: 'Estimated monthly',
@@ -2272,7 +2373,8 @@ class _BillingEstimate {
   ) {
     final baseCents = subscription.unitAmountCents ?? 0;
     final interval = subscription.billingInterval ?? 'monthly';
-    final monthlyBaseCents = interval == 'annual' ? (baseCents / 12).round() : baseCents;
+    final monthlyBaseCents =
+        interval == 'annual' ? (baseCents / 12).round() : baseCents;
     final annualBaseCents = interval == 'annual' ? baseCents : baseCents * 12;
     final addonMonthlyCents = _enabledAddonMonthlyCents(detail, plan);
     final overageMonthlyCents =
@@ -2283,7 +2385,8 @@ class _BillingEstimate {
         annualBaseCents + ((addonMonthlyCents + overageMonthlyCents) * 12);
 
     return _BillingEstimate(
-      billingModeLabel: interval == 'annual' ? 'Annual billing' : 'Monthly billing',
+      billingModeLabel:
+          interval == 'annual' ? 'Annual billing' : 'Monthly billing',
       basePlanLabel: _basePlanLabel(subscription, monthlyBaseCents),
       addonLabel: _addonLabel(detail, plan, addonMonthlyCents),
       hoaOverageLabel: detail.hoaOverageCount == 0
@@ -2303,7 +2406,8 @@ class _BillingEstimate {
     TenantSubscriptionSummary subscription,
     int monthlyBaseCents,
   ) {
-    if (subscription.unitAmountCents == null || subscription.billingInterval == null) {
+    if (subscription.unitAmountCents == null ||
+        subscription.billingInterval == null) {
       return 'No price assigned';
     }
     if (subscription.billingInterval == 'annual') {
@@ -2336,7 +2440,8 @@ class _BillingEstimate {
   }
 }
 
-int _enabledAddonMonthlyCents(TenantDetail detail, SubscriptionPlanSummary? plan) {
+int _enabledAddonMonthlyCents(
+    TenantDetail detail, SubscriptionPlanSummary? plan) {
   return detail.enabledAddons
       .where((addon) => _isBillableAddonStatus(addon.status))
       .fold<int>(
@@ -2390,7 +2495,9 @@ class _SubscriptionCard extends ConsumerWidget {
             label: Text(current == null ? 'Assign' : 'Change'),
           ),
           TextButton.icon(
-            onPressed: canCheckout ? () => _startCheckout(context, ref, current) : null,
+            onPressed: canCheckout
+                ? () => _startCheckout(context, ref, current)
+                : null,
             icon: const Icon(Icons.open_in_new_outlined),
             label: const Text('Checkout'),
           ),
@@ -2408,14 +2515,16 @@ class _SubscriptionCard extends ConsumerWidget {
           _SubscriptionSetupBanner(
             icon: Icons.credit_card_off_outlined,
             title: 'Billing Setup Required',
-            message: 'Assign Starter, Professional, or Enterprise before this tenant can move into beta or paid onboarding.',
+            message:
+                'Assign Starter, Professional, or Enterprise before this tenant can move into beta or paid onboarding.',
             isWarning: true,
           ),
           const SizedBox(height: 12),
           _EmptyActionPanel(
             icon: Icons.workspace_premium_outlined,
             title: 'No subscription assigned',
-            message: 'Choose a plan and billing mode. Free beta can remain active while Stripe is still being configured.',
+            message:
+                'Choose a plan and billing mode. Free beta can remain active while Stripe is still being configured.',
             actionLabel: 'Assign Plan',
             onPressed: () => _openSubscriptionDialog(context, ref, null),
           ),
@@ -2424,29 +2533,38 @@ class _SubscriptionCard extends ConsumerWidget {
             _SubscriptionSetupBanner(
               icon: Icons.science_outlined,
               title: 'Free Beta Active',
-              message: 'This tenant is not being charged. Plan limits, feature gates, and overage warnings still apply.',
+              message:
+                  'This tenant is not being charged. Plan limits, feature gates, and overage warnings still apply.',
             ),
             const SizedBox(height: 12),
           ] else if (!stripeReady) ...[
             _SubscriptionSetupBanner(
               icon: Icons.credit_card_off_outlined,
               title: 'Stripe Checkout Pending',
-              message: 'The plan is assigned, but checkout stays disabled until this rate has a Stripe price ID.',
+              message:
+                  'The plan is assigned, but checkout stays disabled until this rate has a Stripe price ID.',
               isWarning: true,
             ),
             const SizedBox(height: 12),
           ],
           _InfoLine(label: 'Plan', value: current.planDisplayName),
-          _InfoLine(label: 'Limits', value: selectedPlan?.limitLabel ?? 'Plan limits unavailable'),
+          _InfoLine(
+              label: 'Limits',
+              value: selectedPlan?.limitLabel ?? 'Plan limits unavailable'),
           _InfoLine(label: 'Status', value: current.statusLabel),
           _InfoLine(label: 'Price', value: current.priceLabel),
           _InfoLine(label: 'Billing mode', value: current.billingModeLabel),
           if (current.isFreeBeta)
-            _InfoLine(label: 'Free beta ends', value: _formatDate(current.freeBetaEndsAt)),
+            _InfoLine(
+                label: 'Free beta ends',
+                value: _formatDate(current.freeBetaEndsAt)),
           if (current.billingNotes != null)
             _InfoLine(label: 'Billing notes', value: current.billingNotes!),
-          _InfoLine(label: 'Current period ends', value: _formatDate(current.currentPeriodEnd)),
-          _InfoLine(label: 'Trial ends', value: _formatDate(current.trialEndsAt)),
+          _InfoLine(
+              label: 'Current period ends',
+              value: _formatDate(current.currentPeriodEnd)),
+          _InfoLine(
+              label: 'Trial ends', value: _formatDate(current.trialEndsAt)),
           const SizedBox(height: 12),
           _TenantBillingSummary(
             detail: detail,
@@ -2470,7 +2588,8 @@ class _SubscriptionCard extends ConsumerWidget {
     );
   }
 
-  SubscriptionPlanSummary? _planForSubscription(TenantSubscriptionSummary? subscription) {
+  SubscriptionPlanSummary? _planForSubscription(
+      TenantSubscriptionSummary? subscription) {
     if (subscription?.planId == null) return null;
     for (final plan in detail.availablePlans) {
       if (plan.id == subscription!.planId) return plan;
@@ -2524,12 +2643,15 @@ class _SubscriptionCard extends ConsumerWidget {
     TenantSubscriptionSummary subscription,
   ) async {
     final messenger = ScaffoldMessenger.of(context);
-    final result = await ref.read(tenantMutationControllerProvider.notifier).createCheckoutSession(
+    final result = await ref
+        .read(tenantMutationControllerProvider.notifier)
+        .createCheckoutSession(
           tenantId: detail.tenant.id,
           subscriptionId: subscription.id,
         );
     if (result == null) {
-      messenger.showSnackBar(const SnackBar(content: Text('Unable to start Stripe checkout.')));
+      messenger.showSnackBar(
+          const SnackBar(content: Text('Unable to start Stripe checkout.')));
       return;
     }
     if (!result.success || result.checkoutUrl == null) {
@@ -2549,16 +2671,18 @@ class _SubscriptionCard extends ConsumerWidget {
     TenantSubscriptionSummary subscription,
   ) async {
     final messenger = ScaffoldMessenger.of(context);
-    final result = await ref.read(tenantMutationControllerProvider.notifier).syncStripeSubscription(
+    final result = await ref
+        .read(tenantMutationControllerProvider.notifier)
+        .syncStripeSubscription(
           tenantId: detail.tenant.id,
           subscriptionId: subscription.id,
         );
     messenger.showSnackBar(
-      SnackBar(content: Text(result?.message ?? 'Unable to sync Stripe status.')),
+      SnackBar(
+          content: Text(result?.message ?? 'Unable to sync Stripe status.')),
     );
   }
 }
-
 
 void _showFeatureLockedSnackBar(
   BuildContext context,
@@ -2613,12 +2737,7 @@ class _FeatureAccessSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final features = [
-      ...TenantSubscriptionEntitlements.coreFeatures,
-      TenantFeature.dispatchDashboard,
-      TenantFeature.advancedTicketManagement,
-      TenantFeature.analyticsDashboard,
-      TenantFeature.roleManagement,
-      TenantFeature.customBranding,
+      ...TenantSubscriptionEntitlements.customerPortalFeatures,
       ...TenantSubscriptionEntitlements.addonFeatures,
     ];
     final results = entitlements.resultsFor(features);
@@ -2630,14 +2749,16 @@ class _FeatureAccessSummary extends StatelessWidget {
           children: [
             const Icon(Icons.fact_check_outlined, size: 20),
             const SizedBox(width: 8),
-            Text('Feature Access', style: Theme.of(context).textTheme.titleMedium),
+            Text('Feature Access',
+                style: Theme.of(context).textTheme.titleMedium),
           ],
         ),
         const SizedBox(height: 10),
         LayoutBuilder(
           builder: (context, constraints) {
             final columns = constraints.maxWidth >= 520 ? 2 : 1;
-            final itemWidth = (constraints.maxWidth - ((columns - 1) * 8)) / columns;
+            final itemWidth =
+                (constraints.maxWidth - ((columns - 1) * 8)) / columns;
             return Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -2675,14 +2796,17 @@ class _FeatureAccessChip extends StatelessWidget {
               ? Colors.green.withOpacity(0.08)
               : theme.colorScheme.surfaceContainerHighest.withOpacity(0.45),
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: color.withOpacity(result.isEnabled ? 0.35 : 0.2)),
+          border: Border.all(
+              color: color.withOpacity(result.isEnabled ? 0.35 : 0.2)),
         ),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           child: Row(
             children: [
               Icon(
-                result.isEnabled ? Icons.check_circle_outline : Icons.lock_outline,
+                result.isEnabled
+                    ? Icons.check_circle_outline
+                    : Icons.lock_outline,
                 size: 18,
                 color: color,
               ),
@@ -2693,7 +2817,8 @@ class _FeatureAccessChip extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.bodySmall?.copyWith(
-                    fontWeight: result.isEnabled ? FontWeight.w700 : FontWeight.w500,
+                    fontWeight:
+                        result.isEnabled ? FontWeight.w700 : FontWeight.w500,
                   ),
                 ),
               ),
@@ -2788,7 +2913,8 @@ class _BillingContactsCard extends StatelessWidget {
                   onPressed: () => showDialog<Object?>(
                     context: context,
                     barrierDismissible: false,
-                    builder: (_) => BillingContactDialog(tenantId: detail.tenant.id),
+                    builder: (_) =>
+                        BillingContactDialog(tenantId: detail.tenant.id),
                   ),
                   icon: const Icon(Icons.add),
                   label: const Text('Add Contact'),
@@ -2800,12 +2926,14 @@ class _BillingContactsCard extends StatelessWidget {
               _EmptyActionPanel(
                 icon: Icons.receipt_long_outlined,
                 title: 'No billing contact yet',
-                message: 'Add a billing contact before assigning paid subscription workflows.',
+                message:
+                    'Add a billing contact before assigning paid subscription workflows.',
                 actionLabel: 'Add Billing Contact',
                 onPressed: () => showDialog<Object?>(
                   context: context,
                   barrierDismissible: false,
-                  builder: (_) => BillingContactDialog(tenantId: detail.tenant.id),
+                  builder: (_) =>
+                      BillingContactDialog(tenantId: detail.tenant.id),
                 ),
               )
             else
@@ -2890,7 +3018,8 @@ class _AddonsCard extends ConsumerWidget {
               const _EmptyActionPanel(
                 icon: Icons.extension_off_outlined,
                 title: 'No add-ons in the catalog',
-                message: 'Add-on catalog setup can wait until Stripe products and tenant add-ons are finalized.',
+                message:
+                    'Add-on catalog setup can wait until Stripe products and tenant add-ons are finalized.',
               )
             else
               LayoutBuilder(
@@ -2900,9 +3029,11 @@ class _AddonsCard extends ConsumerWidget {
                     children: detail.availableAddons.map((addon) {
                       final enabled = detail.addonFor(addon.id);
                       final status = enabled?.status ?? 'disabled';
-                      final monthlyCents = _addonMonthlyPriceCents(addon.code, plan?.code);
+                      final monthlyCents =
+                          _addonMonthlyPriceCents(addon.code, plan?.code);
                       final priceLabel = monthlyCents == 0
-                          ? addon.code == 'api_access' && plan?.code == 'enterprise'
+                          ? addon.code == 'api_access' &&
+                                  plan?.code == 'enterprise'
                               ? 'Included with Enterprise'
                               : 'No monthly charge configured'
                           : '${_formatMoneyCents(monthlyCents)}/month';
@@ -2951,7 +3082,8 @@ class _AddonsCard extends ConsumerWidget {
   }) async {
     if (newStatus == currentStatus) return;
 
-    final isBillable = monthlyCents > 0 && const {'requested', 'enabled'}.contains(newStatus);
+    final isBillable =
+        monthlyCents > 0 && const {'requested', 'enabled'}.contains(newStatus);
     if (isBillable) {
       final confirmed = await showDialog<bool>(
         context: context,
@@ -2978,7 +3110,9 @@ class _AddonsCard extends ConsumerWidget {
     }
 
     final messenger = ScaffoldMessenger.of(context);
-    final saved = await ref.read(tenantMutationControllerProvider.notifier).setAddonStatus(
+    final saved = await ref
+        .read(tenantMutationControllerProvider.notifier)
+        .setAddonStatus(
           tenantId: detail.tenant.id,
           addonId: addon.id,
           status: newStatus,
@@ -2989,7 +3123,9 @@ class _AddonsCard extends ConsumerWidget {
       ref.invalidate(tenantDetailProvider(detail.tenant.id));
       ref.invalidate(tenantListProvider);
       messenger.showSnackBar(
-        SnackBar(content: Text('${addon.name} set to ${_addonStatusLabel(newStatus)}.')),
+        SnackBar(
+            content:
+                Text('${addon.name} set to ${_addonStatusLabel(newStatus)}.')),
       );
     } else {
       messenger.showSnackBar(
@@ -3142,7 +3278,9 @@ class _TenantHoasCard extends ConsumerWidget {
                 TextButton.icon(
                   onPressed: () => _openCreateHoa(context, ref),
                   icon: const Icon(Icons.add_business_outlined),
-                  label: Text(detail.tenantHoas.isEmpty ? 'Create First HOA' : 'Add HOA'),
+                  label: Text(detail.tenantHoas.isEmpty
+                      ? 'Create First HOA'
+                      : 'Add HOA'),
                 ),
               ],
             ),
@@ -3151,7 +3289,8 @@ class _TenantHoasCard extends ConsumerWidget {
               _EmptyActionPanel(
                 icon: Icons.home_work_outlined,
                 title: 'No HOA communities yet',
-                message: 'Create the first HOA community so this tenant can start onboarding addresses and residents.',
+                message:
+                    'Create the first HOA community so this tenant can start onboarding addresses and residents.',
                 actionLabel: 'Create First HOA',
                 onPressed: () => _openCreateHoa(context, ref),
               )
@@ -3160,7 +3299,9 @@ class _TenantHoasCard extends ConsumerWidget {
                 (hoa) => ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: CircleAvatar(
-                    child: Icon(hoa.isActive ? Icons.home_work_outlined : Icons.home_work),
+                    child: Icon(hoa.isActive
+                        ? Icons.home_work_outlined
+                        : Icons.home_work),
                   ),
                   title: Text(hoa.name),
                   subtitle: Text('${hoa.code} · ${hoa.statusLabel}'),
@@ -3236,7 +3377,8 @@ class _TenantStaffCard extends ConsumerWidget {
                           : () => showDialog<Object?>(
                                 context: context,
                                 barrierDismissible: false,
-                                builder: (_) => TenantStaffAssignmentDialog(detail: detail),
+                                builder: (_) =>
+                                    TenantStaffAssignmentDialog(detail: detail),
                               ),
                       icon: const Icon(Icons.person_add_alt_outlined),
                       label: const Text('Assign Staff'),
@@ -3250,7 +3392,8 @@ class _TenantStaffCard extends ConsumerWidget {
               _EmptyActionPanel(
                 icon: Icons.admin_panel_settings_outlined,
                 title: 'No tenant staff assigned',
-                message: 'Invite or assign a tenant admin before launch so the customer has an owner.',
+                message:
+                    'Invite or assign a tenant admin before launch so the customer has an owner.',
                 actionLabel: 'Invite Tenant Admin',
                 onPressed: () => _openInviteTenantAdmin(context, ref),
               )
@@ -3258,7 +3401,8 @@ class _TenantStaffCard extends ConsumerWidget {
               ...detail.tenantStaff.map(
                 (staff) => ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+                  leading:
+                      const CircleAvatar(child: Icon(Icons.person_outline)),
                   title: Text(staff.displayName),
                   subtitle: Tooltip(
                     message: [
@@ -3268,7 +3412,8 @@ class _TenantStaffCard extends ConsumerWidget {
                     ].join('\n'),
                     waitDuration: const Duration(milliseconds: 400),
                     child: Text(
-                      [staff.email, staff.roleName, staff.statusLabel].join(' · '),
+                      [staff.email, staff.roleName, staff.statusLabel]
+                          .join(' · '),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -3288,7 +3433,8 @@ class _TenantStaffCard extends ConsumerWidget {
     );
   }
 
-  Future<void> _openInviteTenantAdmin(BuildContext context, WidgetRef ref) async {
+  Future<void> _openInviteTenantAdmin(
+      BuildContext context, WidgetRef ref) async {
     final invited = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -3333,16 +3479,19 @@ class _TenantStaffCard extends ConsumerWidget {
     if (confirmed != true || !context.mounted) return;
 
     final messenger = ScaffoldMessenger.of(context);
-    final removed = await ref.read(tenantMutationControllerProvider.notifier).removeTenantStaff(staff);
+    final removed = await ref
+        .read(tenantMutationControllerProvider.notifier)
+        .removeTenantStaff(staff);
     if (!context.mounted) return;
     if (removed) {
       messenger.showSnackBar(
-        SnackBar(content: Text('Removed ${staff.roleName} from ${staff.displayName}.')),
+        SnackBar(
+            content:
+                Text('Removed ${staff.roleName} from ${staff.displayName}.')),
       );
     }
   }
 }
-
 
 class _EmptyActionPanel extends StatelessWidget {
   const _EmptyActionPanel({
@@ -3379,7 +3528,8 @@ class _EmptyActionPanel extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+                Text(title,
+                    style: const TextStyle(fontWeight: FontWeight.w800)),
                 const SizedBox(height: 4),
                 Text(message),
                 if (actionLabel != null && onPressed != null) ...[
@@ -3451,7 +3601,9 @@ class _TenantCard extends StatelessWidget {
                       children: [
                         titleRow,
                         const SizedBox(height: 8),
-                        Align(alignment: Alignment.centerRight, child: actionWidget),
+                        Align(
+                            alignment: Alignment.centerRight,
+                            child: actionWidget),
                       ],
                     );
                   }
@@ -3461,7 +3613,10 @@ class _TenantCard extends StatelessWidget {
                     children: [
                       Expanded(child: titleRow),
                       const SizedBox(width: 8),
-                      Flexible(child: Align(alignment: Alignment.centerRight, child: actionWidget)),
+                      Flexible(
+                          child: Align(
+                              alignment: Alignment.centerRight,
+                              child: actionWidget)),
                     ],
                   );
                 },

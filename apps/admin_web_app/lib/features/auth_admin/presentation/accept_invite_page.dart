@@ -363,7 +363,7 @@ class _AcceptInvitePageState extends ConsumerState<AcceptInvitePage> {
 
   void _clearSensitiveUrl() {
     html.window.history
-        .replaceState(null, 'Accept Invitation', '/#/accept-invite');
+        .replaceState(null, 'Accept Invitation', '/accept-invite');
   }
 
   void _leaveInviteRoute() {
@@ -376,20 +376,13 @@ class _AcceptInvitePageState extends ConsumerState<AcceptInvitePage> {
 
     html.window.history.replaceState(
       null,
-      'HOA Portal Admin',
-      '${html.window.location.origin}/#$target',
+      'Customer Portal Admin',
+      '${html.window.location.origin}$target',
     );
 
     if (mounted) {
       context.go(target);
     }
-
-    Future<void>.delayed(const Duration(milliseconds: 100), () {
-      if (!mounted) return;
-      if (html.window.location.hash != '#$target') {
-        html.window.location.hash = target;
-      }
-    });
   }
 
   _InviteView _viewForState(ColorScheme colorScheme) {

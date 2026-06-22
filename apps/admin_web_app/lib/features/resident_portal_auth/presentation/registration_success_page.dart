@@ -16,7 +16,7 @@ class RegistrationSuccessPage extends ConsumerWidget {
       tenantCode: tenantCode,
       title: 'Registration complete',
       subtitle:
-          'Your email and service address have been verified. You can now sign in to access your resident portal.',
+          'Your email and service address have been verified. You can now sign in to access your customer portal.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

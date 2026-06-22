@@ -1,5 +1,6 @@
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
+import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -13,7 +14,17 @@ abstract interface class ResidentPortalAuthRepository {
 
   Future<void> signIn({required String email, required String password});
   Future<void> signOut();
-  Future<String?> currentUserResidentHoaId();
+  Future<void> sendPasswordResetEmail({
+    required String tenantCode,
+    required String email,
+  });
+  Future<void> beginPasswordRecoveryFromUri(Uri uri);
+  Future<void> updatePassword(
+    String password, {
+    String? fullName,
+    String? phone,
+  });
+  Future<String?> currentUserCustomerServiceLocationId();
   Future<ResidentEmailVerificationCompletion> completeEmailVerificationFromUri(
     Uri uri,
   );
@@ -61,20 +72,107 @@ class SupabaseResidentPortalAuthRepository
   }
 
   @override
-  Future<String?> currentUserResidentHoaId() async {
+  Future<void> sendPasswordResetEmail({
+    required String tenantCode,
+    required String email,
+  }) async {
+    final emailRedirectTo =
+        await _resolveResidentEmailRedirectUrl(tenantCode, 'reset-password');
+    await _client.auth.resetPasswordForEmail(
+      email.trim(),
+      redirectTo: emailRedirectTo,
+    );
+  }
+
+  @override
+  Future<void> beginPasswordRecoveryFromUri(Uri uri) async {
+    final params = _combinedParams(uri);
+    final urlError = params['error_description'] ?? params['error'];
+    if (urlError != null && urlError.trim().isNotEmpty) {
+      throw StateError(urlError.trim());
+    }
+
+    final code = params['code'];
+    final tokenHash = params['token_hash'];
+    final type = params['type'];
+    final accessToken = params['access_token'];
+    final refreshToken = params['refresh_token'];
+
+    if (tokenHash != null && tokenHash.isNotEmpty) {
+      await _client.auth.verifyOTP(
+        tokenHash: tokenHash,
+        type: type == 'recovery' ? OtpType.recovery : OtpType.email,
+      );
+      await _waitForAuthenticatedSession();
+      return;
+    }
+
+    if (code != null && code.isNotEmpty) {
+      await _client.auth.exchangeCodeForSession(code);
+      await _waitForAuthenticatedSession();
+      return;
+    }
+
+    if (refreshToken != null && refreshToken.isNotEmpty) {
+      await _client.auth.setSession(
+        refreshToken,
+        accessToken: accessToken,
+      );
+      await _waitForAuthenticatedSession();
+      return;
+    }
+
+    if (_client.auth.currentUser != null) return;
+
+    throw StateError(
+      'This password reset link is missing required information. Please request a new reset email.',
+    );
+  }
+
+  @override
+  Future<void> updatePassword(
+    String password, {
+    String? fullName,
+    String? phone,
+  }) async {
+    await _client.auth.updateUser(UserAttributes(password: password));
+    final user = _client.auth.currentUser;
+    if (user == null) return;
+
+    final now = DateTime.now().toUtc().toIso8601String();
+    final profileUpdate = <String, dynamic>{
+      'password_set_at': now,
+      'status': 'active',
+      'updated_at': now,
+    };
+    final normalizedName = fullName?.trim();
+    final normalizedPhone = phone?.trim();
+    if (normalizedName != null && normalizedName.isNotEmpty) {
+      profileUpdate['full_name'] = normalizedName;
+    }
+    if (normalizedPhone != null && normalizedPhone.isNotEmpty) {
+      profileUpdate['phone'] = normalizedPhone;
+    }
+
+    await _client.from('profiles').update(profileUpdate).eq('id', user.id);
+  }
+
+  @override
+  Future<String?> currentUserCustomerServiceLocationId() async {
     final user = _client.auth.currentUser;
     if (user == null) return null;
 
     final rows = await _client
-        .from('user_hoa_memberships')
-        .select('hoa_id, roles!inner(code)')
+        .from('customer_memberships')
+        .select('service_location_id, roles!inner(code)')
         .eq('user_id', user.id)
         .eq('status', 'active')
-        .eq('roles.code', 'hoa_resident')
+        .eq('roles.code', 'customer_user')
+        .not('service_location_id', 'is', null)
         .limit(1);
 
     if (rows.isEmpty) return null;
-    return rows.first['hoa_id'] as String?;
+    return rows.first['service_location_id'] as String?;
   }
 
   @override
@@ -194,30 +292,17 @@ class SupabaseResidentPortalAuthRepository
     }
 
     final verification = await _client
-        .from('residency_verifications')
-        .select('hoa_id')
+        .from('customer_verifications')
+        .select('tenant_id')
         .eq('user_id', user.id)
         .order('created_at', ascending: false)
         .limit(1)
         .maybeSingle();
 
-    final hoaId = verification?['hoa_id']?.toString();
-    if (hoaId == null || hoaId.isEmpty) {
-      throw StateError(
-        'We could not determine which HOA portal to finish registration in.',
-      );
-    }
-
-    final hoa = await _client
-        .from('hoa_communities')
-        .select('tenant_id')
-        .eq('id', hoaId)
-        .maybeSingle();
-
-    final tenantId = hoa?['tenant_id']?.toString();
+    final tenantId = verification?['tenant_id']?.toString();
     if (tenantId == null || tenantId.isEmpty) {
       throw StateError(
-        'We could not determine which tenant this HOA belongs to.',
+        'We could not determine which customer portal to finish registration in.',
       );
     }
 
@@ -253,7 +338,7 @@ class SupabaseResidentPortalAuthRepository
     final data = response.data as Map<String, dynamic>;
     if (data['verified'] != true) {
       throw StateError(
-        'We could not match that address to an active HOA address in this portal.',
+        'We could not match that address to an active service address in this portal.',
       );
     }
 
@@ -269,12 +354,13 @@ class SupabaseResidentPortalAuthRepository
   }) async {
     final address =
         await verifyAddress(tenantCode: tenantCode, input: input.address);
-    final emailRedirectTo = await _resolveResidentEmailRedirectUrl(tenantCode);
+    final emailRedirectTo =
+        await _resolveResidentEmailRedirectUrl(tenantCode, 'confirm-email');
     final AuthResponse signUp;
     try {
       signUp = await _client.auth.signUp(
         email: input.email.trim(),
-        password: input.password,
+        password: _generateTemporarySignupPassword(),
         emailRedirectTo: emailRedirectTo,
       );
     } on AuthException catch (error) {
@@ -293,7 +379,6 @@ class SupabaseResidentPortalAuthRepository
         body: {
           'tenantCode': tenantCode,
           'userId': user.id,
-          'fullName': input.fullName.trim(),
           'email': input.email.trim(),
           'addressId': address.id,
         },
@@ -325,6 +410,14 @@ class SupabaseResidentPortalAuthRepository
       return 'An account already exists for this email. Please sign in instead.';
     }
     return message.replaceFirst('Exception: ', '').trim();
+  }
+
+  String _generateTemporarySignupPassword() {
+    const chars =
+        'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#%^*_+-=';
+    final values = Uint8List(32);
+    html.window.crypto!.getRandomValues(values);
+    return values.map((value) => chars[value % chars.length]).join();
   }
 
   @override
@@ -372,63 +465,26 @@ class SupabaseResidentPortalAuthRepository
     return data['verified'] == true;
   }
 
-  Future<String> _resolveResidentEmailRedirectUrl(String tenantCode) async {
-    final tenant = await _client
-        .from('platform_tenants')
-        .select('id')
-        .eq('code', tenantCode)
-        .maybeSingle();
-
-    final tenantId = tenant?['id'] as String?;
-    if (tenantId == null) {
-      return _residentPortalRouteBase(Uri.base.origin, tenantCode);
-    }
-
-    final settings = await _client
-        .from('tenant_settings')
-        .select('portal_hostname')
-        .eq('tenant_id', tenantId)
-        .maybeSingle();
-
-    final configuredHost = settings?['portal_hostname']?.toString().trim();
-    if (configuredHost == null || configuredHost.isEmpty) {
-      return _residentPortalRouteBase(Uri.base.origin, tenantCode);
-    }
-
-    final normalizedBase = _normalizePortalBaseUrl(configuredHost);
-    return _residentPortalRouteBase(normalizedBase, tenantCode);
+  Future<String> _resolveResidentEmailRedirectUrl(
+    String tenantCode,
+    String routeName,
+  ) async {
+    return _residentPortalRouteBase(Uri.base.origin, tenantCode, routeName);
   }
 
-  String _residentPortalRouteBase(String origin, String tenantCode) {
+  String _residentPortalRouteBase(
+    String origin,
+    String tenantCode,
+    String routeName,
+  ) {
     final baseUri = Uri.parse(origin);
     return baseUri
         .replace(
-          path: '/',
-          queryParameters: {
-            'portal_flow': 'resident_confirm',
-            'tenant': tenantCode,
-          },
+          path: '/portal/$tenantCode/$routeName',
+          queryParameters: null,
           fragment: null,
         )
         .toString();
-  }
-
-  String _normalizePortalBaseUrl(String rawValue) {
-    final trimmed = rawValue.trim();
-    final withScheme =
-        trimmed.startsWith('http://') || trimmed.startsWith('https://')
-            ? trimmed
-            : 'http://$trimmed';
-    final uri = Uri.parse(withScheme);
-    final normalized = uri.replace(
-      path: '',
-      query: null,
-      fragment: null,
-    );
-    final origin = normalized.toString();
-    return origin.endsWith('/')
-        ? origin.substring(0, origin.length - 1)
-        : origin;
   }
 
   Map<String, String> _combinedParams(Uri uri) {

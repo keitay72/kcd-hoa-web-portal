@@ -71,11 +71,16 @@ class _CatalogOverview extends StatelessWidget {
     final assignablePlans = planItems.where((plan) => plan.isAssignable).length;
     final stripeReadyPrices = planItems.fold<int>(
       0,
-      (count, plan) => count + plan.prices.where((price) => price.isStripeReady).length,
+      (count, plan) =>
+          count + plan.prices.where((price) => price.isStripeReady).length,
     );
     final missingStripePrices = planItems.fold<int>(
       0,
-      (count, plan) => count + plan.prices.where((price) => price.isActive && !price.isStripeReady).length,
+      (count, plan) =>
+          count +
+          plan.prices
+              .where((price) => price.isActive && !price.isStripeReady)
+              .length,
     );
     final activeAddons = addonItems.where((addon) => addon.isActive).length;
 
@@ -140,8 +145,11 @@ class _CatalogOverview extends StatelessWidget {
                       label: 'Stripe Ready Prices',
                       value: '$stripeReadyPrices',
                       icon: Icons.credit_score_outlined,
-                      isReady: missingStripePrices == 0 && stripeReadyPrices > 0,
-                      warning: missingStripePrices > 0 ? '$missingStripePrices active price(s) missing Stripe ID' : null,
+                      isReady:
+                          missingStripePrices == 0 && stripeReadyPrices > 0,
+                      warning: missingStripePrices > 0
+                          ? '$missingStripePrices active price(s) missing Stripe ID'
+                          : null,
                     ),
                     _CatalogMetricTile(
                       width: width,
@@ -217,12 +225,14 @@ class _CatalogMetricTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+                  Text(label,
+                      style: const TextStyle(fontWeight: FontWeight.w700)),
                   const SizedBox(height: 4),
                   Text(value, style: Theme.of(context).textTheme.titleMedium),
                   if (hasWarning) ...[
                     const SizedBox(height: 4),
-                    Text(warning!, style: Theme.of(context).textTheme.bodySmall),
+                    Text(warning!,
+                        style: Theme.of(context).textTheme.bodySmall),
                   ],
                 ],
               ),
@@ -242,7 +252,8 @@ class _FeatureMatrix extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final planItems = [...(plans.valueOrNull ?? const <SubscriptionPlan>[])]..sort(_planSort);
+    final planItems = [...(plans.valueOrNull ?? const <SubscriptionPlan>[])]
+      ..sort(_planSort);
     final addonItems = addons.valueOrNull ?? const <AddonCatalogItem>[];
 
     return Card(
@@ -284,7 +295,8 @@ class _FeatureMatrix extends StatelessWidget {
               const _EmptyCatalogState(
                 icon: Icons.table_chart_outlined,
                 title: 'No plans to compare yet',
-                message: 'Seed or create subscription plans to populate the SaaS tier matrix.',
+                message:
+                    'Seed or create subscription plans to populate the SaaS tier matrix.',
               )
             else
               LayoutBuilder(
@@ -303,7 +315,9 @@ class _FeatureMatrix extends StatelessWidget {
                             width: cardWidth,
                             child: _FeaturePlanCard(
                               plan: plan,
-                              activeAddons: addonItems.where((addon) => addon.isActive).toList(),
+                              activeAddons: addonItems
+                                  .where((addon) => addon.isActive)
+                                  .toList(),
                             ),
                           ),
                         )
@@ -343,7 +357,11 @@ class _FeaturePlanCard extends StatelessWidget {
       return feature == null || !entitlements.isEnabled(feature);
     });
     final enterpriseExtras = plan.code == 'enterprise'
-        ? const ['Custom Integrations', 'Priority Support', 'Dedicated Onboarding']
+        ? const [
+            'Custom Integrations',
+            'Priority Support',
+            'Dedicated Onboarding'
+          ]
         : const <String>[];
 
     return Container(
@@ -379,24 +397,31 @@ class _FeaturePlanCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(plan.description ?? plan.code),
           const SizedBox(height: 14),
-          _MatrixLine(label: 'Monthly', value: monthly?.priceLabel ?? 'Not set'),
+          _MatrixLine(
+              label: 'Monthly', value: monthly?.priceLabel ?? 'Not set'),
           _MatrixLine(label: 'Annual', value: annual?.priceLabel ?? 'Not set'),
           _MatrixLine(label: 'Limits', value: plan.limitLabel),
           _MatrixLine(
             label: 'Stripe',
-            value: plan.hasStripeReadyPrice ? 'At least one price ready' : 'Price IDs pending',
+            value: plan.hasStripeReadyPrice
+                ? 'At least one price ready'
+                : 'Price IDs pending',
             isWarning: !plan.hasStripeReadyPrice,
           ),
           const Divider(height: 24),
           Text('Included', style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 8),
-          ...includedFeatures.map((feature) => _FeatureBullet(label: feature.label, included: true)),
-          ...enterpriseExtras.map((feature) => _FeatureBullet(label: feature, included: true)),
+          ...includedFeatures.map((feature) =>
+              _FeatureBullet(label: feature.label, included: true)),
+          ...enterpriseExtras
+              .map((feature) => _FeatureBullet(label: feature, included: true)),
           if (optionalAddons.isNotEmpty) ...[
             const SizedBox(height: 10),
-            Text('Optional add-ons', style: Theme.of(context).textTheme.titleSmall),
+            Text('Optional add-ons',
+                style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
-            ...optionalAddons.map((addon) => _FeatureBullet(label: addon.name, included: false)),
+            ...optionalAddons.map(
+                (addon) => _FeatureBullet(label: addon.name, included: false)),
           ],
         ],
       ),
@@ -405,7 +430,8 @@ class _FeaturePlanCard extends StatelessWidget {
 }
 
 class _MatrixLine extends StatelessWidget {
-  const _MatrixLine({required this.label, required this.value, this.isWarning = false});
+  const _MatrixLine(
+      {required this.label, required this.value, this.isWarning = false});
 
   final String label;
   final String value;
@@ -465,15 +491,10 @@ class _FeatureBullet extends StatelessWidget {
   }
 }
 
-List<TenantFeature> _includedFeatures(TenantSubscriptionEntitlements entitlements) {
+List<TenantFeature> _includedFeatures(
+    TenantSubscriptionEntitlements entitlements) {
   const features = [
-    ...TenantSubscriptionEntitlements.coreFeatures,
-    TenantFeature.dispatchDashboard,
-    TenantFeature.advancedTicketManagement,
-    TenantFeature.analyticsDashboard,
-    TenantFeature.roleManagement,
-    TenantFeature.customBranding,
-    TenantFeature.apiAccess,
+    ...TenantSubscriptionEntitlements.customerPortalFeatures,
   ];
   return features.where(entitlements.isEnabled).toList(growable: false);
 }
@@ -540,7 +561,8 @@ class _PlansSection extends StatelessWidget {
                   return _EmptyCatalogState(
                     icon: Icons.workspace_premium_outlined,
                     title: 'No subscription plans yet',
-                    message: 'Create your first plan so tenants can be assigned pricing during onboarding.',
+                    message:
+                        'Create your first plan so tenants can be assigned pricing during onboarding.',
                     actionLabel: 'Add Plan',
                     onPressed: () => showDialog<Object?>(
                       context: context,
@@ -574,7 +596,9 @@ class _PlanTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       child: ExpansionTile(
         leading: Icon(
-          plan.isAssignable ? Icons.workspace_premium_outlined : Icons.pending_actions_outlined,
+          plan.isAssignable
+              ? Icons.workspace_premium_outlined
+              : Icons.pending_actions_outlined,
         ),
         title: Wrap(
           spacing: 8,
@@ -646,7 +670,8 @@ class _PlanTile extends StatelessWidget {
             _EmptyCatalogState(
               icon: Icons.sell_outlined,
               title: 'No prices configured',
-              message: 'Add at least one active price before this plan can be assigned to a tenant.',
+              message:
+                  'Add at least one active price before this plan can be assigned to a tenant.',
               actionLabel: 'Add Price',
               onPressed: () => showDialog<Object?>(
                 context: context,
@@ -726,7 +751,8 @@ class _AddonsSection extends StatelessWidget {
                   return _EmptyCatalogState(
                     icon: Icons.extension_outlined,
                     title: 'No add-ons yet',
-                    message: 'Create optional add-ons like SMS notifications when tenants are ready for upgrades.',
+                    message:
+                        'Create optional add-ons like SMS notifications when tenants are ready for upgrades.',
                     actionLabel: 'Add Add-On',
                     onPressed: () => showDialog<Object?>(
                       context: context,
@@ -740,7 +766,9 @@ class _AddonsSection extends StatelessWidget {
                       .map(
                         (addon) => ListTile(
                           leading: Icon(
-                            addon.isActive ? Icons.add_circle_outline : Icons.extension_off_outlined,
+                            addon.isActive
+                                ? Icons.add_circle_outline
+                                : Icons.extension_off_outlined,
                           ),
                           title: Wrap(
                             spacing: 8,
@@ -841,7 +869,8 @@ class _EmptyCatalogState extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+                Text(title,
+                    style: const TextStyle(fontWeight: FontWeight.w800)),
                 const SizedBox(height: 4),
                 Text(message),
                 if (actionLabel != null && onPressed != null) ...[
@@ -884,8 +913,10 @@ class _PlanDialogState extends ConsumerState<PlanDialog> {
     final plan = widget.plan;
     _name = TextEditingController(text: plan?.name ?? '');
     _description = TextEditingController(text: plan?.description ?? '');
-    _hoaCount = TextEditingController(text: plan?.includedHoaCount?.toString() ?? '');
-    _residentCount = TextEditingController(text: plan?.includedResidentCount?.toString() ?? '');
+    _hoaCount =
+        TextEditingController(text: plan?.includedHoaCount?.toString() ?? '');
+    _residentCount = TextEditingController(
+        text: plan?.includedResidentCount?.toString() ?? '');
     _status = plan?.status ?? 'draft';
   }
 
@@ -926,7 +957,9 @@ class _PlanDialogState extends ConsumerState<PlanDialog> {
                 children: [
                   Expanded(child: _numberField(_hoaCount, 'Included HOAs')),
                   const SizedBox(width: 16),
-                  Expanded(child: _numberField(_residentCount, 'Included residents')),
+                  Expanded(
+                      child:
+                          _numberField(_residentCount, 'Included residents')),
                 ],
               ),
               const SizedBox(height: 16),
@@ -938,7 +971,8 @@ class _PlanDialogState extends ConsumerState<PlanDialog> {
                   DropdownMenuItem(value: 'active', child: Text('Active')),
                   DropdownMenuItem(value: 'archived', child: Text('Archived')),
                 ],
-                onChanged: (value) => setState(() => _status = value ?? _status),
+                onChanged: (value) =>
+                    setState(() => _status = value ?? _status),
               ),
               if (state.hasError) ...[
                 const SizedBox(height: 16),
@@ -982,16 +1016,17 @@ class _PlanDialogState extends ConsumerState<PlanDialog> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    final ok = await ref.read(commercialCatalogControllerProvider.notifier).savePlan(
-          planId: widget.plan?.id,
-          input: PlanInput(
-            name: _name.text,
-            description: _description.text,
-            includedHoaCount: int.tryParse(_hoaCount.text),
-            includedResidentCount: int.tryParse(_residentCount.text),
-            status: _status,
-          ),
-        );
+    final ok =
+        await ref.read(commercialCatalogControllerProvider.notifier).savePlan(
+              planId: widget.plan?.id,
+              input: PlanInput(
+                name: _name.text,
+                description: _description.text,
+                includedHoaCount: int.tryParse(_hoaCount.text),
+                includedResidentCount: int.tryParse(_residentCount.text),
+                status: _status,
+              ),
+            );
     if (ok && mounted) Navigator.of(context).pop(true);
   }
 }
@@ -1021,7 +1056,8 @@ class _PriceDialogState extends ConsumerState<PriceDialog> {
     _interval = price?.billingInterval ?? 'monthly';
     _status = price?.status ?? 'active';
     _amount = TextEditingController(
-      text: price == null ? '' : (price.unitAmountCents / 100).toStringAsFixed(2),
+      text:
+          price == null ? '' : (price.unitAmountCents / 100).toStringAsFixed(2),
     );
     _currency = TextEditingController(text: price?.currency ?? 'usd');
     _stripePriceId = TextEditingController(text: price?.stripePriceId ?? '');
@@ -1049,19 +1085,25 @@ class _PriceDialogState extends ConsumerState<PriceDialog> {
             children: [
               TextFormField(
                 controller: _amount,
-                decoration: const InputDecoration(labelText: 'Amount', prefixText: r'$'),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                validator: (value) => _amountToCents(value) == null ? 'Enter a valid amount.' : null,
+                decoration: const InputDecoration(
+                    labelText: 'Amount', prefixText: r'$'),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                validator: (value) => _amountToCents(value) == null
+                    ? 'Enter a valid amount.'
+                    : null,
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 value: _interval,
-                decoration: const InputDecoration(labelText: 'Billing interval'),
+                decoration:
+                    const InputDecoration(labelText: 'Billing interval'),
                 items: const [
                   DropdownMenuItem(value: 'monthly', child: Text('Monthly')),
                   DropdownMenuItem(value: 'annual', child: Text('Annual')),
                 ],
-                onChanged: (value) => setState(() => _interval = value ?? _interval),
+                onChanged: (value) =>
+                    setState(() => _interval = value ?? _interval),
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -1073,7 +1115,8 @@ class _PriceDialogState extends ConsumerState<PriceDialog> {
                 controller: _stripePriceId,
                 decoration: const InputDecoration(
                   labelText: 'Stripe price ID',
-                  helperText: 'Optional until Stripe is connected. Required before live checkout.',
+                  helperText:
+                      'Optional until Stripe is connected. Required before live checkout.',
                 ),
               ),
               const SizedBox(height: 16),
@@ -1084,7 +1127,8 @@ class _PriceDialogState extends ConsumerState<PriceDialog> {
                   DropdownMenuItem(value: 'active', child: Text('Active')),
                   DropdownMenuItem(value: 'archived', child: Text('Archived')),
                 ],
-                onChanged: (value) => setState(() => _status = value ?? _status),
+                onChanged: (value) =>
+                    setState(() => _status = value ?? _status),
               ),
               if (state.hasError) ...[
                 const SizedBox(height: 16),
@@ -1120,17 +1164,18 @@ class _PriceDialogState extends ConsumerState<PriceDialog> {
     if (!_formKey.currentState!.validate()) return;
     final cents = _amountToCents(_amount.text);
     if (cents == null) return;
-    final ok = await ref.read(commercialCatalogControllerProvider.notifier).savePrice(
-          planId: widget.planId,
-          priceId: widget.price?.id,
-          input: PriceInput(
-            billingInterval: _interval,
-            unitAmountCents: cents,
-            status: _status,
-            currency: _currency.text,
-            stripePriceId: _stripePriceId.text,
-          ),
-        );
+    final ok =
+        await ref.read(commercialCatalogControllerProvider.notifier).savePrice(
+              planId: widget.planId,
+              priceId: widget.price?.id,
+              input: PriceInput(
+                billingInterval: _interval,
+                unitAmountCents: cents,
+                status: _status,
+                currency: _currency.text,
+                stripePriceId: _stripePriceId.text,
+              ),
+            );
     if (ok && mounted) Navigator.of(context).pop(true);
   }
 }
@@ -1181,7 +1226,8 @@ class _AddonDialogState extends ConsumerState<AddonDialog> {
               TextFormField(
                 controller: _name,
                 decoration: const InputDecoration(labelText: 'Add-on name'),
-                validator: (value) => value == null || value.trim().isEmpty ? 'Required.' : null,
+                validator: (value) =>
+                    value == null || value.trim().isEmpty ? 'Required.' : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -1198,7 +1244,8 @@ class _AddonDialogState extends ConsumerState<AddonDialog> {
                   DropdownMenuItem(value: 'active', child: Text('Active')),
                   DropdownMenuItem(value: 'archived', child: Text('Archived')),
                 ],
-                onChanged: (value) => setState(() => _status = value ?? _status),
+                onChanged: (value) =>
+                    setState(() => _status = value ?? _status),
               ),
               if (state.hasError) ...[
                 const SizedBox(height: 16),
@@ -1226,14 +1273,15 @@ class _AddonDialogState extends ConsumerState<AddonDialog> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    final ok = await ref.read(commercialCatalogControllerProvider.notifier).saveAddon(
-          addonId: widget.addon?.id,
-          input: AddonInput(
-            name: _name.text,
-            description: _description.text,
-            status: _status,
-          ),
-        );
+    final ok =
+        await ref.read(commercialCatalogControllerProvider.notifier).saveAddon(
+              addonId: widget.addon?.id,
+              input: AddonInput(
+                name: _name.text,
+                description: _description.text,
+                status: _status,
+              ),
+            );
     if (ok && mounted) Navigator.of(context).pop(true);
   }
 }

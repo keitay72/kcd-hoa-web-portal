@@ -65,12 +65,12 @@ class VerifiedResidentAddress {
 
   String get portalLabel {
     if (tenantName != null && tenantName!.trim().isNotEmpty) {
-      return '$tenantName HOA Portal';
+      return '$tenantName Customer Portal';
     }
     if (tenantCode != null && tenantCode!.trim().isNotEmpty) {
-      return '$tenantCode HOA Portal';
+      return '$tenantCode Customer Portal';
     }
-    return 'HOA Portal';
+    return 'Customer Portal';
   }
 
   String get singleLine {

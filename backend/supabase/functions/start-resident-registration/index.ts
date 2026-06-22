@@ -40,9 +40,9 @@ Deno.serve(async (request) => {
   const fullName = payload.fullName?.trim();
   const addressId = payload.addressId?.trim();
 
-  if (!tenantCode || !userId || !email || !fullName || !addressId) {
+  if (!tenantCode || !userId || !email || !addressId) {
     return jsonResponse({
-      error: "Tenant, user, name, email, and address are required",
+      error: "Tenant, user, email, and address are required",
     }, 400);
   }
 
@@ -59,33 +59,26 @@ Deno.serve(async (request) => {
   if (tenantError) return jsonResponse({ error: tenantError.message }, 500);
   if (!tenant) return jsonResponse({ error: "Tenant not found" }, 404);
 
-  const { data: address, error: addressError } = await supabase
-    .from("hoa_addresses")
-    .select("id, hoa_id, is_active, hoa_communities!inner(tenant_id)")
+  const { data: serviceLocation, error: locationError } = await supabase
+    .from("service_locations")
+    .select(
+      "id, customer_account_id, status, customer_accounts!inner(tenant_id)",
+    )
     .eq("id", addressId)
-    .eq("is_active", true)
-    .eq("hoa_communities.tenant_id", tenant.id)
+    .eq("status", "active")
+    .eq("customer_accounts.tenant_id", tenant.id)
     .maybeSingle();
 
-  if (addressError) return jsonResponse({ error: addressError.message }, 500);
-  if (!address) {
+  if (locationError) return jsonResponse({ error: locationError.message }, 500);
+  if (!serviceLocation) {
     return jsonResponse({ error: "Address not found in this portal" }, 404);
   }
-
-  const { data: activationRequired, error: activationSettingError } =
-    await supabase
-      .rpc("resident_activation_code_required", { _hoa_id: address.hoa_id });
-
-  if (activationSettingError) {
-    return jsonResponse({ error: activationSettingError.message }, 500);
-  }
-
-  const activationCodeRequired = activationRequired !== false;
+  const activationCodeRequired = false;
 
   const { error: profileError } = await supabase.from("profiles").upsert({
     id: userId,
     email,
-    full_name: fullName,
+    full_name: fullName || null,
     status: "active",
   }, { onConflict: "id" });
 
@@ -102,20 +95,51 @@ Deno.serve(async (request) => {
     return jsonResponse({ error: profileError.message }, 500);
   }
 
-  const { data: verification, error: verificationError } = await supabase
-    .from("residency_verifications")
-    .upsert({
-      user_id: userId,
-      hoa_id: address.hoa_id,
-      address_id: address.id,
-      address_verified: false,
-      email_verified: false,
-      activation_code_verified: !activationCodeRequired,
-      status: "pending",
-      verified_at: null,
-    }, { onConflict: "user_id,hoa_id" })
-    .select("id, user_id, hoa_id, address_id, status")
-    .single();
+  const verificationPayload = {
+    tenant_id: tenant.id,
+    user_id: userId,
+    email,
+    customer_account_id: serviceLocation.customer_account_id,
+    service_location_id: serviceLocation.id,
+    verification_method: "address_email",
+    address_matched: true,
+    email_verified: false,
+    status: "email_sent",
+    verified_at: null,
+    metadata: {
+      signup_source: "customer_portal",
+      full_name: fullName || null,
+    },
+  };
+
+  const { data: existingVerification, error: existingVerificationError } =
+    await supabase
+      .from("customer_verifications")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("service_location_id", serviceLocation.id)
+      .in("status", ["pending", "email_sent", "verified"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+  if (existingVerificationError) {
+    return jsonResponse({ error: existingVerificationError.message }, 500);
+  }
+
+  const verificationQuery = existingVerification
+    ? supabase
+        .from("customer_verifications")
+        .update(verificationPayload)
+        .eq("id", existingVerification.id)
+    : supabase
+        .from("customer_verifications")
+        .insert(verificationPayload);
+
+  const { data: verification, error: verificationError } =
+    await verificationQuery
+      .select("id, user_id, customer_account_id, service_location_id, status")
+      .single();
 
   if (verificationError) {
     return jsonResponse({ error: verificationError.message }, 500);

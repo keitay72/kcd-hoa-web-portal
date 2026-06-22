@@ -1,6 +1,8 @@
-# Stripe Setup for HOA Portal SaaS Billing
+# Stripe Setup for Customer Portal SaaS Billing
 
 The platform is Stripe-ready, but safe to run without Stripe keys. Until secrets are configured, checkout and sync actions return clear `Stripe is not configured` messages.
+
+Billing direction is defined in `docs/adr/0002-customer-portal-saas-product-direction.md`: paid tiers should include the full core customer portal feature set and differ by active customer/service-location capacity, with overages for modest growth above a tier.
 
 ## Required Stripe Values
 
