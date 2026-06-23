@@ -87,7 +87,8 @@ class _AddressFormDialogState extends ConsumerState<AddressFormDialog> {
     final hoas = ref.watch(hoaListProvider);
 
     return AlertDialog(
-      title: Text(_isEditing ? 'Edit Address' : 'Create Address'),
+      title:
+          Text(_isEditing ? 'Edit Service Address' : 'Create Service Address'),
       content: SizedBox(
         width: 640,
         child: hoas.when(
@@ -96,14 +97,13 @@ class _AddressFormDialogState extends ConsumerState<AddressFormDialog> {
             padding: EdgeInsets.all(24),
             child: Center(child: CircularProgressIndicator()),
           ),
-          error: (error, _) => Text('Unable to load HOA communities: $error'),
+          error: (error, _) => Text('Unable to load communities: $error'),
         ),
       ),
       actions: [
         TextButton(
-          onPressed: formState.isLoading
-              ? null
-              : () => Navigator.of(context).pop(),
+          onPressed:
+              formState.isLoading ? null : () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
         FilledButton.icon(
@@ -114,7 +114,7 @@ class _AddressFormDialogState extends ConsumerState<AddressFormDialog> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Icon(Icons.save_outlined),
-          label: Text(_isEditing ? 'Save changes' : 'Create address'),
+          label: Text(_isEditing ? 'Save changes' : 'Create service address'),
         ),
       ],
     );
@@ -134,7 +134,7 @@ class _AddressFormDialogState extends ConsumerState<AddressFormDialog> {
             DropdownButtonFormField<String>(
               value: _hoaId,
               decoration: const InputDecoration(
-                labelText: 'HOA Community',
+                labelText: 'Community',
                 border: OutlineInputBorder(),
               ),
               items: hoas
@@ -284,7 +284,8 @@ class _AddressFormDialogState extends ConsumerState<AddressFormDialog> {
 
     final controller = ref.read(addressFormControllerProvider.notifier);
     final result = _isEditing
-        ? await controller.updateAddress(id: widget.initialValue!.id, input: input)
+        ? await controller.updateAddress(
+            id: widget.initialValue!.id, input: input)
         : await controller.create(input);
 
     if (result != null && mounted) {

@@ -1,7 +1,9 @@
 {
     "name": "Customer Portal",
     "short_name": "Customer Portal",
-    "start_url": ".",
+    "id": "/",
+    "start_url": "/",
+    "scope": "/",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",

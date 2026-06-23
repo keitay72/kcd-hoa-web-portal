@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../address_registry/data/address_repository.dart';
 import '../../address_registry/domain/address_normalizer.dart';
+import '../../address_registry/domain/hoa_address.dart';
+import '../../address_registry/domain/hoa_address_input.dart';
+import '../../address_registry/presentation/address_providers.dart';
 import '../../hoa_management/domain/hoa_community.dart';
 import '../domain/customer_account.dart';
 import '../domain/customer_account_input.dart';
@@ -279,6 +283,7 @@ class _ServiceAddressFormDialogState
 
     try {
       final account = await _resolveAccount();
+      final legacyAddress = await _resolveLegacyAddress();
       final input = ServiceLocationInput(
         customerAccountId: account.id,
         line1: _line1Controller.text,
@@ -287,8 +292,8 @@ class _ServiceAddressFormDialogState
         state: _stateController.text,
         postalCode: _postalCodeController.text,
         status: ServiceLocationStatus.active,
-        externalLocationRef: _externalRefController.text,
-        metadata: _serviceLocationMetadata(),
+        externalLocationRef: _externalLocationRef(legacyAddress),
+        metadata: _serviceLocationMetadata(legacyAddress),
       );
 
       final location = await ref
@@ -307,6 +312,39 @@ class _ServiceAddressFormDialogState
         });
       }
     }
+  }
+
+  Future<HoaAddress?> _resolveLegacyAddress() async {
+    if (!_belongsToCommunity || _communityId == null) return null;
+
+    final input = HoaAddressInput(
+      hoaId: _communityId!,
+      line1: _line1Controller.text,
+      line2: _line2Controller.text,
+      city: _cityController.text,
+      state: _stateController.text,
+      postalCode: _postalCodeController.text,
+      isActive: true,
+    );
+    final repository = ref.read(addressRepositoryProvider);
+
+    try {
+      return await repository.create(input);
+    } on DuplicateHoaAddressException {
+      final existingAddresses = await repository.list(hoaId: input.hoaId);
+      return existingAddresses.firstWhere(
+        (address) => address.normalizedKey == input.normalizedKey,
+        orElse: () => throw StateError(
+          'A matching community address exists, but it could not be loaded.',
+        ),
+      );
+    }
+  }
+
+  String _externalLocationRef(HoaAddress? legacyAddress) {
+    final typedValue = _externalRefController.text.trim();
+    if (typedValue.isNotEmpty) return typedValue;
+    return legacyAddress?.id ?? '';
   }
 
   Future<CustomerAccount> _resolveAccount() async {
@@ -348,9 +386,12 @@ class _ServiceAddressFormDialogState
         );
   }
 
-  Map<String, dynamic> _serviceLocationMetadata() {
+  Map<String, dynamic> _serviceLocationMetadata(HoaAddress? legacyAddress) {
     if (!_belongsToCommunity || _communityId == null) return const {};
-    return {'legacy_hoa_id': _communityId};
+    return {
+      'legacy_hoa_id': _communityId,
+      if (legacyAddress != null) 'legacy_address_id': legacyAddress.id,
+    };
   }
 
   String _singleLineAddress() {

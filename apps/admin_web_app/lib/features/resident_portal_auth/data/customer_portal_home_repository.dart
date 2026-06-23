@@ -38,6 +38,7 @@ class SupabaseCustomerPortalHomeRepository
     return CustomerPortalTicketDetail(
       ticket: _ticket(data['ticket'] as Map<String, dynamic>),
       events: _list(data['events'], _ticketEvent),
+      attachments: _list(data['attachments'], _ticketAttachment),
     );
   }
 
@@ -128,6 +129,30 @@ class SupabaseCustomerPortalHomeRepository
       oldStatus: json['oldStatus'] as String? ?? json['old_status'] as String?,
       newStatus: json['newStatus'] as String? ?? json['new_status'] as String?,
       note: json['note'] as String?,
+      createdAt:
+          _date(json['createdAt'] ?? json['created_at']) ?? DateTime.now(),
+    );
+  }
+
+  CustomerPortalTicketAttachment _ticketAttachment(Map<String, dynamic> json) {
+    final rawFileSize = json['fileSize'] ?? json['file_size'] ?? 0;
+    return CustomerPortalTicketAttachment(
+      id: json['id'] as String,
+      ticketId: json['ticketId'] as String? ?? json['ticket_id'] as String,
+      uploadedBy: json['uploadedBy'] as String? ??
+          json['uploaded_by'] as String? ??
+          'Service team',
+      storagePath:
+          json['storagePath'] as String? ?? json['storage_path'] as String,
+      mimeType: json['mimeType'] as String? ??
+          json['mime_type'] as String? ??
+          'application/octet-stream',
+      fileSize: rawFileSize is int
+          ? rawFileSize
+          : int.tryParse(rawFileSize.toString()) ?? 0,
+      scanStatus: json['scanStatus'] as String? ??
+          json['scan_status'] as String? ??
+          'pending',
       createdAt:
           _date(json['createdAt'] ?? json['created_at']) ?? DateTime.now(),
     );

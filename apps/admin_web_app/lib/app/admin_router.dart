@@ -45,6 +45,7 @@ import '../features/hoa_manager_experience/presentation/hoa_tickets_page.dart';
 import '../features/schedules_admin/presentation/service_schedule_detail_page.dart';
 import '../features/schedules_admin/presentation/service_schedule_list_page.dart';
 import '../features/resident_portal_auth/presentation/activation_code_verification_page.dart';
+import '../features/resident_portal_auth/presentation/customer_document_view_page.dart';
 import '../features/resident_portal_auth/presentation/customer_portal_home_page.dart';
 import '../features/resident_portal_auth/presentation/customer_service_issue_page.dart';
 import '../features/resident_portal_auth/presentation/customer_ticket_detail_page.dart';
@@ -68,6 +69,9 @@ import '../features/verification_admin/presentation/resident_verification_detail
 import '../features/verification_admin/presentation/resident_verification_list_page.dart';
 
 final currentAdminRoleProvider = currentAdminContextSummaryProvider;
+
+const _residentLastTenantCodeKey = 'resident_last_tenant_code';
+const _residentPendingTenantCodeKey = 'resident_pending_tenant_code';
 
 final adminRouterProvider = Provider<GoRouter>((ref) {
   String resolveHomeRoute() {
@@ -161,6 +165,11 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
         return null;
       }
 
+      if (_isInstalledAppLaunchRoute(path)) {
+        final residentLaunchRoute = _residentLaunchRouteFromStorage(user);
+        if (residentLaunchRoute != null) return residentLaunchRoute;
+      }
+
       if (path == '/') {
         return user == null ? '/sign-in' : resolveHomeRoute();
       }
@@ -180,15 +189,18 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
 
         if (segments.length == 2) {
           final tenantCode = segments[1];
+          _rememberResidentTenantCode(tenantCode);
           return '/portal/$tenantCode/register';
         }
 
         if (segments.length >= 3) {
           final tenantCode = segments[1];
           final leaf = segments[2];
+          _rememberResidentTenantCode(tenantCode);
 
           const protectedPortalLeaves = {
             'activation-code',
+            'documents',
             'home',
             'service-issue',
             'service-issues',
@@ -204,6 +216,15 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
 
       if (user == null) {
         return isSignIn || isPasswordFlow ? null : '/sign-in';
+      }
+
+      final access = ref.read(adminAccessProvider).asData?.value;
+      if (access != null && !_hasAdminPortalAccess(access)) {
+        final residentRoute = _residentHomeRouteFromStorage();
+        if (residentRoute != null && !isResidentPortal) {
+          return residentRoute;
+        }
+        if (path.startsWith('/admin')) return '/sign-in';
       }
 
       if (isSignIn && !isPasswordFlow) {
@@ -292,6 +313,14 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
         name: 'customerPortalHome',
         builder: (context, state) => CustomerPortalHomePage(
           tenantCode: state.pathParameters['tenantCode']!,
+        ),
+      ),
+      GoRoute(
+        path: '/portal/:tenantCode/documents/:documentId',
+        name: 'customerPortalDocument',
+        builder: (context, state) => CustomerDocumentViewPage(
+          tenantCode: state.pathParameters['tenantCode']!,
+          documentId: state.pathParameters['documentId']!,
         ),
       ),
       GoRoute(
@@ -633,6 +662,62 @@ bool _routeContainsAuthPayload(String route) {
       query.contains('error_description=');
 }
 
+bool _hasAdminPortalAccess(AdminAccess access) {
+  if (access.hasGlobalRoleAssignment || access.hasTenantRoleAssignment) {
+    return true;
+  }
+
+  return access.hoaRoles.any(
+    (role) => role.code == 'hoa_manager' || role.code == 'hoa_board',
+  );
+}
+
+String? _residentHomeRouteFromStorage() {
+  final tenantCode = html.window.localStorage[_residentLastTenantCodeKey] ??
+      html.window.localStorage[_residentPendingTenantCodeKey];
+  final normalized = tenantCode?.trim();
+  if (normalized == null || normalized.isEmpty) return null;
+  return '/portal/$normalized/home';
+}
+
+String? _residentLaunchRouteFromStorage(User? user) {
+  final tenantCode = html.window.localStorage[_residentLastTenantCodeKey] ??
+      html.window.localStorage[_residentPendingTenantCodeKey];
+  final normalized = tenantCode?.trim();
+  if (normalized == null || normalized.isEmpty) return null;
+  return user == null
+      ? '/portal/$normalized/sign-in'
+      : '/portal/$normalized/home';
+}
+
+bool _isInstalledAppLaunchRoute(String path) {
+  if (path != '/' && path != '/sign-in') return false;
+
+  final standaloneDisplay = html.window
+      .matchMedia(
+        '(display-mode: standalone)',
+      )
+      .matches;
+  final fullscreenDisplay = html.window
+      .matchMedia(
+        '(display-mode: fullscreen)',
+      )
+      .matches;
+  final minimalUiDisplay = html.window
+      .matchMedia(
+        '(display-mode: minimal-ui)',
+      )
+      .matches;
+
+  return standaloneDisplay || fullscreenDisplay || minimalUiDisplay;
+}
+
+void _rememberResidentTenantCode(String tenantCode) {
+  final normalized = tenantCode.trim();
+  if (normalized.isEmpty || normalized == 'confirm-email') return;
+  html.window.localStorage[_residentLastTenantCodeKey] = normalized;
+}
+
 String _devHomeRoute() {
   final storedContext = html.window.localStorage['selected_admin_context_id'];
   if (storedContext?.startsWith('hoa:') ?? false) {
@@ -645,7 +730,7 @@ Future<void> forceAdminSignOut(WidgetRef ref) async {
   if (devSecurityBypassEnabled) {
     setSelectedAdminContextId(ref, null);
     html.window.localStorage.remove('resident_email_callback_payload');
-    html.window.localStorage.remove('resident_pending_tenant_code');
+    html.window.localStorage.remove(_residentPendingTenantCodeKey);
     html.window.localStorage.remove('resident_pending_email');
     ref.invalidate(adminAccessProvider);
     ref.invalidate(availableAdminContextsProvider);
@@ -661,7 +746,7 @@ Future<void> forceAdminSignOut(WidgetRef ref) async {
 
   setSelectedAdminContextId(ref, null);
   html.window.localStorage.remove('resident_email_callback_payload');
-  html.window.localStorage.remove('resident_pending_tenant_code');
+  html.window.localStorage.remove(_residentPendingTenantCodeKey);
   html.window.localStorage.remove('resident_pending_email');
   await ref.read(supabaseClientProvider).auth.signOut();
   ref.invalidate(authStateProvider);
@@ -740,10 +825,18 @@ class AdminNavigationShell extends ConsumerStatefulWidget {
 class _AdminNavigationShellState extends ConsumerState<AdminNavigationShell> {
   bool _isCollapsed = false;
   bool _isSigningOut = false;
+  bool _isRedirectingNonAdmin = false;
 
   @override
   Widget build(BuildContext context) {
     if (_isSigningOut) {
+      return const Scaffold(body: SizedBox.expand());
+    }
+
+    final accessState = ref.watch(adminAccessProvider);
+    final access = accessState.asData?.value;
+    if (access != null && !_hasAdminPortalAccess(access)) {
+      _redirectNonAdminSession();
       return const Scaffold(body: SizedBox.expand());
     }
 
@@ -803,6 +896,24 @@ class _AdminNavigationShellState extends ConsumerState<AdminNavigationShell> {
     setState(() => _isSigningOut = true);
     await forceAdminSignOut(ref);
     if (mounted) context.go('/sign-in');
+  }
+
+  void _redirectNonAdminSession() {
+    if (_isRedirectingNonAdmin) return;
+    _isRedirectingNonAdmin = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+
+      final residentRoute = _residentHomeRouteFromStorage();
+      if (residentRoute != null) {
+        context.go(residentRoute);
+        return;
+      }
+
+      await forceAdminSignOut(ref);
+      if (mounted) context.go('/sign-in');
+    });
   }
 }
 
@@ -911,7 +1022,7 @@ class _AdminContextSelector extends ConsumerWidget {
         return Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
           child: DropdownButtonFormField<String>(
-            value: items.any((item) => item.id == activeId)
+            initialValue: items.any((item) => item.id == activeId)
                 ? activeId
                 : items.first.id,
             isExpanded: true,

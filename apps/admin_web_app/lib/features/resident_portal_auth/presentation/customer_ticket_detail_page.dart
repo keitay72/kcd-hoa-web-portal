@@ -1,3 +1,6 @@
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -83,6 +86,8 @@ class _TicketDetailContent extends StatelessWidget {
         const SizedBox(height: 24),
         _TicketSummaryCard(ticket: ticket),
         const SizedBox(height: 16),
+        _AttachmentCard(attachments: snapshot.attachments),
+        const SizedBox(height: 16),
         _TimelineCard(events: snapshot.events),
       ],
     );
@@ -110,7 +115,10 @@ class _TicketSummaryCard extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),
-                _StatusChip(status: ticket.statusLabel),
+                _StatusChip(
+                  status: ticket.status,
+                  label: ticket.statusLabel,
+                ),
               ],
             ),
             const SizedBox(height: 12),
@@ -126,6 +134,113 @@ class _TicketSummaryCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _AttachmentCard extends ConsumerWidget {
+  const _AttachmentCard({required this.attachments});
+
+  final List<CustomerPortalTicketAttachment> attachments;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Attachments',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            if (attachments.isEmpty)
+              const Text('No attachments are available for this issue.')
+            else
+              ...attachments.map(
+                (attachment) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(_attachmentIcon(attachment.mimeType)),
+                  title: Text(attachment.fileName),
+                  subtitle: Text(
+                    [
+                      attachment.uploadedBy,
+                      attachment.fileSizeLabel,
+                      _formatDateTime(attachment.createdAt),
+                    ].join(' · '),
+                  ),
+                  trailing: Wrap(
+                    spacing: 8,
+                    children: [
+                      IconButton(
+                        tooltip: 'Open',
+                        onPressed: () => _openAttachment(
+                          context,
+                          ref,
+                          attachment,
+                          download: false,
+                        ),
+                        icon: const Icon(Icons.open_in_new),
+                      ),
+                      IconButton(
+                        tooltip: 'Download',
+                        onPressed: () => _openAttachment(
+                          context,
+                          ref,
+                          attachment,
+                          download: true,
+                        ),
+                        icon: const Icon(Icons.download_outlined),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openAttachment(
+    BuildContext context,
+    WidgetRef ref,
+    CustomerPortalTicketAttachment attachment, {
+    required bool download,
+  }) async {
+    try {
+      final url = await ref
+          .read(supabaseClientProvider)
+          .storage
+          .from('ticket-attachments')
+          .createSignedUrl(attachment.storagePath, 60 * 10);
+      if (download) {
+        final separator = url.contains('?') ? '&' : '?';
+        final downloadUrl =
+            '$url${separator}download=${Uri.encodeComponent(attachment.fileName)}';
+        html.AnchorElement(href: downloadUrl)
+          ..download = attachment.fileName
+          ..target = '_blank'
+          ..click();
+      } else {
+        html.window.open(url, '_blank');
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('We could not open this attachment.'),
+          ),
+        );
+      }
+    }
+  }
+
+  IconData _attachmentIcon(String mimeType) {
+    if (mimeType.startsWith('image/')) return Icons.image_outlined;
+    if (mimeType == 'application/pdf') return Icons.picture_as_pdf_outlined;
+    return Icons.attach_file;
   }
 }
 
@@ -168,9 +283,15 @@ class _TimelineItem extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.only(top: 2),
-            child: Icon(Icons.radio_button_checked, size: 18),
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Icon(
+              Icons.radio_button_checked,
+              size: 18,
+              color: _ticketStatusStyle(
+                event.newStatus ?? event.oldStatus ?? 'unknown',
+              ).foreground,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -219,19 +340,77 @@ class _DetailRow extends StatelessWidget {
 }
 
 class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.status});
+  const _StatusChip({
+    required this.status,
+    required this.label,
+  });
 
   final String status;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final style = _ticketStatusStyle(status);
     return Chip(
-      label: Text(status),
-      backgroundColor: colorScheme.primaryContainer,
-      labelStyle: TextStyle(color: colorScheme.onPrimaryContainer),
+      avatar: Icon(Icons.circle, size: 10, color: style.foreground),
+      label: Text(label),
+      backgroundColor: style.background,
+      side: BorderSide(color: style.border),
+      labelStyle: TextStyle(color: style.foreground),
     );
   }
+}
+
+class _TicketStatusStyle {
+  const _TicketStatusStyle({
+    required this.background,
+    required this.border,
+    required this.foreground,
+  });
+
+  final Color background;
+  final Color border;
+  final Color foreground;
+}
+
+_TicketStatusStyle _ticketStatusStyle(String status) {
+  return switch (status) {
+    'new' => const _TicketStatusStyle(
+        background: Color(0xFFE8F5E9),
+        border: Color(0xFFA5D6A7),
+        foreground: Color(0xFF1B5E20),
+      ),
+    'open' => const _TicketStatusStyle(
+        background: Color(0xFFE3F2FD),
+        border: Color(0xFF90CAF9),
+        foreground: Color(0xFF0D47A1),
+      ),
+    'assigned' => const _TicketStatusStyle(
+        background: Color(0xFFEDE7F6),
+        border: Color(0xFFB39DDB),
+        foreground: Color(0xFF4527A0),
+      ),
+    'in_progress' => const _TicketStatusStyle(
+        background: Color(0xFFFFF8E1),
+        border: Color(0xFFFFD54F),
+        foreground: Color(0xFF7A4F00),
+      ),
+    'resolved' => const _TicketStatusStyle(
+        background: Color(0xFFE0F2F1),
+        border: Color(0xFF80CBC4),
+        foreground: Color(0xFF004D40),
+      ),
+    'closed' => const _TicketStatusStyle(
+        background: Color(0xFFECEFF1),
+        border: Color(0xFFB0BEC5),
+        foreground: Color(0xFF37474F),
+      ),
+    _ => const _TicketStatusStyle(
+        background: Color(0xFFF5F5F5),
+        border: Color(0xFFBDBDBD),
+        foreground: Color(0xFF424242),
+      ),
+  };
 }
 
 class _TicketDetailError extends StatelessWidget {

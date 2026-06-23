@@ -37,7 +37,7 @@ class HoaDetailPage extends ConsumerWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'HOA Detail',
+                    'Community Detail',
                     style: Theme.of(context).textTheme.headlineMedium,
                   ),
                 ),
@@ -48,7 +48,7 @@ class HoaDetailPage extends ConsumerWidget {
                     builder: (_) => HoaFormDialog(initialValue: item),
                   ),
                   icon: const Icon(Icons.edit_outlined),
-                  label: const Text('Edit HOA'),
+                  label: const Text('Edit Community'),
                 ),
               ],
             ),
@@ -67,11 +67,11 @@ class HoaDetailPage extends ConsumerWidget {
                     const SizedBox(height: 20),
                     _DetailRow(label: 'ID', value: item.id),
                     _DetailRow(label: 'Tenant ID', value: item.tenantId),
-                    _DetailRow(label: 'Code', value: item.code),
+                    _DetailRow(label: 'Community Code', value: item.code),
                     _DetailRow(label: 'Name', value: item.name),
                     _DetailRow(label: 'Status', value: item.status.name),
                     _DetailRow(
-                      label: 'Activation codes',
+                      label: 'Customer verification',
                       value: item.residentActivationCodeSettingLabel
                           .replaceFirst('Activation codes: ', ''),
                     ),
@@ -93,7 +93,7 @@ class HoaDetailPage extends ConsumerWidget {
         ),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(
-          child: Text('Unable to load HOA: $error'),
+          child: Text('Unable to load community: $error'),
         ),
       ),
     );
@@ -133,12 +133,12 @@ class _HoaStaffSection extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'HOA Staff',
+                        'Community Contacts',
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Invite and manage HOA managers and board members for $hoaName.',
+                        'Invite and manage community contacts for $hoaName.',
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                     ],
@@ -149,7 +149,7 @@ class _HoaStaffSection extends ConsumerWidget {
                   onPressed:
                       canInvite ? () => _openInviteDialog(context, ref) : null,
                   icon: const Icon(Icons.person_add_alt_1_outlined),
-                  label: const Text('Add HOA User'),
+                  label: const Text('Add Community User'),
                 ),
               ],
             ),
@@ -166,7 +166,7 @@ class _HoaStaffSection extends ConsumerWidget {
                           Theme.of(context).colorScheme.surfaceContainerLowest,
                     ),
                     child: const Text(
-                      'No HOA users have been assigned yet. Add an HOA manager or board member to get started.',
+                      'No community contacts have been assigned yet. Add a community manager or board member to get started.',
                     ),
                   );
                 }
@@ -188,7 +188,7 @@ class _HoaStaffSection extends ConsumerWidget {
               ),
               error: (error, _) => Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text('Unable to load HOA staff: $error'),
+                child: Text('Unable to load community contacts: $error'),
               ),
             ),
           ],
@@ -232,7 +232,7 @@ class _HoaStaffSection extends ConsumerWidget {
     final result = await showDialog<bool>(
       context: context,
       builder: (_) => InviteUserDialog(
-        title: 'Add HOA User - $hoaName',
+        title: 'Add Community User - $hoaName',
         initialCategory: 'hoa',
         initialRoleCode: allowedRoleCodes.length == 1
             ? allowedRoleCodes.first

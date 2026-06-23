@@ -153,6 +153,7 @@ class _ResidentSignInPageState extends ConsumerState<ResidentSignInPage> {
 
   void _openResidentPortal() {
     final target = '/portal/${widget.tenantCode}/home';
+    html.window.localStorage['resident_last_tenant_code'] = widget.tenantCode;
     html.window.history.replaceState(
       null,
       'Customer Portal',

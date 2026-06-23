@@ -1,3 +1,6 @@
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +12,9 @@ import '../../../core/rbac/rbac_providers.dart';
 import '../../../core/supabase/supabase_provider.dart';
 import '../../resident_portal_auth/presentation/resident_auth_providers.dart';
 import '../../resident_portal_auth/presentation/resident_portal_labels.dart';
+
+const _residentLastTenantCodeKey = 'resident_last_tenant_code';
+const _residentPendingTenantCodeKey = 'resident_pending_tenant_code';
 
 class SignInPage extends ConsumerStatefulWidget {
   const SignInPage({this.tenantCode, super.key});
@@ -34,7 +40,7 @@ class _SignInPageState extends ConsumerState<SignInPage> {
 
   @override
   Widget build(BuildContext context) {
-    final tenantCode = widget.tenantCode;
+    final tenantCode = _effectiveTenantCode();
     final portalTitle = tenantCode == null
         ? 'Customer Portal'
         : customerPortalTitle(tenantCode);
@@ -172,7 +178,7 @@ class _SignInPageState extends ConsumerState<SignInPage> {
       return _adminHomeRoute(adminAccess);
     }
 
-    final tenantCode = widget.tenantCode ??
+    final tenantCode = _effectiveTenantCode() ??
         await ref
             .read(residentPortalAuthRepositoryProvider)
             .resolveTenantCodeForCurrentResident();
@@ -186,6 +192,14 @@ class _SignInPageState extends ConsumerState<SignInPage> {
     throw StateError(
       'This account does not have management access or verified customer access yet.',
     );
+  }
+
+  String? _effectiveTenantCode() {
+    final tenantCode = widget.tenantCode ??
+        html.window.localStorage[_residentLastTenantCodeKey] ??
+        html.window.localStorage[_residentPendingTenantCodeKey];
+    final normalized = tenantCode?.trim();
+    return normalized == null || normalized.isEmpty ? null : normalized;
   }
 
   String _adminHomeRoute(AdminAccess access) {

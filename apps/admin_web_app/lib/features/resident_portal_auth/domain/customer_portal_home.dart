@@ -194,10 +194,12 @@ class CustomerPortalTicketDetail {
   const CustomerPortalTicketDetail({
     required this.ticket,
     required this.events,
+    required this.attachments,
   });
 
   final CustomerPortalTicket ticket;
   final List<CustomerPortalTicketEvent> events;
+  final List<CustomerPortalTicketAttachment> attachments;
 }
 
 class CustomerPortalTicketEvent {
@@ -231,4 +233,41 @@ class CustomerPortalTicketEvent {
   }
 
   String get displayNote => (note ?? '').trim();
+}
+
+class CustomerPortalTicketAttachment {
+  const CustomerPortalTicketAttachment({
+    required this.id,
+    required this.ticketId,
+    required this.uploadedBy,
+    required this.storagePath,
+    required this.mimeType,
+    required this.fileSize,
+    required this.scanStatus,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String ticketId;
+  final String uploadedBy;
+  final String storagePath;
+  final String mimeType;
+  final int fileSize;
+  final String scanStatus;
+  final DateTime createdAt;
+
+  String get fileName {
+    final parts = storagePath.split('/');
+    return parts.isEmpty ? storagePath : parts.last;
+  }
+
+  String get fileSizeLabel {
+    if (fileSize >= 1024 * 1024) {
+      return '${(fileSize / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+    if (fileSize >= 1024) {
+      return '${(fileSize / 1024).toStringAsFixed(1)} KB';
+    }
+    return '$fileSize bytes';
+  }
 }

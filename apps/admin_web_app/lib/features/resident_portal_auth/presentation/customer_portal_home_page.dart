@@ -70,33 +70,195 @@ class _HomeContent extends StatelessWidget {
   Widget build(BuildContext context) {
     return RefreshIndicator(
       onRefresh: onRefresh,
-      child: ListView(
-        padding: const EdgeInsets.all(24),
+      child: ColoredBox(
+        color: const Color(0xFFF7FAF6),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+          children: [
+            _PortalOverview(
+              home: snapshot,
+            ),
+            const SizedBox(height: 18),
+            _CommunityOverview(home: snapshot),
+            const SizedBox(height: 16),
+            _ScheduleSection(schedules: snapshot.schedules),
+            const SizedBox(height: 16),
+            _AnnouncementSection(announcements: snapshot.announcements),
+            const SizedBox(height: 16),
+            _DocumentSection(
+              tenantCode: tenantCode,
+              documents: snapshot.documents,
+            ),
+            const SizedBox(height: 16),
+            _BoardSection(boardMembers: snapshot.boardMembers),
+            const SizedBox(height: 16),
+            _ServiceIssueSection(
+              tenantCode: tenantCode,
+              tickets: snapshot.recentTickets,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PortalOverview extends StatelessWidget {
+  const _PortalOverview({
+    required this.home,
+  });
+
+  final CustomerPortalHome home;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final serviceAddress = home.serviceLocation?.singleLine;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFE9F4EF),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFD1E3D9)),
+      ),
+      padding: const EdgeInsets.all(22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Welcome to your customer portal',
-            style: Theme.of(context).textTheme.headlineMedium,
+          Wrap(
+            spacing: 18,
+            runSpacing: 16,
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 760),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Welcome back',
+                      style: textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    if (serviceAddress != null)
+                      _InfoPill(
+                        icon: Icons.location_on_outlined,
+                        label: serviceAddress,
+                      )
+                    else
+                      Text(
+                        home.account.displayName,
+                        style: textTheme.bodyLarge,
+                      ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            snapshot.serviceLocation?.singleLine ??
-                snapshot.account.displayName,
-            style: Theme.of(context).textTheme.bodyLarge,
+          const SizedBox(height: 20),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              _OverviewStat(
+                icon: Icons.event_repeat_outlined,
+                label: 'Schedules',
+                value: home.schedules.length.toString(),
+                color: const Color(0xFF2F6F9F),
+              ),
+              _OverviewStat(
+                icon: Icons.description_outlined,
+                label: 'Documents',
+                value: home.documents.length.toString(),
+                color: const Color(0xFF6F4AA8),
+              ),
+              _OverviewStat(
+                icon: Icons.confirmation_number_outlined,
+                label: 'Service issues',
+                value: home.recentTickets.length.toString(),
+                color: const Color(0xFF8A5A00),
+              ),
+            ],
           ),
-          const SizedBox(height: 24),
-          _CommunityOverview(home: snapshot),
-          const SizedBox(height: 16),
-          _ScheduleSection(schedules: snapshot.schedules),
-          const SizedBox(height: 16),
-          _AnnouncementSection(announcements: snapshot.announcements),
-          const SizedBox(height: 16),
-          _DocumentSection(documents: snapshot.documents),
-          const SizedBox(height: 16),
-          _BoardSection(boardMembers: snapshot.boardMembers),
-          const SizedBox(height: 16),
-          _ServiceIssueSection(
-            tenantCode: tenantCode,
-            tickets: snapshot.recentTickets,
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoPill extends StatelessWidget {
+  const _InfoPill({
+    required this.icon,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.76),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFC8DBD0)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: const Color(0xFF256D46)),
+          const SizedBox(width: 8),
+          Flexible(child: Text(label)),
+        ],
+      ),
+    );
+  }
+}
+
+class _OverviewStat extends StatelessWidget {
+  const _OverviewStat({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 190,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.8),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFD8E5DD)),
+      ),
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: [
+          _IconBubble(icon: icon, color: color),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                Text(label),
+              ],
+            ),
           ),
         ],
       ),
@@ -112,17 +274,35 @@ class _CommunityOverview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      elevation: 0,
+      color: Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              home.hasCommunityInfo ? 'Community' : 'Account',
-              style: Theme.of(context).textTheme.titleLarge,
+            Row(
+              children: [
+                _IconBubble(
+                  icon: home.hasCommunityInfo
+                      ? Icons.apartment_outlined
+                      : Icons.account_circle_outlined,
+                  color: const Color(0xFF00897B),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    home.hasCommunityInfo ? 'Community' : 'Account',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(home.account.displayName),
+            const SizedBox(height: 14),
+            Text(
+              home.account.displayName,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             if (home.account.accountNumber != null) ...[
               const SizedBox(height: 4),
               Text('Account ${home.account.accountNumber}'),
@@ -149,12 +329,14 @@ class _ScheduleSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return _SectionCard(
       title: 'Service schedule',
+      icon: Icons.event_repeat_outlined,
+      accentColor: const Color(0xFF2F6F9F),
       emptyText: 'No community service schedules are published yet.',
       children: schedules
           .map(
-            (schedule) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.event_repeat_outlined),
+            (schedule) => _PortalListTile(
+              icon: Icons.event_repeat_outlined,
+              iconColor: const Color(0xFF2F6F9F),
               title: Text(schedule.serviceTypeLabel),
               subtitle: Text(
                 [
@@ -182,12 +364,14 @@ class _AnnouncementSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return _SectionCard(
       title: 'Announcements',
+      icon: Icons.campaign_outlined,
+      accentColor: const Color(0xFFA43D62),
       emptyText: 'No announcements are published right now.',
       children: announcements
           .map(
-            (announcement) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.campaign_outlined),
+            (announcement) => _PortalListTile(
+              icon: Icons.campaign_outlined,
+              iconColor: const Color(0xFFA43D62),
               title: Text(announcement.title),
               subtitle: Text(announcement.body),
             ),
@@ -198,22 +382,32 @@ class _AnnouncementSection extends StatelessWidget {
 }
 
 class _DocumentSection extends StatelessWidget {
-  const _DocumentSection({required this.documents});
+  const _DocumentSection({
+    required this.tenantCode,
+    required this.documents,
+  });
 
+  final String tenantCode;
   final List<CustomerPortalDocument> documents;
 
   @override
   Widget build(BuildContext context) {
     return _SectionCard(
       title: 'Documents',
+      icon: Icons.description_outlined,
+      accentColor: const Color(0xFF6F4AA8),
       emptyText: 'No community documents are available yet.',
       children: documents
           .map(
-            (document) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.description_outlined),
+            (document) => _PortalListTile(
+              icon: Icons.description_outlined,
+              iconColor: const Color(0xFF6F4AA8),
               title: Text(document.title),
               subtitle: Text(document.category),
+              trailing: const Icon(Icons.open_in_new),
+              onTap: () => context.go(
+                '/portal/$tenantCode/documents/${document.id}',
+              ),
             ),
           )
           .toList(),
@@ -230,12 +424,14 @@ class _BoardSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return _SectionCard(
       title: 'Community contacts',
+      icon: Icons.groups_outlined,
+      accentColor: const Color(0xFF4E6E2E),
       emptyText: 'No board or community contacts have been published yet.',
       children: boardMembers
           .map(
-            (member) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.groups_outlined),
+            (member) => _PortalListTile(
+              icon: Icons.groups_outlined,
+              iconColor: const Color(0xFF4E6E2E),
               title: Text(member.name),
               subtitle: Text(
                 [
@@ -267,6 +463,8 @@ class _ServiceIssueSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return _SectionCard(
       title: 'Service issues',
+      icon: Icons.confirmation_number_outlined,
+      accentColor: const Color(0xFF8A5A00),
       emptyText: 'No service issues have been submitted yet.',
       trailing: FilledButton.icon(
         onPressed: () => context.go('/portal/$tenantCode/service-issue'),
@@ -275,19 +473,21 @@ class _ServiceIssueSection extends StatelessWidget {
       ),
       children: tickets
           .map(
-            (ticket) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(_ticketIcon(ticket.type)),
+            (ticket) => _PortalListTile(
+              icon: _ticketIcon(ticket.type),
+              iconColor: const Color(0xFF8A5A00),
               title: Text(ticket.subject),
               subtitle: Text(
                 [
                   ticket.typeLabel,
-                  ticket.statusLabel,
                   'Ticket ${ticket.shortId}',
                   _formatDate(ticket.createdAt),
                 ].join(' · '),
               ),
-              trailing: _TicketStatusChip(status: ticket.statusLabel),
+              trailing: _TicketStatusChip(
+                status: ticket.status,
+                label: ticket.statusLabel,
+              ),
               onTap: () => context.go(
                 '/portal/$tenantCode/service-issues/${ticket.id}',
               ),
@@ -327,31 +527,93 @@ class _ServiceIssueSection extends StatelessWidget {
 }
 
 class _TicketStatusChip extends StatelessWidget {
-  const _TicketStatusChip({required this.status});
+  const _TicketStatusChip({
+    required this.status,
+    required this.label,
+  });
 
   final String status;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final style = _ticketStatusStyle(status);
     return Chip(
-      label: Text(status),
+      avatar: Icon(Icons.circle, size: 10, color: style.foreground),
+      label: Text(label),
       visualDensity: VisualDensity.compact,
-      backgroundColor: colorScheme.primaryContainer,
-      labelStyle: TextStyle(color: colorScheme.onPrimaryContainer),
+      backgroundColor: style.background,
+      side: BorderSide(color: style.border),
+      labelStyle: TextStyle(color: style.foreground),
     );
   }
+}
+
+class _TicketStatusStyle {
+  const _TicketStatusStyle({
+    required this.background,
+    required this.border,
+    required this.foreground,
+  });
+
+  final Color background;
+  final Color border;
+  final Color foreground;
+}
+
+_TicketStatusStyle _ticketStatusStyle(String status) {
+  return switch (status) {
+    'new' => const _TicketStatusStyle(
+        background: Color(0xFFE8F5E9),
+        border: Color(0xFFA5D6A7),
+        foreground: Color(0xFF1B5E20),
+      ),
+    'open' => const _TicketStatusStyle(
+        background: Color(0xFFE3F2FD),
+        border: Color(0xFF90CAF9),
+        foreground: Color(0xFF0D47A1),
+      ),
+    'assigned' => const _TicketStatusStyle(
+        background: Color(0xFFEDE7F6),
+        border: Color(0xFFB39DDB),
+        foreground: Color(0xFF4527A0),
+      ),
+    'in_progress' => const _TicketStatusStyle(
+        background: Color(0xFFFFF8E1),
+        border: Color(0xFFFFD54F),
+        foreground: Color(0xFF7A4F00),
+      ),
+    'resolved' => const _TicketStatusStyle(
+        background: Color(0xFFE0F2F1),
+        border: Color(0xFF80CBC4),
+        foreground: Color(0xFF004D40),
+      ),
+    'closed' => const _TicketStatusStyle(
+        background: Color(0xFFECEFF1),
+        border: Color(0xFFB0BEC5),
+        foreground: Color(0xFF37474F),
+      ),
+    _ => const _TicketStatusStyle(
+        background: Color(0xFFF5F5F5),
+        border: Color(0xFFBDBDBD),
+        foreground: Color(0xFF424242),
+      ),
+  };
 }
 
 class _SectionCard extends StatelessWidget {
   const _SectionCard({
     required this.title,
+    required this.icon,
+    required this.accentColor,
     required this.emptyText,
     required this.children,
     this.trailing,
   });
 
   final String title;
+  final IconData icon;
+  final Color accentColor;
   final String emptyText;
   final List<Widget> children;
   final Widget? trailing;
@@ -359,6 +621,8 @@ class _SectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      elevation: 0,
+      color: Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -366,6 +630,8 @@ class _SectionCard extends StatelessWidget {
           children: [
             Row(
               children: [
+                _IconBubble(icon: icon, color: accentColor),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     title,
@@ -375,11 +641,71 @@ class _SectionCard extends StatelessWidget {
                 if (trailing != null) trailing!,
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             if (children.isEmpty) Text(emptyText) else ...children,
           ],
         ),
       ),
+    );
+  }
+}
+
+class _PortalListTile extends StatelessWidget {
+  const _PortalListTile({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    this.subtitle,
+    this.trailing,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final Widget title;
+  final Widget? subtitle;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Material(
+        color: const Color(0xFFF7FAF6),
+        borderRadius: BorderRadius.circular(8),
+        child: ListTile(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          leading: _IconBubble(icon: icon, color: iconColor),
+          title: title,
+          subtitle: subtitle,
+          trailing: trailing,
+          onTap: onTap,
+        ),
+      ),
+    );
+  }
+}
+
+class _IconBubble extends StatelessWidget {
+  const _IconBubble({
+    required this.icon,
+    required this.color,
+  });
+
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Icon(icon, color: color, size: 22),
     );
   }
 }

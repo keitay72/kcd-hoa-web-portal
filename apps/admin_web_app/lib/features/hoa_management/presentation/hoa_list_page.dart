@@ -146,11 +146,11 @@ class _TenantActivationCodeDefaultCard extends ConsumerWidget {
               margin: EdgeInsets.zero,
               child: SwitchListTile(
                 secondary: const Icon(Icons.pin_outlined),
-                title: const Text('Tenant default: customer activation codes'),
+                title: const Text('Default customer verification'),
                 subtitle: Text(
                   requiresCodes
-                      ? 'Communities using tenant default require activation codes.'
-                      : 'Communities using tenant default bypass activation codes.',
+                      ? 'Communities using the default require activation codes before customer self-registration.'
+                      : 'Communities using the default allow address and email verification without activation codes.',
                 ),
                 value: requiresCodes,
                 onChanged: mutationState.isLoading
@@ -171,7 +171,7 @@ class _TenantActivationCodeDefaultCard extends ConsumerWidget {
                 dimension: 20,
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
-              title: Text('Loading tenant activation-code default'),
+              title: Text('Loading customer verification default'),
             ),
           ),
           error: (error, _) => Card(
@@ -181,8 +181,7 @@ class _TenantActivationCodeDefaultCard extends ConsumerWidget {
                 Icons.error_outline,
                 color: Theme.of(context).colorScheme.error,
               ),
-              title:
-                  const Text('Unable to load tenant activation-code default'),
+              title: const Text('Unable to load customer verification default'),
               subtitle: Text('$error'),
             ),
           ),

@@ -7,12 +7,12 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/rbac/admin_context.dart';
 import '../domain/ticket.dart';
+import '../domain/ticket_inputs.dart';
 import 'ticket_assignment_dialog.dart';
 import 'ticket_customer_update_dialog.dart';
 import 'ticket_internal_note_dialog.dart';
 import 'ticket_priority_dialog.dart';
 import 'ticket_providers.dart';
-import 'ticket_status_dialog.dart';
 
 class TicketDetailPage extends ConsumerWidget {
   const TicketDetailPage({required this.ticketId, super.key});
@@ -65,54 +65,49 @@ class _TicketDetailContent extends ConsumerWidget {
         LayoutBuilder(
           builder: (context, constraints) {
             if (constraints.maxWidth >= 1040) {
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              return Column(
                 children: [
-                  Expanded(flex: 3, child: _TicketSummaryCard(ticket: ticket)),
-                  const SizedBox(width: 20),
-                  Expanded(flex: 2, child: _TicketMetadataCard(ticket: ticket)),
-                ],
-              );
-            }
-
-            return Column(
-              children: [
-                _TicketSummaryCard(ticket: ticket),
-                const SizedBox(height: 20),
-                _TicketMetadataCard(ticket: ticket),
-              ],
-            );
-          },
-        ),
-        const SizedBox(height: 20),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            if (constraints.maxWidth >= 1040) {
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: _TicketTimeline(
-                      ticketId: ticket.id,
-                      showInternalNotes: canManageTicket,
-                    ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 4,
+                        child: _TicketWorkspaceCard(
+                          ticket: ticket,
+                          canManageTicket: canManageTicket,
+                        ),
+                      ),
+                      const SizedBox(width: 20),
+                      Expanded(
+                        flex: 2,
+                        child: _TicketMetadataCard(ticket: ticket),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 20),
-                  Expanded(
-                      flex: 2, child: _AttachmentViewer(ticketId: ticket.id)),
+                  const SizedBox(height: 20),
+                  _TicketTimeline(
+                    ticket: ticket,
+                    showInternalNotes: canManageTicket,
+                    canManageTicket: canManageTicket,
+                  ),
                 ],
               );
             }
 
             return Column(
               children: [
-                _TicketTimeline(
-                  ticketId: ticket.id,
-                  showInternalNotes: canManageTicket,
+                _TicketWorkspaceCard(
+                  ticket: ticket,
+                  canManageTicket: canManageTicket,
                 ),
                 const SizedBox(height: 20),
-                _AttachmentViewer(ticketId: ticket.id),
+                _TicketMetadataCard(ticket: ticket),
+                const SizedBox(height: 20),
+                _TicketTimeline(
+                  ticket: ticket,
+                  showInternalNotes: canManageTicket,
+                  canManageTicket: canManageTicket,
+                ),
               ],
             );
           },
@@ -120,6 +115,219 @@ class _TicketDetailContent extends ConsumerWidget {
       ],
     );
   }
+}
+
+class _TicketWorkspaceCard extends StatelessWidget {
+  const _TicketWorkspaceCard({
+    required this.ticket,
+    required this.canManageTicket,
+  });
+
+  final ServiceTicket ticket;
+  final bool canManageTicket;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final useColumns = constraints.maxWidth >= 720;
+            final details = _TicketDetailsSection(ticket: ticket);
+            final workflow = _TicketWorkflowSection(
+              ticket: ticket,
+              canManageTicket: canManageTicket,
+            );
+            final attachments = _InlineAttachmentSection(ticketId: ticket.id);
+
+            if (!useColumns) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  details,
+                  const SizedBox(height: 24),
+                  const Divider(height: 1),
+                  const SizedBox(height: 24),
+                  workflow,
+                  const SizedBox(height: 24),
+                  const Divider(height: 1),
+                  const SizedBox(height: 24),
+                  attachments,
+                ],
+              );
+            }
+
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(flex: 5, child: details),
+                const SizedBox(width: 28),
+                Expanded(
+                  flex: 4,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      workflow,
+                      const SizedBox(height: 24),
+                      const Divider(height: 1),
+                      const SizedBox(height: 20),
+                      attachments,
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _TicketDetailsSection extends StatelessWidget {
+  const _TicketDetailsSection({required this.ticket});
+
+  final ServiceTicket ticket;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Ticket Details', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 16),
+        _InfoRow(label: 'Subject', value: ticket.subject),
+        _InfoRow(label: 'Description', value: ticket.description),
+        _InfoRow(label: 'Type', value: ticket.type.label),
+        _InfoRow(
+          label: 'SLA',
+          value: '${ticket.slaState.label} - ${ticket.slaLabel}',
+        ),
+        _InfoRow(label: 'Age', value: ticket.ageLabel),
+      ],
+    );
+  }
+}
+
+class _TicketWorkflowSection extends StatelessWidget {
+  const _TicketWorkflowSection({
+    required this.ticket,
+    required this.canManageTicket,
+  });
+
+  final ServiceTicket ticket;
+  final bool canManageTicket;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Workflow', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 16),
+        _InlineStatusPicker(
+          ticket: ticket,
+          canManageTicket: canManageTicket,
+        ),
+        const Divider(height: 32),
+        _WorkflowRow(
+          icon: Icons.priority_high,
+          label: 'Priority',
+          value: ticket.priority.label,
+          accent: _priorityColor(ticket.priority),
+          actionLabel: 'Change',
+          enabled: canManageTicket,
+          onPressed: () => _openPriorityDialog(context, ticket),
+        ),
+        const Divider(height: 28),
+        _WorkflowRow(
+          icon: Icons.assignment_ind_outlined,
+          label: 'Assignment',
+          value: 'Route to CSR or dispatch',
+          accent: Theme.of(context).colorScheme.primary,
+          actionLabel: 'Assign',
+          enabled: canManageTicket,
+          onPressed: () => _openAssignDialog(context, ticket),
+        ),
+      ],
+    );
+  }
+}
+
+class _InlineAttachmentSection extends ConsumerWidget {
+  const _InlineAttachmentSection({required this.ticketId});
+
+  final String ticketId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final attachments = ref.watch(ticketAttachmentsProvider(ticketId));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.attach_file),
+            const SizedBox(width: 8),
+            Text('Attachments', style: Theme.of(context).textTheme.titleLarge),
+          ],
+        ),
+        const SizedBox(height: 12),
+        attachments.when(
+          data: (items) {
+            if (items.isEmpty) {
+              return const Text('No attachments uploaded.');
+            }
+            return Column(
+              children: items
+                  .map((item) => _AttachmentTile(attachment: item))
+                  .toList(),
+            );
+          },
+          loading: () => const LinearProgressIndicator(),
+          error: (error, _) => Text('Unable to load attachments: $error'),
+        ),
+      ],
+    );
+  }
+}
+
+Future<void> _openAssignDialog(BuildContext context, ServiceTicket ticket) {
+  return showDialog<void>(
+    context: context,
+    builder: (_) => TicketAssignmentDialog(ticket: ticket),
+  );
+}
+
+Future<void> _openPriorityDialog(BuildContext context, ServiceTicket ticket) {
+  return showDialog<void>(
+    context: context,
+    builder: (_) => TicketPriorityDialog(ticket: ticket),
+  );
+}
+
+Future<void> _openInternalNoteDialog(
+    BuildContext context, ServiceTicket ticket) {
+  return showDialog<void>(
+    context: context,
+    builder: (_) => TicketInternalNoteDialog(ticket: ticket),
+  );
+}
+
+Future<void> _openCustomerUpdateDialog(
+    BuildContext context, ServiceTicket ticket) {
+  return showDialog<void>(
+    context: context,
+    builder: (_) => TicketCustomerUpdateDialog(ticket: ticket),
+  );
+}
+
+String _backPath(WidgetRef ref) {
+  final activeContext = ref.read(activeAdminContextProvider).asData?.value;
+  return activeContext?.isHoa == true ? '/admin/hoa/tickets' : '/admin/tickets';
 }
 
 class _TicketHeader extends ConsumerWidget {
@@ -129,176 +337,195 @@ class _TicketHeader extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final canManageTicket = ref.watch(activeAdminAccessProvider).maybeWhen(
-          data: (value) => value.can('tickets.update'),
-          orElse: () => false,
-        );
-
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      alignment: WrapAlignment.spaceBetween,
-      crossAxisAlignment: WrapCrossAlignment.center,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 760),
+        TextButton.icon(
+          onPressed: () => context.go(_backPath(ref)),
+          icon: const Icon(Icons.arrow_back),
+          label: const Text('Back to Tickets'),
+        ),
+        const SizedBox(height: 8),
+        Text(ticket.subject, style: Theme.of(context).textTheme.headlineMedium),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _ToneChip(label: ticket.status.label, color: _statusColor(ticket)),
+            _ToneChip(
+              label: ticket.priority.label,
+              color: _priorityColor(ticket.priority),
+            ),
+            _ToneChip(
+              label: ticket.type.label,
+              color: Theme.of(context).colorScheme.secondary,
+            ),
+            _ToneChip(
+              label: ticket.slaLabel,
+              color: _slaColor(ticket.slaState),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _WorkflowRow extends StatelessWidget {
+  const _WorkflowRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.accent,
+    required this.actionLabel,
+    required this.enabled,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color accent;
+  final String actionLabel;
+  final bool enabled;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: accent.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: accent),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              TextButton.icon(
-                onPressed: () => context.go(_backPath(ref)),
-                icon: const Icon(Icons.arrow_back),
-                label: const Text('Back to Tickets'),
-              ),
-              const SizedBox(height: 8),
-              Text(ticket.subject,
-                  style: Theme.of(context).textTheme.headlineMedium),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  Chip(label: Text(ticket.status.label)),
-                  Chip(label: Text(ticket.priority.label)),
-                  Chip(label: Text(ticket.type.label)),
-                ],
-              ),
+              Text(label, style: theme.textTheme.labelLarge),
+              const SizedBox(height: 4),
+              Text(value, style: theme.textTheme.bodyLarge),
             ],
           ),
         ),
-        if (canManageTicket)
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              OutlinedButton.icon(
-                onPressed: () => _openAssignDialog(context, ticket),
-                icon: const Icon(Icons.assignment_ind_outlined),
-                label: const Text('Assign'),
+        TextButton(
+          onPressed: enabled ? onPressed : null,
+          child: Text(actionLabel),
+        ),
+      ],
+    );
+  }
+}
+
+class _InlineStatusPicker extends ConsumerWidget {
+  const _InlineStatusPicker({
+    required this.ticket,
+    required this.canManageTicket,
+  });
+
+  final ServiceTicket ticket;
+  final bool canManageTicket;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final commandState = ref.watch(ticketCommandProvider);
+    final isBusy = commandState.isLoading;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: _statusColor(ticket).withOpacity(0.12),
+                borderRadius: BorderRadius.circular(8),
               ),
-              OutlinedButton.icon(
-                onPressed: () => _openPriorityDialog(context, ticket),
-                icon: const Icon(Icons.priority_high),
-                label: const Text('Priority'),
+              child: Icon(Icons.rule_outlined, color: _statusColor(ticket)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Status', style: Theme.of(context).textTheme.labelLarge),
+                  const SizedBox(height: 4),
+                  Text(
+                    ticket.status.label,
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                ],
               ),
-              OutlinedButton.icon(
-                onPressed: () => _openInternalNoteDialog(context, ticket),
-                icon: const Icon(Icons.sticky_note_2_outlined),
-                label: const Text('Internal Note'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: TicketStatus.values.map((status) {
+            final selected = status == ticket.status;
+            final accent = _statusColorForStatus(status);
+            return ChoiceChip(
+              label: Text(status.label),
+              selected: selected,
+              showCheckmark: selected,
+              selectedColor: accent.withOpacity(0.18),
+              side: BorderSide(
+                color: selected ? accent : Theme.of(context).dividerColor,
               ),
-              OutlinedButton.icon(
-                onPressed: () => _openCustomerUpdateDialog(context, ticket),
-                icon: const Icon(Icons.forum_outlined),
-                label: const Text('Customer Update'),
+              labelStyle: TextStyle(
+                color: selected ? accent : null,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
               ),
-              OutlinedButton.icon(
-                onPressed: () => _runAutomation(context, ref, ticket),
-                icon: const Icon(Icons.auto_fix_high),
-                label: const Text('Run Automation'),
-              ),
-              FilledButton.icon(
-                onPressed: () => _openStatusDialog(context, ticket),
-                icon: const Icon(Icons.rule_outlined),
-                label: const Text('Update Status'),
-              ),
-            ],
+              onSelected: !canManageTicket || isBusy || selected
+                  ? null
+                  : (_) => _setStatus(context, ref, status),
+            );
+          }).toList(),
+        ),
+        if (commandState.hasError) ...[
+          const SizedBox(height: 10),
+          Text(
+            commandState.error.toString(),
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
           ),
+        ],
       ],
     );
   }
 
-  Future<void> _openStatusDialog(BuildContext context, ServiceTicket ticket) {
-    return showDialog<void>(
-      context: context,
-      builder: (_) => TicketStatusDialog(ticket: ticket),
-    );
-  }
-
-  Future<void> _openAssignDialog(BuildContext context, ServiceTicket ticket) {
-    return showDialog<void>(
-      context: context,
-      builder: (_) => TicketAssignmentDialog(ticket: ticket),
-    );
-  }
-
-  Future<void> _openPriorityDialog(BuildContext context, ServiceTicket ticket) {
-    return showDialog<void>(
-      context: context,
-      builder: (_) => TicketPriorityDialog(ticket: ticket),
-    );
-  }
-
-  Future<void> _openInternalNoteDialog(
-      BuildContext context, ServiceTicket ticket) {
-    return showDialog<void>(
-      context: context,
-      builder: (_) => TicketInternalNoteDialog(ticket: ticket),
-    );
-  }
-
-  Future<void> _openCustomerUpdateDialog(
-      BuildContext context, ServiceTicket ticket) {
-    return showDialog<void>(
-      context: context,
-      builder: (_) => TicketCustomerUpdateDialog(ticket: ticket),
-    );
-  }
-
-  Future<void> _runAutomation(
+  Future<void> _setStatus(
     BuildContext context,
     WidgetRef ref,
-    ServiceTicket ticket,
+    TicketStatus status,
   ) async {
-    final result = await ref
-        .read(ticketCommandProvider.notifier)
-        .runWorkflowAutomation(ticket);
+    final result = await ref.read(ticketCommandProvider.notifier).updateStatus(
+          TicketStatusUpdateInput(
+            ticket: ticket,
+            status: status,
+          ),
+        );
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
           result == null
-              ? 'Workflow automation failed.'
-              : 'Workflow automation completed.',
-        ),
-      ),
-    );
-  }
-
-  String _backPath(WidgetRef ref) {
-    final activeContext = ref.read(activeAdminContextProvider).asData?.value;
-    return activeContext?.isHoa == true
-        ? '/admin/hoa/tickets'
-        : '/admin/tickets';
-  }
-}
-
-class _TicketSummaryCard extends StatelessWidget {
-  const _TicketSummaryCard({required this.ticket});
-
-  final ServiceTicket ticket;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Ticket Details',
-                style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 16),
-            _InfoRow(label: 'Subject', value: ticket.subject),
-            _InfoRow(label: 'Description', value: ticket.description),
-            _InfoRow(label: 'Type', value: ticket.type.label),
-            _InfoRow(label: 'Priority', value: ticket.priority.label),
-            _InfoRow(label: 'Status', value: ticket.status.label),
-            _InfoRow(
-                label: 'SLA',
-                value: '${ticket.slaState.label} - ${ticket.slaLabel}'),
-            _InfoRow(label: 'Age', value: ticket.ageLabel),
-          ],
+              ? 'Unable to update status.'
+              : 'Ticket status changed to ${status.label}.',
         ),
       ),
     );
@@ -319,11 +546,11 @@ class _TicketMetadataCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Resident and HOA',
+            Text('Customer and Community',
                 style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 16),
-            _InfoRow(label: 'HOA', value: ticket.hoaLabel),
-            _InfoRow(label: 'Resident', value: ticket.requesterLabel),
+            _InfoRow(label: 'Community', value: ticket.hoaLabel),
+            _InfoRow(label: 'Customer', value: ticket.requesterLabel),
             _InfoRow(
                 label: 'Email',
                 value: ticket.requesterEmail ?? 'Not available'),
@@ -341,16 +568,18 @@ class _TicketMetadataCard extends StatelessWidget {
 
 class _TicketTimeline extends ConsumerWidget {
   const _TicketTimeline({
-    required this.ticketId,
+    required this.ticket,
     required this.showInternalNotes,
+    required this.canManageTicket,
   });
 
-  final String ticketId;
+  final ServiceTicket ticket;
   final bool showInternalNotes;
+  final bool canManageTicket;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final events = ref.watch(ticketEventsProvider(ticketId));
+    final events = ref.watch(ticketEventsProvider(ticket.id));
 
     return Card(
       margin: EdgeInsets.zero,
@@ -359,7 +588,34 @@ class _TicketTimeline extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Timeline', style: Theme.of(context).textTheme.titleLarge),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text('Timeline', style: Theme.of(context).textTheme.titleLarge),
+                if (canManageTicket)
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () =>
+                            _openInternalNoteDialog(context, ticket),
+                        icon: const Icon(Icons.sticky_note_2_outlined),
+                        label: const Text('Internal note'),
+                      ),
+                      FilledButton.tonalIcon(
+                        onPressed: () =>
+                            _openCustomerUpdateDialog(context, ticket),
+                        icon: const Icon(Icons.forum_outlined),
+                        label: const Text('Customer update'),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
             const SizedBox(height: 16),
             events.when(
               data: (items) {
@@ -455,45 +711,6 @@ class _TimelineItem extends StatelessWidget {
   }
 }
 
-class _AttachmentViewer extends ConsumerWidget {
-  const _AttachmentViewer({required this.ticketId});
-
-  final String ticketId;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final attachments = ref.watch(ticketAttachmentsProvider(ticketId));
-
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Attachments', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 16),
-            attachments.when(
-              data: (items) {
-                if (items.isEmpty) {
-                  return const Text('No attachments uploaded.');
-                }
-                return Column(
-                  children: items
-                      .map((item) => _AttachmentTile(attachment: item))
-                      .toList(),
-                );
-              },
-              loading: () => const LinearProgressIndicator(),
-              error: (error, _) => Text('Unable to load attachments: $error'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _AttachmentTile extends ConsumerWidget {
   const _AttachmentTile({required this.attachment});
 
@@ -529,6 +746,66 @@ class _AttachmentTile extends ConsumerWidget {
       );
     }
   }
+}
+
+class _ToneChip extends StatelessWidget {
+  const _ToneChip({
+    required this.label,
+    required this.color,
+  });
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        border: Border.all(color: color.withOpacity(0.35)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelLarge?.copyWith(color: color),
+      ),
+    );
+  }
+}
+
+Color _statusColor(ServiceTicket ticket) {
+  return _statusColorForStatus(ticket.status);
+}
+
+Color _statusColorForStatus(TicketStatus status) {
+  return switch (status) {
+    TicketStatus.newTicket => Colors.blueGrey,
+    TicketStatus.open => Colors.blue,
+    TicketStatus.assigned => Colors.indigo,
+    TicketStatus.inProgress => Colors.orange,
+    TicketStatus.waitingOnCustomer => Colors.purple,
+    TicketStatus.resolved => Colors.green,
+    TicketStatus.closed => Colors.grey,
+  };
+}
+
+Color _priorityColor(TicketPriority priority) {
+  return switch (priority) {
+    TicketPriority.low => Colors.blueGrey,
+    TicketPriority.normal => Colors.green,
+    TicketPriority.high => Colors.orange,
+    TicketPriority.urgent => Colors.red,
+  };
+}
+
+Color _slaColor(SlaState state) {
+  return switch (state) {
+    SlaState.onTrack => Colors.green,
+    SlaState.dueSoon => Colors.orange,
+    SlaState.breached => Colors.red,
+    SlaState.complete => Colors.blueGrey,
+  };
 }
 
 class _InfoRow extends StatelessWidget {
