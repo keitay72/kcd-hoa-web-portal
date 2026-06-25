@@ -23,10 +23,13 @@ class AnalyticsDashboardPage extends ConsumerWidget {
       data: (resolvedAccess) {
         final isTenantScoped = resolvedAccess.hasTenantRoleAssignment &&
             !resolvedAccess.hasGlobalRoleAssignment;
+        final showLaunchReadiness =
+            !isTenantScoped || resolvedAccess.isTenantAdmin;
         return dashboard.when(
           data: (snapshot) => _AnalyticsDashboardContent(
             snapshot: snapshot,
             isTenantScoped: isTenantScoped,
+            showLaunchReadiness: showLaunchReadiness,
           ),
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (error, _) => _DashboardError(error: error),
@@ -42,10 +45,12 @@ class _AnalyticsDashboardContent extends ConsumerWidget {
   const _AnalyticsDashboardContent({
     required this.snapshot,
     required this.isTenantScoped,
+    required this.showLaunchReadiness,
   });
 
   final AnalyticsDashboardSnapshot snapshot;
   final bool isTenantScoped;
+  final bool showLaunchReadiness;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -125,10 +130,11 @@ class _AnalyticsDashboardContent extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 28),
-              if (!isTenantScoped ||
-                  _tenantVisibleAttentionCount(
-                          snapshot.launchReadinessMetrics) >
-                      0) ...[
+              if (showLaunchReadiness &&
+                  (!isTenantScoped ||
+                      _tenantVisibleAttentionCount(
+                              snapshot.launchReadinessMetrics) >
+                          0)) ...[
                 _SectionHeader(
                   title: isTenantScoped
                       ? 'Portal Readiness'
@@ -665,30 +671,25 @@ class _OperationalMetricsPanel extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Team Coverage',
-                style: Theme.of(context).textTheme.titleLarge),
+            Text('Team Members', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 4),
-            const Text('Assigned tenant staff and community contacts.'),
+            const Text('Tenant staff and community contacts for this portal.'),
             const SizedBox(height: 18),
-            _CompactMetric(
+            _TeamMemberMetric(
                 label: 'Community Managers',
-                value: metrics.hoaManagers,
+                members: metrics.communityManagers,
                 icon: Icons.supervisor_account_outlined),
-            _CompactMetric(
+            _TeamMemberMetric(
                 label: 'Board Contacts',
-                value: metrics.hoaBoardMembers,
+                members: metrics.boardContacts,
                 icon: Icons.groups_outlined),
-            _CompactMetric(
+            _TeamMemberMetric(
                 label: 'Tenant Staff',
-                value: metrics.tenantStaff,
+                members: metrics.tenantStaffMembers,
                 icon: Icons.badge_outlined),
-            _CompactMetric(
-                label: 'Dispatch Users',
-                value: metrics.dispatchUsers,
-                icon: Icons.local_shipping_outlined),
-            _CompactMetric(
-                label: 'CSR Users',
-                value: metrics.csrUsers,
+            _TeamMemberMetric(
+                label: 'Customer Service',
+                members: metrics.customerServiceMembers,
                 icon: Icons.support_agent_outlined),
           ],
         ),
@@ -744,12 +745,15 @@ class _MetricBarRow extends StatelessWidget {
   }
 }
 
-class _CompactMetric extends StatelessWidget {
-  const _CompactMetric(
-      {required this.label, required this.value, required this.icon});
+class _TeamMemberMetric extends StatelessWidget {
+  const _TeamMemberMetric({
+    required this.label,
+    required this.members,
+    required this.icon,
+  });
 
   final String label;
-  final int value;
+  final List<TeamMemberSummary> members;
   final IconData icon;
 
   @override
@@ -758,10 +762,70 @@ class _CompactMetric extends StatelessWidget {
       contentPadding: EdgeInsets.zero,
       leading: CircleAvatar(child: Icon(icon)),
       title: Text(label),
-      trailing:
-          Text(value.toString(), style: Theme.of(context).textTheme.titleLarge),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            members.length.toString(),
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          if (members.isNotEmpty) ...[
+            const SizedBox(width: 4),
+            const Icon(Icons.chevron_right),
+          ],
+        ],
+      ),
+      onTap: members.isEmpty
+          ? null
+          : () => _showTeamMembersDialog(context, label, members),
     );
   }
+}
+
+void _showTeamMembersDialog(
+  BuildContext context,
+  String title,
+  List<TeamMemberSummary> members,
+) {
+  showDialog<void>(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: Text(title),
+        content: SizedBox(
+          width: 520,
+          child: ListView.separated(
+            shrinkWrap: true,
+            itemCount: members.length,
+            separatorBuilder: (_, __) => const Divider(height: 20),
+            itemBuilder: (context, index) {
+              final member = members[index];
+              final phone = member.phone;
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+                title: Text(member.name),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(member.role),
+                    if (member.email.isNotEmpty) Text(member.email),
+                    if (phone != null && phone.isNotEmpty) Text(phone),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      );
+    },
+  );
 }
 
 class _RecentActivityGrid extends StatelessWidget {

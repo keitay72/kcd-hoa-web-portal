@@ -208,19 +208,330 @@ class _QueueTicketList extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isCompact = constraints.maxWidth < 860;
-        return Column(
-          children: [
-            for (var index = 0; index < tickets.length; index += 1) ...[
-              _QueueTicketCard(
-                ticket: tickets[index],
-                isCompact: isCompact,
-              ),
-              if (index != tickets.length - 1) const SizedBox(height: 12),
-            ],
-          ],
+        return _TicketBoard(
+          tickets: tickets,
+          compact: constraints.maxWidth < 860,
         );
       },
+    );
+  }
+}
+
+class _TicketBoard extends StatelessWidget {
+  const _TicketBoard({
+    required this.tickets,
+    required this.compact,
+  });
+
+  final List<ServiceTicket> tickets;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final grouped = {
+      for (final status in TicketStatus.values)
+        status: tickets.where((ticket) => ticket.status == status).toList(),
+    };
+    final visibleStatuses = TicketStatus.values
+        .where((status) => grouped[status]!.isNotEmpty || !compact)
+        .toList();
+
+    if (compact) {
+      return Column(
+        children: [
+          for (var index = 0; index < visibleStatuses.length; index += 1) ...[
+            _TicketBoardColumn(
+              status: visibleStatuses[index],
+              tickets: grouped[visibleStatuses[index]]!,
+              compact: true,
+            ),
+            if (index != visibleStatuses.length - 1) const SizedBox(height: 16),
+          ],
+        ],
+      );
+    }
+
+    final viewportHeight = MediaQuery.sizeOf(context).height;
+    final boardHeight = (viewportHeight * 0.64).clamp(420.0, 760.0);
+
+    return Container(
+      height: boardHeight,
+      decoration: BoxDecoration(
+        color: Theme.of(context)
+            .colorScheme
+            .surfaceContainerHighest
+            .withOpacity(0.28),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Scrollbar(
+        thumbVisibility: true,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var index = 0; index < visibleStatuses.length; index += 1)
+                Padding(
+                  padding: EdgeInsets.only(
+                    right: index == visibleStatuses.length - 1 ? 0 : 16,
+                  ),
+                  child: SizedBox(
+                    width: 320,
+                    height: boardHeight - 32,
+                    child: _TicketBoardColumn(
+                      status: visibleStatuses[index],
+                      tickets: grouped[visibleStatuses[index]]!,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TicketBoardColumn extends StatelessWidget {
+  const _TicketBoardColumn({
+    required this.status,
+    required this.tickets,
+    this.compact = false,
+  });
+
+  final TicketStatus status;
+  final List<ServiceTicket> tickets;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = _statusStyle(context, status);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: style.background.withOpacity(0.42),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: style.foreground.withOpacity(0.16)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    status.label,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                ),
+                _CountPill(
+                  value: tickets.length,
+                  foreground: style.foreground,
+                  background: Theme.of(context).colorScheme.surface,
+                ),
+              ],
+            ),
+          ),
+          Container(height: 3, color: style.foreground),
+          if (tickets.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: Text(
+                'No tickets',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            )
+          else if (compact)
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                children: [
+                  for (var index = 0; index < tickets.length; index += 1) ...[
+                    _BoardTicketCard(ticket: tickets[index]),
+                    if (index != tickets.length - 1) const SizedBox(height: 8),
+                  ],
+                ],
+              ),
+            )
+          else
+            Expanded(
+              child: Scrollbar(
+                child: ListView.separated(
+                  padding: const EdgeInsets.all(10),
+                  itemCount: tickets.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (context, index) =>
+                      _BoardTicketCard(ticket: tickets[index]),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BoardTicketCard extends StatelessWidget {
+  const _BoardTicketCard({required this.ticket});
+
+  final ServiceTicket ticket;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final priorityStyle = _priorityStyle(context, ticket.priority);
+    final slaColor = _slaColor(context, ticket);
+
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => context.go(_ticketDetailPath(context, ticket.id)),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      '#${ticket.id.substring(0, 8)}',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    ticket.ageLabel,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                ticket.subject,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  _SoftBadge(
+                    label: ticket.priority.label,
+                    icon: Icons.flag_outlined,
+                    foreground: priorityStyle.foreground,
+                    background: priorityStyle.background,
+                  ),
+                  _SoftBadge(
+                    label: ticket.type.label,
+                    icon: Icons.category_outlined,
+                    foreground: theme.colorScheme.primary,
+                    background:
+                        theme.colorScheme.primaryContainer.withOpacity(0.45),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _MiniInfoLine(
+                icon: Icons.person_outline,
+                text: ticket.requesterLabel,
+              ),
+              const SizedBox(height: 6),
+              _MiniInfoLine(
+                icon: Icons.domain_outlined,
+                text: ticket.hoaLabel,
+              ),
+              const SizedBox(height: 6),
+              _MiniInfoLine(
+                icon: Icons.timer_outlined,
+                text: ticket.slaLabel,
+                color: slaColor,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniInfoLine extends StatelessWidget {
+  const _MiniInfoLine({
+    required this.icon,
+    required this.text,
+    this.color,
+  });
+
+  final IconData icon;
+  final String text;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = color ?? Theme.of(context).colorScheme.onSurfaceVariant;
+
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: foreground),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: foreground,
+                ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CountPill extends StatelessWidget {
+  const _CountPill({
+    required this.value,
+    required this.foreground,
+    required this.background,
+  });
+
+  final int value;
+  final Color foreground;
+  final Color background;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: foreground.withOpacity(0.2)),
+      ),
+      child: Text(
+        value.toString(),
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: foreground,
+              fontWeight: FontWeight.w800,
+            ),
+      ),
     );
   }
 }
@@ -244,7 +555,7 @@ class _QueueTicketCard extends StatelessWidget {
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () => context.go('/admin/tickets/${ticket.id}'),
+        onTap: () => context.go(_ticketDetailPath(context, ticket.id)),
         child: Padding(
           padding: const EdgeInsets.all(18),
           child: isCompact
@@ -464,7 +775,7 @@ class _TicketActionStrip extends StatelessWidget {
         Align(
           alignment: Alignment.centerRight,
           child: FilledButton.icon(
-            onPressed: () => context.go('/admin/tickets/${ticket.id}'),
+            onPressed: () => context.go(_ticketDetailPath(context, ticket.id)),
             icon: const Icon(Icons.open_in_new),
             label: const Text('Open Ticket'),
           ),
@@ -472,6 +783,24 @@ class _TicketActionStrip extends StatelessWidget {
       ],
     );
   }
+}
+
+String _ticketDetailPath(BuildContext context, String ticketId) {
+  final currentPath = GoRouterState.of(context).uri.path;
+  final source = switch (currentPath) {
+    '/admin/tickets/csr' => 'csr',
+    '/admin/tickets/dispatch' => 'dispatch',
+    '/admin/tickets/urgent' => 'urgent',
+    '/admin/tickets/aging' => 'aging',
+    _ => null,
+  };
+
+  if (source == null) return '/admin/tickets/$ticketId';
+
+  return Uri(
+    path: '/admin/tickets/$ticketId',
+    queryParameters: {'from': source},
+  ).toString();
 }
 
 class _SlaLine extends StatelessWidget {

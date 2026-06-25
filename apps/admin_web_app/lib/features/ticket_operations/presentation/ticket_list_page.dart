@@ -85,13 +85,13 @@ class _TicketListPageState extends ConsumerState<TicketListPage> {
                       OutlinedButton.icon(
                         onPressed: () => context.go('/admin/tickets/csr'),
                         icon: const Icon(Icons.support_agent),
-                        label: const Text('CSR Dashboard'),
+                        label: const Text('CSR Queue'),
                       ),
                     if (canOpenDispatchDashboard)
                       OutlinedButton.icon(
                         onPressed: () => context.go('/admin/tickets/dispatch'),
                         icon: const Icon(Icons.local_shipping_outlined),
-                        label: const Text('Dispatch Dashboard'),
+                        label: const Text('Dispatch Queue'),
                       ),
                   ],
                 ),
@@ -399,7 +399,8 @@ class _TicketTable extends StatelessWidget {
             ),
             title: Text(ticket.subject),
             subtitle: Text(
-              '${ticket.hoaLabel} - ${ticket.type.label} - ${ticket.requesterLabel} - ${ticket.slaLabel}',
+              '${ticket.hoaLabel} - ${ticket.type.label} - '
+              '${ticket.requesterLabel} - ${ticket.slaLabel}',
             ),
             trailing: Wrap(
               spacing: 8,

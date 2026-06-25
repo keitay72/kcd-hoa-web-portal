@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/rbac/admin_access.dart';
-import '../../../core/rbac/rbac_providers.dart';
+import '../../../core/rbac/admin_context.dart';
 import '../../../core/supabase/supabase_provider.dart';
 import '../domain/admin_user.dart';
 import 'assign_hoa_role_dialog.dart';
@@ -51,7 +51,7 @@ class _UserDetailContent extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final commandState = ref.watch(userCommandProvider);
-    final access = ref.watch(adminAccessProvider).valueOrNull;
+    final access = ref.watch(activeAdminAccessProvider).valueOrNull;
     final isInviteOnly = user.id.startsWith('invite:');
     final isCurrentUser = ref.watch(currentUserProvider)?.id == user.id;
     final canManageTarget = _canManageTargetUser(access, user);
@@ -59,7 +59,9 @@ class _UserDetailContent extends ConsumerWidget {
         !isInviteOnly && user.isActive && canManageTarget && !isCurrentUser;
     final canReactivate =
         !isInviteOnly && user.status == 'disabled' && canManageTarget;
-    final canAssignScopedRoles = !isInviteOnly && !user.hasGlobalRoles;
+    final canAssignScopedRoles = !isInviteOnly &&
+        !user.hasGlobalRoles &&
+        access?.can('roles.manage') == true;
     final showAccountActivity = user.latestInvite != null || !isInviteOnly;
 
     return ListView(
@@ -92,8 +94,9 @@ class _UserDetailContent extends ConsumerWidget {
               alignment: WrapAlignment.end,
               children: [
                 OutlinedButton.icon(
-                  onPressed:
-                      isInviteOnly ? null : () => _openEditDialog(context, ref),
+                  onPressed: isInviteOnly || !canManageTarget
+                      ? null
+                      : () => _openEditDialog(context, ref),
                   icon: const Icon(Icons.edit_outlined),
                   label: const Text('Edit User'),
                 ),
@@ -205,6 +208,32 @@ class _UserDetailContent extends ConsumerWidget {
     if (target.isPlatformOwner) return false;
     if (access?.isPlatformOwner == true) return true;
     if (access?.isPlatformAdmin == true) return !target.isPlatformAdmin;
+    if (access == null || !access.isTenantStaff) return false;
+
+    for (final targetRole in target.platformRoles) {
+      final actorRoles = access.tenantRoles
+          .where((role) => role.tenantId == targetRole.tenantId)
+          .map((role) => role.code)
+          .toSet();
+
+      if (actorRoles.contains('tenant_owner')) {
+        return targetRole.roleCode != 'tenant_owner';
+      }
+
+      if (actorRoles.contains('tenant_admin') ||
+          actorRoles.contains('sys_admin')) {
+        return const {
+          'tenant_manager',
+          'tenant_csr',
+        }.contains(targetRole.roleCode);
+      }
+
+      if (actorRoles.contains('tenant_manager') ||
+          actorRoles.contains('mgmt')) {
+        return targetRole.roleCode == 'tenant_csr';
+      }
+    }
+
     return false;
   }
 

@@ -15,16 +15,24 @@ import 'ticket_priority_dialog.dart';
 import 'ticket_providers.dart';
 
 class TicketDetailPage extends ConsumerWidget {
-  const TicketDetailPage({required this.ticketId, super.key});
+  const TicketDetailPage({
+    required this.ticketId,
+    this.backSource,
+    super.key,
+  });
 
   final String ticketId;
+  final String? backSource;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ticket = ref.watch(ticketDetailProvider(ticketId));
 
     return ticket.when(
-      data: (item) => _TicketDetailContent(ticket: item),
+      data: (item) => _TicketDetailContent(
+        ticket: item,
+        backSource: backSource,
+      ),
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) => Padding(
         padding: const EdgeInsets.all(24),
@@ -32,9 +40,10 @@ class TicketDetailPage extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             TextButton.icon(
-              onPressed: () => context.go('/admin/tickets'),
+              onPressed: () =>
+                  context.go(_backDestination(ref, backSource).path),
               icon: const Icon(Icons.arrow_back),
-              label: const Text('Back to Tickets'),
+              label: Text(_backDestination(ref, backSource).label),
             ),
             const SizedBox(height: 16),
             Text('Unable to load ticket: $error'),
@@ -46,9 +55,13 @@ class TicketDetailPage extends ConsumerWidget {
 }
 
 class _TicketDetailContent extends ConsumerWidget {
-  const _TicketDetailContent({required this.ticket});
+  const _TicketDetailContent({
+    required this.ticket,
+    required this.backSource,
+  });
 
   final ServiceTicket ticket;
+  final String? backSource;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -60,7 +73,7 @@ class _TicketDetailContent extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        _TicketHeader(ticket: ticket),
+        _TicketHeader(ticket: ticket, backSource: backSource),
         const SizedBox(height: 20),
         LayoutBuilder(
           builder: (context, constraints) {
@@ -325,25 +338,65 @@ Future<void> _openCustomerUpdateDialog(
   );
 }
 
-String _backPath(WidgetRef ref) {
+class _BackDestination {
+  const _BackDestination({required this.path, required this.label});
+
+  final String path;
+  final String label;
+}
+
+_BackDestination _backDestination(WidgetRef ref, String? source) {
+  switch (source) {
+    case 'csr':
+      return const _BackDestination(
+        path: '/admin/tickets/csr',
+        label: 'Back to CSR Queue',
+      );
+    case 'dispatch':
+      return const _BackDestination(
+        path: '/admin/tickets/dispatch',
+        label: 'Back to Dispatch Queue',
+      );
+    case 'urgent':
+      return const _BackDestination(
+        path: '/admin/tickets/urgent',
+        label: 'Back to Urgent Queue',
+      );
+    case 'aging':
+      return const _BackDestination(
+        path: '/admin/tickets/aging',
+        label: 'Back to Aging Queue',
+      );
+  }
+
   final activeContext = ref.read(activeAdminContextProvider).asData?.value;
-  return activeContext?.isHoa == true ? '/admin/hoa/tickets' : '/admin/tickets';
+  return _BackDestination(
+    path:
+        activeContext?.isHoa == true ? '/admin/hoa/tickets' : '/admin/tickets',
+    label: 'Back to Tickets',
+  );
 }
 
 class _TicketHeader extends ConsumerWidget {
-  const _TicketHeader({required this.ticket});
+  const _TicketHeader({
+    required this.ticket,
+    required this.backSource,
+  });
 
   final ServiceTicket ticket;
+  final String? backSource;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final backDestination = _backDestination(ref, backSource);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         TextButton.icon(
-          onPressed: () => context.go(_backPath(ref)),
+          onPressed: () => context.go(backDestination.path),
           icon: const Icon(Icons.arrow_back),
-          label: const Text('Back to Tickets'),
+          label: Text(backDestination.label),
         ),
         const SizedBox(height: 8),
         Text(ticket.subject, style: Theme.of(context).textTheme.headlineMedium),

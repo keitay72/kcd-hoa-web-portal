@@ -39,10 +39,10 @@ class ProtectedAdminPage extends ConsumerWidget {
 
   bool _isAllowed(AdminAccess access) {
     final hasPermissions =
-        rule.permissions.isEmpty || access.canAny(rule.permissions);
+        rule.permissions.isNotEmpty && access.canAny(rule.permissions);
     final hasRoles =
-        rule.roleCodes.isEmpty || access.hasAnyRoleCode(rule.roleCodes);
-    return hasPermissions && hasRoles;
+        rule.roleCodes.isNotEmpty && access.hasAnyRoleCode(rule.roleCodes);
+    return hasPermissions || hasRoles;
   }
 }
 

@@ -213,7 +213,7 @@ class _SignInPageState extends ConsumerState<SignInPage> {
       if (tenantId != null) {
         setSelectedAdminContextId(ref, 'tenant:$tenantId');
       }
-      return '/admin/hoas';
+      return '/admin';
     }
 
     if (access.hoaRoles.isNotEmpty) {

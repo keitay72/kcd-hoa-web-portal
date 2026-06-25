@@ -264,9 +264,6 @@ with role_permission_map(role_code, permission_code) as (
     ('tenant_manager', 'tenants.read'),
     ('tenant_manager', 'tenant.users.read'),
     ('tenant_manager', 'tenant.analytics.read'),
-    ('tenant_manager', 'billing.read'),
-    ('tenant_manager', 'subscriptions.read'),
-    ('tenant_manager', 'addons.read'),
     ('tenant_manager', 'communications.read')
 )
 insert into public.role_permissions (role_id, permission_id)

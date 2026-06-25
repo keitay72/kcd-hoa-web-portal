@@ -598,23 +598,21 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
             name: 'ticketDetail',
             builder: (context, state) => TicketDetailPage(
               ticketId: state.pathParameters['ticketId']!,
+              backSource: state.uri.queryParameters['from'],
             ).protectedBy(AdminPermissions.ticketsRead),
           ),
           GoRoute(
             path: '/admin/users',
             name: 'userList',
             builder: (context, state) => const UserListPage()
-                .protectedByFeature(TenantFeature.roleManagement)
-                .protectedBy(AdminPermissions.rolesManage),
+                .protectedBy(AdminPermissions.userManagement),
           ),
           GoRoute(
             path: '/admin/users/:userId',
             name: 'userDetail',
             builder: (context, state) => UserDetailPage(
               userId: state.pathParameters['userId']!,
-            )
-                .protectedByFeature(TenantFeature.roleManagement)
-                .protectedBy(AdminPermissions.rolesManage),
+            ).protectedBy(AdminPermissions.userManagement),
           ),
           GoRoute(
             path: '/admin/unauthorized',
@@ -1183,11 +1181,10 @@ class _AdminSidebar extends ConsumerWidget {
     ),
     _AdminNavItem(
       label: 'Users & Roles',
-      permissionRule: AdminPermissions.rolesManage,
+      permissionRule: AdminPermissions.userManagement,
       path: '/admin/users',
       icon: Icons.manage_accounts_outlined,
       activePrefixes: ['/admin/users'],
-      feature: TenantFeature.roleManagement,
     ),
     _AdminNavItem(
       label: 'Audit Logs',
@@ -1266,11 +1263,10 @@ class _AdminSidebar extends ConsumerWidget {
     ),
     _AdminNavItem(
       label: 'Users & Roles',
-      permissionRule: AdminPermissions.rolesManage,
+      permissionRule: AdminPermissions.userManagement,
       path: '/admin/users',
       icon: Icons.manage_accounts_outlined,
       activePrefixes: ['/admin/users'],
-      feature: TenantFeature.roleManagement,
     ),
   ];
 
@@ -1630,11 +1626,11 @@ class _AdminNavItem {
   bool canShow(AdminAccess access, WidgetRef ref) {
     if (devSecurityBypassEnabled) return true;
     if (permissionRule.isOpen) return true;
-    final hasPermissions = permissionRule.permissions.isEmpty ||
+    final hasPermissions = permissionRule.permissions.isNotEmpty &&
         access.canAny(permissionRule.permissions);
-    final hasRoles = permissionRule.roleCodes.isEmpty ||
+    final hasRoles = permissionRule.roleCodes.isNotEmpty &&
         access.hasAnyRoleCode(permissionRule.roleCodes);
-    if (!hasPermissions || !hasRoles) return false;
+    if (!hasPermissions && !hasRoles) return false;
 
     final feature = this.feature;
     if (feature == null || access.isPlatformOperator) return true;

@@ -53,6 +53,12 @@ class AdminPermissions {
     roleCodes: {'platform_owner', 'platform_admin', 'platform_support'},
   );
   static const rolesManage = AdminPermissionRule.any({'roles.manage'});
+  static const userManagement = AdminPermissionRule.any({
+    'roles.manage',
+    'tenant.users.manage',
+  }, roleCodes: {
+    'tenant_manager',
+  });
   static const tenantRead = AdminPermissionRule.any(
     {'tenants.read'},
     roleCodes: {

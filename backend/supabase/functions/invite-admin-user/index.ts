@@ -353,6 +353,7 @@ async function callerCanManageTenantScopedInvites(
   supabase: SupabaseClient,
   userId: string,
   tenantId: string,
+  roleCode: string,
 ) {
   if (await callerCanManageInvites(supabase, userId)) return true;
 
@@ -361,11 +362,30 @@ async function callerCanManageTenantScopedInvites(
     .select('role_id, roles!inner(code)')
     .eq('user_id', userId)
     .eq('tenant_id', tenantId)
-    .in('roles.code', ['tenant_owner', 'tenant_admin', 'tenant_manager', 'sys_admin', 'mgmt'])
-    .limit(1);
+    .in('roles.code', ['tenant_owner', 'tenant_admin', 'tenant_manager', 'sys_admin', 'mgmt']);
 
   if (error) throw error;
-  return Array.isArray(data) && data.length > 0;
+  const callerRoles = new Set(
+    (Array.isArray(data) ? data : []).map((row) => {
+      const role = row.roles as { code?: string } | { code?: string }[] | null;
+      if (Array.isArray(role)) return role[0]?.code;
+      return role?.code;
+    }),
+  );
+
+  if (
+    callerRoles.has('tenant_owner') ||
+    callerRoles.has('tenant_admin') ||
+    callerRoles.has('sys_admin')
+  ) {
+    return new Set(['tenant_admin', 'tenant_manager', 'tenant_csr']).has(roleCode);
+  }
+
+  if (callerRoles.has('tenant_manager') || callerRoles.has('mgmt')) {
+    return roleCode === 'tenant_csr';
+  }
+
+  return false;
 }
 
 async function callerCanManageHoaScopedInvites(
@@ -431,9 +451,10 @@ async function assertInvitePermissionForParsedInput(
     supabase,
     actorUserId,
     tenantScopeId,
+    input.role,
   );
   if (!canManageScopedInvite) {
-    throw new Error('Only platform admins or tenant owners/admins/managers may manage invitations for this tenant');
+    throw new Error('Only platform admins, tenant owners/admins, or tenant managers inviting customer service users may manage invitations for this tenant');
   }
 }
 
@@ -468,9 +489,10 @@ async function assertInvitePermissionForStoredInvite(
     supabase,
     actorUserId,
     tenantScopeId,
+    roleCode,
   );
   if (!canManageScopedInvite) {
-    throw new Error('Only platform admins or tenant owners/admins/managers may manage invitations for this tenant');
+    throw new Error('Only platform admins, tenant owners/admins, or tenant managers inviting customer service users may manage invitations for this tenant');
   }
 }
 

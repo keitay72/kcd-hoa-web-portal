@@ -63,20 +63,38 @@ class TicketMetricsBreakdown {
 
 class OperationalMetrics {
   const OperationalMetrics({
-    required this.hoaManagers,
-    required this.hoaBoardMembers,
-    required this.tenantStaff,
-    required this.dispatchUsers,
-    required this.csrUsers,
+    required this.communityManagers,
+    required this.boardContacts,
+    required this.tenantStaffMembers,
+    required this.customerServiceMembers,
   });
 
-  final int hoaManagers;
-  final int hoaBoardMembers;
-  final int tenantStaff;
-  final int dispatchUsers;
-  final int csrUsers;
+  final List<TeamMemberSummary> communityManagers;
+  final List<TeamMemberSummary> boardContacts;
+  final List<TeamMemberSummary> tenantStaffMembers;
+  final List<TeamMemberSummary> customerServiceMembers;
+
+  int get hoaManagers => communityManagers.length;
+  int get hoaBoardMembers => boardContacts.length;
+  int get tenantStaff => tenantStaffMembers.length;
+  int get csrUsers => customerServiceMembers.length;
 }
 
+class TeamMemberSummary {
+  const TeamMemberSummary({
+    required this.userId,
+    required this.name,
+    required this.email,
+    this.phone,
+    required this.role,
+  });
+
+  final String userId;
+  final String name;
+  final String email;
+  final String? phone;
+  final String role;
+}
 
 class TenantLaunchReadinessMetrics {
   const TenantLaunchReadinessMetrics({

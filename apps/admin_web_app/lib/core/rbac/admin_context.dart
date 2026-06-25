@@ -220,16 +220,16 @@ List<AdminContext> _contextsForAccess(AdminAccess access) {
 }
 
 String _tenantContextPrefix(List<AdminRoleAssignment> roles) {
-  if (roles.any((role) => role.code == 'tenant_owner')) return 'Tenant Owner';
-  if (roles.any((role) => role.code == 'tenant_admin')) return 'Tenant Admin';
+  if (roles.any((role) => role.code == 'tenant_owner')) return 'Owner';
+  if (roles.any((role) => role.code == 'tenant_admin')) return 'Admin';
   if (roles.any((role) => role.code == 'tenant_manager')) {
-    return 'Tenant Manager';
+    return 'Manager';
   }
   if (roles.any((role) => role.code == 'tenant_csr')) {
     return 'Customer Service';
   }
   if (roles.any((role) => role.code == 'tenant_dispatch')) return 'Dispatch';
-  return 'Tenant Staff';
+  return 'Staff';
 }
 
 String _hoaContextPrefix(List<AdminRoleAssignment> roles) {

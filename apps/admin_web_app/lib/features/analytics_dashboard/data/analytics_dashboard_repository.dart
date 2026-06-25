@@ -4,7 +4,9 @@ import '../domain/analytics_dashboard.dart';
 import 'analytics_dashboard_dtos.dart';
 
 abstract interface class AnalyticsDashboardRepository {
-  Future<AnalyticsDashboardSnapshot> loadSnapshot();
+  Future<AnalyticsDashboardSnapshot> loadSnapshot({
+    bool includeLaunchReadiness = true,
+  });
 }
 
 class SupabaseAnalyticsDashboardRepository
@@ -14,12 +16,16 @@ class SupabaseAnalyticsDashboardRepository
   final SupabaseClient _client;
 
   @override
-  Future<AnalyticsDashboardSnapshot> loadSnapshot() async {
+  Future<AnalyticsDashboardSnapshot> loadSnapshot({
+    bool includeLaunchReadiness = true,
+  }) async {
     final results = await Future.wait<Object>([
       _platformMetrics(),
       _ticketMetrics(),
       _operationalMetrics(),
-      _tenantLaunchReadinessMetrics(),
+      includeLaunchReadiness
+          ? _tenantLaunchReadinessMetrics()
+          : Future.value(_emptyLaunchReadinessMetrics),
       _recentTickets(),
       _recentResidentRegistrations(),
       _recentHoaCreations(),
@@ -39,6 +45,19 @@ class SupabaseAnalyticsDashboardRepository
       loadedAt: DateTime.now().toUtc(),
     );
   }
+
+  static const _emptyLaunchReadinessMetrics = TenantLaunchReadinessMetrics(
+    totalTenants: 0,
+    readyToLaunch: 0,
+    launched: 0,
+    blocked: 0,
+    missingSubscription: 0,
+    missingBillingContact: 0,
+    missingTenantAdmin: 0,
+    missingHoa: 0,
+    stripePending: 0,
+    overIncludedLimits: 0,
+  );
 
   Future<PlatformMetrics> _platformMetrics() async {
     final now = DateTime.now().toUtc().toIso8601String();
@@ -108,44 +127,100 @@ class SupabaseAnalyticsDashboardRepository
       tenantRoleRows.map((row) => row['role_id'] as int),
     );
 
-    final hoaManagers = <String>{};
-    final hoaBoardMembers = <String>{};
+    final communityManagers = <String, String>{};
+    final boardContacts = <String, String>{};
     for (final row in hoaRoleRows) {
       final role = row['roles'] as Map<String, dynamic>?;
       final roleCode = role?['code'] as String?;
       final userId = row['user_id'] as String?;
       if (userId == null) continue;
-      if (roleCode == 'hoa_manager') hoaManagers.add(userId);
-      if (roleCode == 'hoa_board') hoaBoardMembers.add(userId);
+      if (roleCode == 'hoa_manager') {
+        communityManagers[userId] = 'Community Manager';
+      }
+      if (roleCode == 'hoa_board') {
+        boardContacts[userId] = 'Board Contact';
+      }
     }
 
-    final tenantStaff = <String>{};
-    final dispatchUsers = <String>{};
-    final csrUsers = <String>{};
+    final tenantStaff = <String, String>{};
+    final customerService = <String, String>{};
     for (final row in tenantRoleRows) {
       final roleCode = tenantRoleCodes[row['role_id'] as int];
       final userId = row['user_id'] as String?;
       if (userId == null) continue;
-      if ({
-        'tenant_owner',
-        'tenant_admin',
-        'tenant_manager',
-        'tenant_csr',
-        'tenant_dispatch',
-      }.contains(roleCode)) {
-        tenantStaff.add(userId);
+      final roleLabel = _teamRoleLabel(roleCode);
+      if (roleLabel != null) {
+        tenantStaff[userId] = roleLabel;
       }
-      if (roleCode == 'tenant_dispatch') dispatchUsers.add(userId);
-      if (roleCode == 'tenant_csr') csrUsers.add(userId);
+      if (roleCode == 'tenant_csr') {
+        customerService[userId] = 'Customer Service';
+      }
     }
 
+    final profiles = await _profilesById({
+      ...communityManagers.keys,
+      ...boardContacts.keys,
+      ...tenantStaff.keys,
+      ...customerService.keys,
+    });
+
     return OperationalMetrics(
-      hoaManagers: hoaManagers.length,
-      hoaBoardMembers: hoaBoardMembers.length,
-      tenantStaff: tenantStaff.length,
-      dispatchUsers: dispatchUsers.length,
-      csrUsers: csrUsers.length,
+      communityManagers: _teamMembers(communityManagers, profiles),
+      boardContacts: _teamMembers(boardContacts, profiles),
+      tenantStaffMembers: _teamMembers(tenantStaff, profiles),
+      customerServiceMembers: _teamMembers(customerService, profiles),
     );
+  }
+
+  String? _teamRoleLabel(String? roleCode) {
+    return switch (roleCode) {
+      'tenant_owner' => 'Owner',
+      'tenant_admin' => 'Admin',
+      'tenant_manager' => 'Manager',
+      'tenant_csr' => 'Customer Service',
+      _ => null,
+    };
+  }
+
+  Future<Map<String, _TeamProfile>> _profilesById(Set<String> ids) async {
+    if (ids.isEmpty) return const {};
+
+    final rows = await _client
+        .from('profiles')
+        .select('id, full_name, email, phone')
+        .inFilter('id', ids.toList());
+
+    return {
+      for (final row in rows)
+        row['id'] as String: _TeamProfile(
+          name: row['full_name'] as String?,
+          email: row['email'] as String?,
+          phone: row['phone'] as String?,
+        ),
+    };
+  }
+
+  List<TeamMemberSummary> _teamMembers(
+    Map<String, String> roleByUserId,
+    Map<String, _TeamProfile> profiles,
+  ) {
+    final members = roleByUserId.entries.map((entry) {
+      final profile = profiles[entry.key];
+      final email = profile?.email?.trim() ?? '';
+      final name = profile?.name?.trim();
+      return TeamMemberSummary(
+        userId: entry.key,
+        name: name == null || name.isEmpty
+            ? (email.isEmpty ? 'Unknown user' : email)
+            : name,
+        email: email,
+        phone: profile?.phone?.trim(),
+        role: entry.value,
+      );
+    }).toList()
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+
+    return members;
   }
 
   Future<Map<int, String>> _roleCodesById(Iterable<int> roleIds) async {
@@ -219,16 +294,27 @@ class SupabaseAnalyticsDashboardRepository
           (onboardingStatus == 'ready_to_launch' || hasLaunchReadyAt);
       final isBlocked = onboardingStatus == 'blocked';
 
-      if (isLaunched)
+      if (isLaunched) {
         launched++;
-      else if (isReadyToLaunch) readyToLaunch++;
+      } else if (isReadyToLaunch) {
+        readyToLaunch++;
+      }
 
-      if (isBlocked) blocked++;
-      if (subscription == null || subscription.status == 'cancelled')
+      if (isBlocked) {
+        blocked++;
+      }
+      if (subscription == null || subscription.status == 'cancelled') {
         missingSubscription++;
-      if ((billingContactCounts[tenantId] ?? 0) == 0) missingBillingContact++;
-      if ((tenantAdminCounts[tenantId] ?? 0) == 0) missingTenantAdmin++;
-      if (hoaCount == 0) missingHoa++;
+      }
+      if ((billingContactCounts[tenantId] ?? 0) == 0) {
+        missingBillingContact++;
+      }
+      if ((tenantAdminCounts[tenantId] ?? 0) == 0) {
+        missingTenantAdmin++;
+      }
+      if (hoaCount == 0) {
+        missingHoa++;
+      }
       if (subscription != null &&
           subscription.status != 'cancelled' &&
           !subscription.hasStripePrice) {
@@ -480,4 +566,16 @@ class _TenantReadinessSubscriptionSnapshot {
       includedResidentCount: plan?['included_resident_count'] as int?,
     );
   }
+}
+
+class _TeamProfile {
+  const _TeamProfile({
+    required this.name,
+    required this.email,
+    required this.phone,
+  });
+
+  final String? name;
+  final String? email;
+  final String? phone;
 }

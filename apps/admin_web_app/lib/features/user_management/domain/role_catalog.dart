@@ -65,7 +65,6 @@ class RoleCatalogEntry {
           'tenant_admin',
           'tenant_manager',
           'tenant_csr',
-          'tenant_dispatch',
         }.contains(code);
   }
 

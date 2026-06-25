@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/rbac/admin_access.dart';
-import '../../../core/rbac/rbac_providers.dart';
+import '../../../core/rbac/admin_context.dart';
 import '../domain/role_catalog.dart';
 import '../domain/user_management_inputs.dart';
 import 'user_form_fields.dart';
@@ -93,8 +93,34 @@ class _InviteUserDialogState extends ConsumerState<InviteUserDialog> {
     final tenants = ref.watch(platformTenantOptionsProvider);
     final hoas = ref.watch(hoaScopeOptionsProvider);
     final commandState = ref.watch(userCommandProvider);
-    final access = ref.watch(adminAccessProvider).valueOrNull;
-    final canSubmit = _hasValidFieldValues() && _hasRequiredSelections();
+    final access = ref.watch(activeAdminAccessProvider).valueOrNull;
+    final includeCommunityCategory = hoas.maybeWhen(
+      data: (items) => items.isNotEmpty,
+      orElse: () => true,
+    );
+    final availableCategories = _availableCategories(
+      access,
+      includeCommunity: includeCommunityCategory,
+    );
+    final selectedCategory = availableCategories.contains(_category)
+        ? _category
+        : availableCategories.first;
+    final shouldChooseTenant =
+        selectedCategory == 'tenant' && access?.isPlatformOperator == true;
+    if (!availableCategories.contains(_category) &&
+        availableCategories.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() {
+          _category = availableCategories.first;
+          _roleCode = null;
+          _tenantId = null;
+          _hoaId = null;
+        });
+        _refreshFormState();
+      });
+    }
+    final canSubmit = _hasValidFieldValues() && _hasRequiredSelections(access);
 
     return AlertDialog(
       title: Text(widget.title),
@@ -147,23 +173,17 @@ class _InviteUserDialogState extends ConsumerState<InviteUserDialog> {
                   validator: UserFormValidators.phone,
                 ),
                 const SizedBox(height: 16),
-                if (!widget.lockScope) ...[
+                if (!widget.lockScope && availableCategories.length > 1) ...[
                   SegmentedButton<String>(
-                    segments: const [
-                      ButtonSegment(
-                        value: 'platform',
-                        label: Text('Platform Staff'),
-                      ),
-                      ButtonSegment(
-                        value: 'tenant',
-                        label: Text('Tenant Staff'),
-                      ),
-                      ButtonSegment(
-                        value: 'community',
-                        label: Text('Community'),
-                      ),
-                    ],
-                    selected: {_category},
+                    segments: availableCategories
+                        .map(
+                          (category) => ButtonSegment(
+                            value: category,
+                            label: Text(_categoryLabel(category)),
+                          ),
+                        )
+                        .toList(),
+                    selected: {selectedCategory},
                     onSelectionChanged: (value) {
                       setState(() {
                         _category = value.first;
@@ -178,28 +198,38 @@ class _InviteUserDialogState extends ConsumerState<InviteUserDialog> {
                 ],
                 roles.when(
                   data: (items) {
-                    final availableRoles = switch (_category) {
+                    final availableRoles = switch (selectedCategory) {
                       'platform' => items.where((role) =>
                           role.canBeInvitedAsPlatformStaff &&
                           _canInvitePlatformRole(role.code, access)),
-                      'tenant' =>
-                        items.where((role) => role.canBeInvitedAsTenantStaff),
+                      'tenant' => items.where((role) =>
+                          role.canBeInvitedAsTenantStaff &&
+                          _canInviteTenantRole(role.code, access)),
                       _ => items
                           .where((role) => role.canBeInvitedAsCommunityContact),
                     }
                         .where((role) =>
                             widget.allowedRoleCodes == null ||
                             widget.allowedRoleCodes!.contains(role.code))
-                        .toList();
+                        .toList()
+                      ..sort(_compareRolePermission);
 
-                    if (_roleCode != null &&
-                        availableRoles
-                            .every((role) => role.code != _roleCode)) {
+                    final selectedRoleCode =
+                        availableRoles.any((role) => role.code == _roleCode)
+                            ? _roleCode
+                            : null;
+
+                    if (availableRoles.length == 1 &&
+                        _roleCode != availableRoles.first.code) {
                       WidgetsBinding.instance.addPostFrameCallback((_) {
                         if (!mounted) return;
-                        setState(() => _roleCode = availableRoles.length == 1
-                            ? availableRoles.first.code
-                            : null);
+                        setState(() => _roleCode = availableRoles.first.code);
+                        _refreshFormState();
+                      });
+                    } else if (_roleCode != null && selectedRoleCode == null) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (!mounted) return;
+                        setState(() => _roleCode = null);
                         _refreshFormState();
                       });
                     }
@@ -211,12 +241,16 @@ class _InviteUserDialogState extends ConsumerState<InviteUserDialog> {
                     }
 
                     if (availableRoles.length == 1) {
-                      return _LockedRoleField(role: availableRoles.first);
+                      return _LockedRoleField(
+                        role: availableRoles.first,
+                        label: _roleLabel(availableRoles.first),
+                      );
                     }
 
                     return _RoleSelect(
                       roles: availableRoles,
-                      value: _roleCode,
+                      value: selectedRoleCode,
+                      labelForRole: _roleLabel,
                       onChanged: (value) {
                         setState(() => _roleCode = value);
                         _refreshFormState();
@@ -227,31 +261,47 @@ class _InviteUserDialogState extends ConsumerState<InviteUserDialog> {
                   error: (error, _) => Text('Unable to load roles: $error'),
                 ),
                 const SizedBox(height: 16),
-                if (_category == 'tenant')
+                if (shouldChooseTenant)
                   tenants.when(
-                    data: (items) => _TenantSelect(
-                      tenants: items,
-                      value: _tenantId ?? _primaryTenantId(items),
-                      onChanged: widget.lockScope
-                          ? null
-                          : (value) {
-                              setState(() => _tenantId = value);
-                              _refreshFormState();
-                            },
-                    ),
+                    data: (items) {
+                      final tenantId = _tenantId ?? _primaryTenantId(items);
+                      final selectedTenantId =
+                          items.any((tenant) => tenant.id == tenantId)
+                              ? tenantId
+                              : null;
+                      return _TenantSelect(
+                        tenants: items,
+                        value: selectedTenantId,
+                        onChanged: widget.lockScope
+                            ? null
+                            : (value) {
+                                setState(() => _tenantId = value);
+                                _refreshFormState();
+                              },
+                      );
+                    },
                     loading: () => const LinearProgressIndicator(),
                     error: (error, _) => Text('Unable to load tenants: $error'),
                   )
-                else if (_category == 'community' && !widget.lockScope)
+                else if (selectedCategory == 'community' && !widget.lockScope)
                   hoas.when(
-                    data: (items) => _HoaSelect(
-                      hoas: items,
-                      value: _hoaId,
-                      onChanged: (value) {
-                        setState(() => _hoaId = value);
-                        _refreshFormState();
-                      },
-                    ),
+                    data: (items) {
+                      if (items.isEmpty) {
+                        return const Text(
+                          'No communities are available for this tenant.',
+                        );
+                      }
+                      final selectedHoaId =
+                          items.any((hoa) => hoa.id == _hoaId) ? _hoaId : null;
+                      return _HoaSelect(
+                        hoas: items,
+                        value: selectedHoaId,
+                        onChanged: (value) {
+                          setState(() => _hoaId = value);
+                          _refreshFormState();
+                        },
+                      );
+                    },
                     loading: () => const LinearProgressIndicator(),
                     error: (error, _) =>
                         Text('Unable to load communities: $error'),
@@ -293,12 +343,100 @@ class _InviteUserDialogState extends ConsumerState<InviteUserDialog> {
     return false;
   }
 
+  bool _canInviteTenantRole(String roleCode, AdminAccess? access) {
+    if (access?.isPlatformOperator == true) return true;
+    if (access == null || !access.isTenantStaff) return false;
+
+    if (access.hasAnyRoleCode({'tenant_owner', 'tenant_admin'})) {
+      return const {
+        'tenant_admin',
+        'tenant_manager',
+        'tenant_csr',
+      }.contains(roleCode);
+    }
+
+    if (access.hasTenantRole('tenant_manager')) {
+      return roleCode == 'tenant_csr';
+    }
+
+    return false;
+  }
+
+  List<String> _availableCategories(
+    AdminAccess? access, {
+    required bool includeCommunity,
+  }) {
+    if (access == null) return [_category];
+
+    final isPlatformOperator = access.isPlatformOperator;
+    final isTenantOperator = access.isTenantStaff;
+    final isCommunityOperator = access.hoaRoles.isNotEmpty;
+
+    if (widget.lockScope) return [_category];
+    if (isPlatformOperator) {
+      return [
+        'platform',
+        'tenant',
+        if (includeCommunity) 'community',
+      ];
+    }
+    if (isTenantOperator) {
+      return [
+        'tenant',
+        if (includeCommunity) 'community',
+      ];
+    }
+    if (isCommunityOperator) return const ['community'];
+    return includeCommunity ? const ['community'] : const ['tenant'];
+  }
+
+  String _categoryLabel(String category) {
+    return switch (category) {
+      'platform' => 'Platform Staff',
+      'tenant' => 'Tenant Staff',
+      _ => 'Community Contact',
+    };
+  }
+
+  int _compareRolePermission(RoleCatalogEntry a, RoleCatalogEntry b) {
+    final rankCompare = _rolePermissionRank(b.code).compareTo(
+      _rolePermissionRank(a.code),
+    );
+    if (rankCompare != 0) return rankCompare;
+    return a.name.compareTo(b.name);
+  }
+
+  int _rolePermissionRank(String roleCode) {
+    return switch (roleCode) {
+      'platform_owner' => 1000,
+      'platform_admin' => 900,
+      'platform_support' => 800,
+      'platform_sales' => 700,
+      'tenant_owner' => 600,
+      'tenant_admin' => 500,
+      'tenant_manager' => 400,
+      'tenant_csr' => 300,
+      'community_admin' => 100,
+      _ => 0,
+    };
+  }
+
+  String _roleLabel(RoleCatalogEntry role) {
+    return switch (role.code) {
+      'tenant_owner' => 'Owner',
+      'tenant_admin' => 'Admin',
+      'tenant_manager' => 'Manager',
+      'tenant_csr' => 'Customer Service',
+      'community_admin' => 'Community Contact',
+      _ => role.name,
+    };
+  }
+
   Future<void> _submit() async {
     final roleCode = _roleCode;
-    final tenantId = _tenantId ??
-        _primaryTenantId(
-            ref.read(platformTenantOptionsProvider).valueOrNull ?? []);
-    if (!_validateForm() || roleCode == null) return;
+    final access = ref.read(activeAdminAccessProvider).valueOrNull;
+    final tenantId = _effectiveTenantId(access);
+    if (!_validateForm(access) || roleCode == null) return;
     if (_category == 'tenant' && tenantId == null) return;
     if (_category == 'community' && _hoaId == null) return;
 
@@ -327,21 +465,31 @@ class _InviteUserDialogState extends ConsumerState<InviteUserDialog> {
         .id;
   }
 
-  bool _validateForm() {
+  bool _validateForm(AdminAccess? access) {
     return _formKey.currentState?.validate() == true &&
-        _hasRequiredSelections();
+        _hasRequiredSelections(access);
   }
 
-  bool _hasRequiredSelections() {
-    final tenantId = _tenantId ??
-        _primaryTenantId(
-            ref.read(platformTenantOptionsProvider).valueOrNull ?? []);
+  bool _hasRequiredSelections(AdminAccess? access) {
+    final tenantId = _effectiveTenantId(access);
     return _roleCode != null &&
         switch (_category) {
           'platform' => true,
           'tenant' => tenantId != null,
           _ => _hoaId != null,
         };
+  }
+
+  String? _effectiveTenantId(AdminAccess? access) {
+    if (_tenantId != null) return _tenantId;
+    if (access != null &&
+        !access.isPlatformOperator &&
+        access.tenantScopeIds.isNotEmpty) {
+      return access.tenantScopeIds.first;
+    }
+    return _primaryTenantId(
+      ref.read(platformTenantOptionsProvider).valueOrNull ?? [],
+    );
   }
 
   bool _hasValidFieldValues() {
@@ -359,7 +507,8 @@ class _InviteUserDialogState extends ConsumerState<InviteUserDialog> {
   }
 
   void _refreshFormState() {
-    final isValid = _hasValidFieldValues() && _hasRequiredSelections();
+    final access = ref.read(activeAdminAccessProvider).valueOrNull;
+    final isValid = _hasValidFieldValues() && _hasRequiredSelections(access);
     if (isValid != _isFormValid && mounted) {
       setState(() => _isFormValid = isValid);
     }
@@ -408,11 +557,16 @@ class _NameField extends StatelessWidget {
 }
 
 class _RoleSelect extends StatelessWidget {
-  const _RoleSelect(
-      {required this.roles, required this.value, required this.onChanged});
+  const _RoleSelect({
+    required this.roles,
+    required this.value,
+    required this.labelForRole,
+    required this.onChanged,
+  });
 
   final List<RoleCatalogEntry> roles;
   final String? value;
+  final String Function(RoleCatalogEntry role) labelForRole;
   final ValueChanged<String?>? onChanged;
 
   @override
@@ -423,8 +577,8 @@ class _RoleSelect extends StatelessWidget {
       decoration: const InputDecoration(
           labelText: 'Role', border: OutlineInputBorder()),
       items: roles
-          .map((role) =>
-              DropdownMenuItem(value: role.code, child: Text(role.name)))
+          .map((role) => DropdownMenuItem(
+              value: role.code, child: Text(labelForRole(role))))
           .toList(),
       onChanged: onChanged,
       validator: (value) => value == null ? 'Select a role.' : null,
@@ -433,14 +587,15 @@ class _RoleSelect extends StatelessWidget {
 }
 
 class _LockedRoleField extends StatelessWidget {
-  const _LockedRoleField({required this.role});
+  const _LockedRoleField({required this.role, this.label});
 
   final RoleCatalogEntry role;
+  final String? label;
 
   @override
   Widget build(BuildContext context) {
     return TextFormField(
-      initialValue: role.name,
+      initialValue: label ?? role.name,
       readOnly: true,
       decoration: const InputDecoration(
         labelText: 'Role',
