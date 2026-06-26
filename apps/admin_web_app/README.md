@@ -1,16 +1,28 @@
-# admin_web_app
+# Admin Web App
 
-A new Flutter project.
+Flutter Web app for the Waste Hauler Customer Portal SaaS.
 
-## Getting Started
+This app currently hosts:
 
-This project is a starting point for a Flutter application.
+- Platform administration for the SaaS operator.
+- Tenant management portals for subscribed waste haulers.
+- Customer portal signup, sign-in, customer home, documents, schedules, and service issues.
 
-A few resources to get you started if this is your first Flutter project:
+The product is moving from an HOA-first portal to a tenant-branded customer portal for residential, community/HOA, commercial, and future roll-off service customers. Some folders still use legacy names such as `hoa_management` and `address_registry`; new work should use customer account, community, and service-location language in the UI and domain model.
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+## Local Development
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Start the local Supabase stack first, then run the Flutter web app with the local Supabase URL and anon key:
+
+```sh
+flutter run -d chrome \
+  --web-port 8080 \
+  --dart-define=SUPABASE_URL=http://127.0.0.1:54321 \
+  --dart-define=SUPABASE_ANON_KEY=<local anon key>
+```
+
+Common local URLs:
+
+- App: `http://127.0.0.1:8080`
+- Supabase Studio: `http://127.0.0.1:54323`
+- Mailpit: `http://127.0.0.1:54324`

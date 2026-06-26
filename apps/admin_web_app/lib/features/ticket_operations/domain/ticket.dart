@@ -111,7 +111,6 @@ enum TicketType {
 enum TicketQueue {
   all,
   csr,
-  dispatch,
   urgent,
   aging;
 
@@ -119,7 +118,6 @@ enum TicketQueue {
     return switch (this) {
       TicketQueue.all => 'All Tickets',
       TicketQueue.csr => 'CSR Queue',
-      TicketQueue.dispatch => 'Dispatch Queue',
       TicketQueue.urgent => 'Urgent Queue',
       TicketQueue.aging => 'Aging Queue',
     };
@@ -326,10 +324,6 @@ class TicketAssigneeOption {
   final String label;
   final Set<String> roleCodes;
 
-  bool get canDispatch =>
-      roleCodes.contains('tenant_dispatch') ||
-      roleCodes.contains('tenant_owner') ||
-      roleCodes.contains('tenant_admin');
   bool get canCsr =>
       roleCodes.contains('tenant_csr') ||
       roleCodes.contains('tenant_owner') ||

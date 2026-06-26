@@ -86,7 +86,7 @@ class TenantSettingsDto {
       emailReplyTo: _text(json['email_reply_to']),
       timezone: json['timezone'] as String? ?? 'America/Chicago',
       residentActivationCodesRequired:
-          json['resident_activation_codes_required'] as bool? ?? true,
+          json['resident_activation_codes_required'] as bool? ?? false,
     );
   }
 }

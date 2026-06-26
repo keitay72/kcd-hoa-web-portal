@@ -71,9 +71,8 @@ class HoaDetailPage extends ConsumerWidget {
                     _DetailRow(label: 'Name', value: item.name),
                     _DetailRow(label: 'Status', value: item.status.name),
                     _DetailRow(
-                      label: 'Customer verification',
-                      value: item.residentActivationCodeSettingLabel
-                          .replaceFirst('Activation codes: ', ''),
+                      label: 'Customer signup',
+                      value: 'Address match and email verification',
                     ),
                     _DetailRow(
                       label: 'Created',

@@ -60,10 +60,10 @@ The current system already includes the hard product foundations:
 - Storage policies
 - Edge Functions
 - Admin Web App
-- HOA communities
-- HOA address registry
+- community accounts
+- service-location registry
 - resident verification
-- activation codes
+- legacy activation-code compatibility data
 - documents
 - announcements
 - service schedules
@@ -143,7 +143,6 @@ resident
 hoa_board
 hoa_manager
 tenant_csr
-tenant_dispatch
 mgmt
 sys_admin
 ```
@@ -152,7 +151,8 @@ Current concerns:
 
 - `sys_admin` currently means KC Disposal tenant admin, not true SaaS platform admin.
 - `mgmt` is abbreviated and tenant-specific.
-- `tenant_csr` and `tenant_dispatch` are valid, but should be tenant-scoped.
+- `tenant_csr` is valid, but should be tenant-scoped.
+- `tenant_dispatch` exists in legacy role data, but dispatch-specific routing is no longer part of the near-term product direction.
 - `hoa_manager`, `hoa_board`, and `resident` are valid and should remain HOA-scoped.
 - There are no true SaaS operator roles yet.
 
@@ -189,7 +189,7 @@ is_kcd_staff() = sys_admin, tenant_csr, tenant_dispatch, mgmt
 Target behavior:
 
 ```text
-is_tenant_staff(tenant_id) = tenant_admin, tenant_manager, tenant_csr, tenant_dispatch within that tenant
+is_tenant_staff(tenant_id) = tenant_owner, tenant_admin, tenant_manager, tenant_csr within that tenant
 ```
 
 There should also be separate global platform helper functions for SaaS operator roles.
@@ -258,7 +258,6 @@ Roles:
 tenant_admin
 tenant_manager
 tenant_csr
-tenant_dispatch
 ```
 
 Scope:
@@ -347,10 +346,15 @@ Keep:
 
 ```text
 tenant_csr
-tenant_dispatch
 hoa_manager
 hoa_board
 resident
+```
+
+Legacy compatibility only:
+
+```text
+tenant_dispatch
 ```
 
 Deprecate:
@@ -367,7 +371,7 @@ mgmt
 | `sys_admin` | `tenant_admin` | tenant | Add new role, migrate assignments, keep deprecated alias temporarily |
 | `mgmt` | `tenant_manager` | tenant | Add new role, migrate assignments, keep deprecated alias temporarily |
 | `csr` | `tenant_csr` | tenant | Rename for SaaS clarity |
-| `dispatch` | `tenant_dispatch` | tenant | Rename for SaaS clarity |
+| `dispatch` | `tenant_dispatch` | tenant | Keep only for historical compatibility unless dispatch workflows return |
 | `hoa_manager` | `hoa_manager` | HOA | Keep |
 | `hoa_board` | `hoa_board` | HOA | Keep |
 | `resident` | `hoa_resident` | resident/address | Rename for SaaS clarity |
@@ -683,10 +687,9 @@ Current app has platform-like admin navigation:
 
 ```text
 Dashboard
-HOA Management
-Address Registry
-Activation Codes
-Resident Verification
+Community Management
+Service Locations
+Customer Verification
 Announcements
 Documents
 Service Schedules
@@ -698,8 +701,8 @@ Audit Logs
 Current HOA-scoped navigation:
 
 ```text
-HOA Dashboard
-Residents
+Customer Portal Dashboard
+Customer Accounts
 Documents
 Announcements
 Tickets
@@ -740,17 +743,15 @@ Visible to:
 tenant_admin
 tenant_manager
 tenant_csr
-tenant_dispatch
 ```
 
 Navigation depends on permissions:
 
 ```text
 Tenant Dashboard
-HOA Management
-Address Registry
-Activation Codes
-Resident Verification
+Community Management
+Service Locations
+Customer Verification
 Announcements
 Documents
 Service Schedules
@@ -846,11 +847,11 @@ A SaaS operator should be able to onboard a new waste-management company without
 3. Platform owner/admin invites first tenant admin.
 4. Tenant admin accepts invite.
 5. Tenant admin configures company profile.
-6. Tenant admin creates/imports HOA communities.
-7. Tenant admin imports HOA addresses.
-8. Tenant admin invites tenant staff, CSR, dispatch, HOA managers, and HOA board members.
-9. Tenant staff generates activation codes.
-10. Residents register through address and activation-code verification.
+6. Tenant admin creates/imports community accounts where HOA or neighborhood service is relevant.
+7. Tenant admin imports service locations for community and non-community customers.
+8. Tenant admin invites tenant staff, customer service users, and community contacts.
+9. Customers self-register by matching an active service address and verifying email.
+10. Verified customers access tenant-branded portal content for their address and community context.
 
 ## Required Admin UI
 
@@ -1026,7 +1027,6 @@ platform_owner can see all tenants
 tenant_admin can see only own tenant
 tenant_manager can see only own tenant
 tenant_csr can see only own tenant support data
-tenant_dispatch can see only own tenant dispatch data
 hoa_manager can see only assigned HOA
 hoa_board can see only assigned HOA
 resident can see only own resident-scoped data
@@ -1582,7 +1582,7 @@ Recommended enforcement:
 - `trialing` tenants get plan features
 - `active` tenants get plan features
 - `past_due` tenants get grace-period access
-- `paused` tenants lose resident-facing sends and new activation codes
+- `paused` tenants lose customer-facing sends and new customer registration
 - `cancelled` tenants become read-only after grace period
 - platform owners/admins can override access
 

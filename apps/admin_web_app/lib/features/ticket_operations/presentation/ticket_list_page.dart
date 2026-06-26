@@ -45,8 +45,6 @@ class _TicketListPageState extends ConsumerState<TicketListPage> {
     final access = ref.watch(activeAdminAccessProvider);
     final csrEntitlement = ref.watch(adminFeatureEntitlementProvider(
         TenantFeature.advancedTicketManagement));
-    final dispatchEntitlement = ref.watch(
-        adminFeatureEntitlementProvider(TenantFeature.dispatchDashboard));
 
     final canReadTickets = access.maybeWhen(
       data: (value) => value.can('tickets.read'),
@@ -54,11 +52,6 @@ class _TicketListPageState extends ConsumerState<TicketListPage> {
     );
     final canOpenCsrDashboard = canReadTickets &&
         csrEntitlement.maybeWhen(
-          data: (result) => result.isEnabled,
-          orElse: () => false,
-        );
-    final canOpenDispatchDashboard = canReadTickets &&
-        dispatchEntitlement.maybeWhen(
           data: (result) => result.isEnabled,
           orElse: () => false,
         );
@@ -76,23 +69,16 @@ class _TicketListPageState extends ConsumerState<TicketListPage> {
             children: [
               Text('Tickets',
                   style: Theme.of(context).textTheme.headlineMedium),
-              if (canOpenCsrDashboard || canOpenDispatchDashboard)
+              if (canOpenCsrDashboard)
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    if (canOpenCsrDashboard)
-                      OutlinedButton.icon(
-                        onPressed: () => context.go('/admin/tickets/csr'),
-                        icon: const Icon(Icons.support_agent),
-                        label: const Text('CSR Queue'),
-                      ),
-                    if (canOpenDispatchDashboard)
-                      OutlinedButton.icon(
-                        onPressed: () => context.go('/admin/tickets/dispatch'),
-                        icon: const Icon(Icons.local_shipping_outlined),
-                        label: const Text('Dispatch Queue'),
-                      ),
+                    OutlinedButton.icon(
+                      onPressed: () => context.go('/admin/tickets/csr'),
+                      icon: const Icon(Icons.support_agent),
+                      label: const Text('CSR Queue'),
+                    ),
                   ],
                 ),
             ],
@@ -181,9 +167,42 @@ class _MetricChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Chip(
-      avatar: CircleAvatar(child: Text(value.toString())),
-      label: Text(label),
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            height: 24,
+            constraints: const BoxConstraints(minWidth: 24),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: scheme.primaryContainer,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              value.toString(),
+              style: TextStyle(
+                color: scheme.onPrimaryContainer,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -231,7 +250,9 @@ class _TicketFilterBar extends StatelessWidget {
           value: status ?? _allValue,
           isExpanded: true,
           decoration: const InputDecoration(
-              labelText: 'Status', border: OutlineInputBorder()),
+            labelText: 'Status',
+            border: OutlineInputBorder(),
+          ),
           items: [
             const DropdownMenuItem(
                 value: _allValue, child: Text('All Statuses')),
@@ -249,7 +270,9 @@ class _TicketFilterBar extends StatelessWidget {
           value: priority ?? _allValue,
           isExpanded: true,
           decoration: const InputDecoration(
-              labelText: 'Priority', border: OutlineInputBorder()),
+            labelText: 'Priority',
+            border: OutlineInputBorder(),
+          ),
           items: [
             const DropdownMenuItem(
                 value: _allValue, child: Text('All Priorities')),
@@ -322,10 +345,15 @@ class _HoaFilter extends StatelessWidget {
     return DropdownButtonFormField<String?>(
       value: value,
       isExpanded: true,
-      decoration:
-          const InputDecoration(labelText: 'HOA', border: OutlineInputBorder()),
+      decoration: const InputDecoration(
+        labelText: 'Community',
+        border: OutlineInputBorder(),
+      ),
       items: [
-        const DropdownMenuItem<String?>(value: null, child: Text('All HOAs')),
+        const DropdownMenuItem<String?>(
+          value: null,
+          child: Text('All Communities'),
+        ),
         ...hoas.map(
           (hoa) => DropdownMenuItem<String?>(
             value: hoa.id,
@@ -336,7 +364,7 @@ class _HoaFilter extends StatelessWidget {
       ],
       selectedItemBuilder: (context) {
         return [
-          const Text('All HOAs', overflow: TextOverflow.ellipsis),
+          const Text('All Communities', overflow: TextOverflow.ellipsis),
           ...hoas.map(
             (hoa) => Text('${hoa.name} (${hoa.code})',
                 overflow: TextOverflow.ellipsis),
@@ -380,41 +408,330 @@ class _TicketTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (tickets.isEmpty) return const Center(child: Text('No tickets found.'));
+    final scheme = Theme.of(context).colorScheme;
+    if (tickets.isEmpty) {
+      return Card(
+        margin: EdgeInsets.zero,
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.confirmation_number_outlined,
+                  size: 42,
+                  color: scheme.onSurfaceVariant,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'No tickets found',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Adjust the filters or search to find matching service issues.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     return Card(
       margin: EdgeInsets.zero,
       child: ListView.separated(
+        padding: const EdgeInsets.symmetric(vertical: 8),
         itemCount: tickets.length,
         separatorBuilder: (_, __) => const Divider(height: 1),
         itemBuilder: (context, index) {
           final ticket = tickets[index];
-          return ListTile(
-            leading: Tooltip(
-              message: '${ticket.slaState.label}: ${ticket.slaLabel}',
-              child: Icon(
-                Icons.confirmation_number_outlined,
-                color: _slaColor(context, ticket),
-              ),
-            ),
-            title: Text(ticket.subject),
-            subtitle: Text(
-              '${ticket.hoaLabel} - ${ticket.type.label} - '
-              '${ticket.requesterLabel} - ${ticket.slaLabel}',
-            ),
-            trailing: Wrap(
-              spacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                Chip(label: Text(ticket.priority.label)),
-                Chip(label: Text(ticket.status.label)),
-                const Icon(Icons.chevron_right),
-              ],
-            ),
-            onTap: () => context.go('/admin/tickets/${ticket.id}'),
-          );
+          return _TicketListRow(ticket: ticket);
         },
       ),
     );
   }
+}
+
+class _TicketListRow extends StatelessWidget {
+  const _TicketListRow({required this.ticket});
+
+  final ServiceTicket ticket;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final slaColor = _slaColor(context, ticket);
+    final ticketId =
+        ticket.id.length <= 8 ? ticket.id : ticket.id.substring(0, 8);
+
+    return InkWell(
+      onTap: () => context.go('/admin/tickets/${ticket.id}'),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 820;
+            final titleBlock = Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Tooltip(
+                  message: '${ticket.slaState.label}: ${ticket.slaLabel}',
+                  child: Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: slaColor.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.confirmation_number_outlined,
+                      color: slaColor,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              ticket.subject,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w800),
+                            ),
+                          ),
+                          if (compact) const SizedBox(width: 8),
+                          if (compact)
+                            _TicketBadge(
+                              label: ticket.status.label,
+                              style: _statusBadgeStyle(context, ticket.status),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 6,
+                        children: [
+                          _TicketMeta(
+                            icon: Icons.tag_outlined,
+                            label: 'Ticket $ticketId',
+                          ),
+                          _TicketMeta(
+                            icon: Icons.category_outlined,
+                            label: ticket.type.label,
+                          ),
+                          _TicketMeta(
+                            icon: Icons.person_outline,
+                            label: ticket.requesterLabel,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 14,
+                        runSpacing: 6,
+                        children: [
+                          _TicketMeta(
+                            icon: Icons.apartment_outlined,
+                            label: ticket.hoaLabel,
+                          ),
+                          _TicketMeta(
+                            icon: Icons.location_on_outlined,
+                            label: ticket.addressLabel,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+
+            final statusBlock = Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: compact ? WrapAlignment.start : WrapAlignment.end,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                _TicketBadge(
+                  label: ticket.priority.label,
+                  style: _priorityBadgeStyle(context, ticket.priority),
+                ),
+                if (!compact)
+                  _TicketBadge(
+                    label: ticket.status.label,
+                    style: _statusBadgeStyle(context, ticket.status),
+                  ),
+                _TicketBadge(
+                  label: ticket.slaLabel,
+                  style: _BadgeStyle(
+                    foreground: slaColor,
+                    background: slaColor.withOpacity(0.10),
+                    border: slaColor.withOpacity(0.35),
+                  ),
+                  icon: Icons.timer_outlined,
+                ),
+                Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
+              ],
+            );
+
+            if (compact) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  titleBlock,
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 54),
+                    child: statusBlock,
+                  ),
+                ],
+              );
+            }
+
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(child: titleBlock),
+                const SizedBox(width: 16),
+                SizedBox(
+                  width: 320,
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: statusBlock,
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _TicketMeta extends StatelessWidget {
+  const _TicketMeta({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.bodySmall;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon,
+            size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+        const SizedBox(width: 4),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: style,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TicketBadge extends StatelessWidget {
+  const _TicketBadge({
+    required this.label,
+    required this.style,
+    this.icon,
+  });
+
+  final String label;
+  final _BadgeStyle style;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: style.background,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: style.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 15, color: style.foreground),
+            const SizedBox(width: 5),
+          ],
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: style.foreground,
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BadgeStyle {
+  const _BadgeStyle({
+    required this.foreground,
+    required this.background,
+    required this.border,
+  });
+
+  final Color foreground;
+  final Color background;
+  final Color border;
+}
+
+_BadgeStyle _statusBadgeStyle(BuildContext context, TicketStatus status) {
+  final scheme = Theme.of(context).colorScheme;
+  final color = switch (status) {
+    TicketStatus.newTicket => scheme.secondary,
+    TicketStatus.open => scheme.primary,
+    TicketStatus.assigned => const Color(0xff3347a8),
+    TicketStatus.inProgress => const Color(0xffb26a00),
+    TicketStatus.waitingOnCustomer => const Color(0xff7c3aed),
+    TicketStatus.resolved => const Color(0xff2f855a),
+    TicketStatus.closed => scheme.onSurfaceVariant,
+  };
+  return _BadgeStyle(
+    foreground: color,
+    background: color.withOpacity(0.10),
+    border: color.withOpacity(0.35),
+  );
+}
+
+_BadgeStyle _priorityBadgeStyle(BuildContext context, TicketPriority priority) {
+  final scheme = Theme.of(context).colorScheme;
+  final color = switch (priority) {
+    TicketPriority.low => scheme.onSurfaceVariant,
+    TicketPriority.normal => scheme.primary,
+    TicketPriority.high => const Color(0xffb7791f),
+    TicketPriority.urgent => scheme.error,
+  };
+  return _BadgeStyle(
+    foreground: color,
+    background: color.withOpacity(0.10),
+    border: color.withOpacity(0.35),
+  );
 }

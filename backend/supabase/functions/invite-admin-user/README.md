@@ -59,11 +59,12 @@ Deploy migration `0015_admin_user_invite_lifecycle.sql` before using this functi
 
 Accepted roles:
 
-- Tenant staff: `tenant_owner`, `tenant_admin`, `tenant_manager`, `tenant_csr`, `tenant_dispatch`
-- HOA users: `hoa_manager`, `hoa_board`, `hoa_resident`
+- Platform staff: `platform_owner`, `platform_admin`, `platform_support`, `platform_sales`
+- Tenant staff: `tenant_owner`, `tenant_admin`, `tenant_manager`, `tenant_csr`
+- Community contacts: `community_admin`
 
 Tenant staff assignments are written to `public.user_platform_roles` during the transition and exposed through `public.user_tenant_roles`.
-HOA user assignments are written to `public.user_hoa_memberships`.
+Community contact assignments are written to `public.user_hoa_memberships`.
 Invite lifecycle state is written to `public.admin_user_invites`.
 
 ## Friendly invite acceptance page

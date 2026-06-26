@@ -76,8 +76,6 @@ class TicketDashboardPage extends ConsumerWidget {
     return switch (queue) {
       TicketQueue.csr =>
         'New, open, and customer-facing tickets for CSR triage.',
-      TicketQueue.dispatch =>
-        'Route-impacting tickets ready for dispatch operations.',
       TicketQueue.urgent =>
         'Urgent and SLA-breached tickets needing immediate attention.',
       TicketQueue.aging => 'Open tickets older than 48 hours.',
@@ -252,7 +250,7 @@ class _TicketBoard extends StatelessWidget {
     }
 
     final viewportHeight = MediaQuery.sizeOf(context).height;
-    final boardHeight = (viewportHeight * 0.64).clamp(420.0, 760.0);
+    final boardHeight = (viewportHeight * 0.72).clamp(540.0, 880.0);
 
     return Container(
       height: boardHeight,
@@ -277,7 +275,7 @@ class _TicketBoard extends StatelessWidget {
                     right: index == visibleStatuses.length - 1 ? 0 : 16,
                   ),
                   child: SizedBox(
-                    width: 320,
+                    width: 312,
                     height: boardHeight - 32,
                     child: _TicketBoardColumn(
                       status: visibleStatuses[index],
@@ -395,7 +393,7 @@ class _BoardTicketCard extends StatelessWidget {
       child: InkWell(
         onTap: () => context.go(_ticketDetailPath(context, ticket.id)),
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -424,10 +422,10 @@ class _BoardTicketCard extends StatelessWidget {
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w700,
                 ),
-                maxLines: 2,
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Wrap(
                 spacing: 6,
                 runSpacing: 6,
@@ -447,17 +445,12 @@ class _BoardTicketCard extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               _MiniInfoLine(
                 icon: Icons.person_outline,
                 text: ticket.requesterLabel,
               ),
-              const SizedBox(height: 6),
-              _MiniInfoLine(
-                icon: Icons.domain_outlined,
-                text: ticket.hoaLabel,
-              ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 5),
               _MiniInfoLine(
                 icon: Icons.timer_outlined,
                 text: ticket.slaLabel,
@@ -536,260 +529,10 @@ class _CountPill extends StatelessWidget {
   }
 }
 
-class _QueueTicketCard extends StatelessWidget {
-  const _QueueTicketCard({
-    required this.ticket,
-    required this.isCompact,
-  });
-
-  final ServiceTicket ticket;
-  final bool isCompact;
-
-  @override
-  Widget build(BuildContext context) {
-    final slaColor = _slaColor(context, ticket);
-    final statusStyle = _statusStyle(context, ticket.status);
-    final priorityStyle = _priorityStyle(context, ticket.priority);
-
-    return Card(
-      margin: EdgeInsets.zero,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => context.go(_ticketDetailPath(context, ticket.id)),
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: isCompact
-              ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _TicketTitleBlock(ticket: ticket),
-                    const SizedBox(height: 14),
-                    _TicketMetaGrid(ticket: ticket),
-                    const SizedBox(height: 14),
-                    _TicketActionStrip(
-                      ticket: ticket,
-                      slaColor: slaColor,
-                      statusStyle: statusStyle,
-                      priorityStyle: priorityStyle,
-                    ),
-                  ],
-                )
-              : Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 4,
-                      height: 112,
-                      decoration: BoxDecoration(
-                        color: slaColor,
-                        borderRadius: BorderRadius.circular(99),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      flex: 5,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _TicketTitleBlock(ticket: ticket),
-                          const SizedBox(height: 14),
-                          _TicketMetaGrid(ticket: ticket),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 18),
-                    SizedBox(
-                      width: 330,
-                      child: _TicketActionStrip(
-                        ticket: ticket,
-                        slaColor: slaColor,
-                        statusStyle: statusStyle,
-                        priorityStyle: priorityStyle,
-                      ),
-                    ),
-                  ],
-                ),
-        ),
-      ),
-    );
-  }
-}
-
-class _TicketTitleBlock extends StatelessWidget {
-  const _TicketTitleBlock({required this.ticket});
-
-  final ServiceTicket ticket;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            Text(
-              ticket.subject,
-              style: theme.textTheme.titleLarge,
-            ),
-            _SoftBadge(
-              label: ticket.type.label,
-              icon: Icons.category_outlined,
-              foreground: theme.colorScheme.primary,
-              background: theme.colorScheme.primaryContainer.withOpacity(0.45),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'Ticket ${ticket.id.substring(0, 8)} · Created ${ticket.ageLabel} ago',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _TicketMetaGrid extends StatelessWidget {
-  const _TicketMetaGrid({required this.ticket});
-
-  final ServiceTicket ticket;
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 12,
-      runSpacing: 10,
-      children: [
-        _MetaItem(
-          icon: Icons.person_outline,
-          label: 'Customer',
-          value: ticket.requesterLabel,
-        ),
-        _MetaItem(
-          icon: Icons.location_on_outlined,
-          label: 'Service Address',
-          value: ticket.addressLabel,
-        ),
-        _MetaItem(
-          icon: Icons.domain_outlined,
-          label: 'Community',
-          value: ticket.hoaLabel,
-        ),
-      ],
-    );
-  }
-}
-
-class _MetaItem extends StatelessWidget {
-  const _MetaItem({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 220, maxWidth: 360),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 18, color: theme.colorScheme.onSurfaceVariant),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                Text(
-                  value,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TicketActionStrip extends StatelessWidget {
-  const _TicketActionStrip({
-    required this.ticket,
-    required this.slaColor,
-    required this.statusStyle,
-    required this.priorityStyle,
-  });
-
-  final ServiceTicket ticket;
-  final Color slaColor;
-  final _BadgeStyle statusStyle;
-  final _BadgeStyle priorityStyle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          alignment: WrapAlignment.end,
-          children: [
-            _SoftBadge(
-              label: ticket.status.label,
-              icon: Icons.circle,
-              foreground: statusStyle.foreground,
-              background: statusStyle.background,
-              dotIcon: true,
-            ),
-            _SoftBadge(
-              label: ticket.priority.label,
-              icon: Icons.flag_outlined,
-              foreground: priorityStyle.foreground,
-              background: priorityStyle.background,
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        _SlaLine(ticket: ticket, color: slaColor),
-        const SizedBox(height: 14),
-        Align(
-          alignment: Alignment.centerRight,
-          child: FilledButton.icon(
-            onPressed: () => context.go(_ticketDetailPath(context, ticket.id)),
-            icon: const Icon(Icons.open_in_new),
-            label: const Text('Open Ticket'),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 String _ticketDetailPath(BuildContext context, String ticketId) {
   final currentPath = GoRouterState.of(context).uri.path;
   final source = switch (currentPath) {
     '/admin/tickets/csr' => 'csr',
-    '/admin/tickets/dispatch' => 'dispatch',
     '/admin/tickets/urgent' => 'urgent',
     '/admin/tickets/aging' => 'aging',
     _ => null,
@@ -803,46 +546,18 @@ String _ticketDetailPath(BuildContext context, String ticketId) {
   ).toString();
 }
 
-class _SlaLine extends StatelessWidget {
-  const _SlaLine({required this.ticket, required this.color});
-
-  final ServiceTicket ticket;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Row(
-      children: [
-        Icon(Icons.timer_outlined, size: 18, color: color),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            '${ticket.slaState.label}: ${ticket.slaLabel}',
-            style: theme.textTheme.bodyMedium?.copyWith(color: color),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _SoftBadge extends StatelessWidget {
   const _SoftBadge({
     required this.label,
     required this.icon,
     required this.foreground,
     required this.background,
-    this.dotIcon = false,
   });
 
   final String label;
   final IconData icon;
   final Color foreground;
   final Color background;
-  final bool dotIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -856,7 +571,7 @@ class _SoftBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: dotIcon ? 9 : 16, color: foreground),
+          Icon(icon, size: 16, color: foreground),
           const SizedBox(width: 6),
           Text(
             label,

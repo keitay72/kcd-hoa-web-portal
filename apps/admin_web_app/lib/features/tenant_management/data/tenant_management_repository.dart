@@ -964,7 +964,6 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
       'tenant_admin',
       'tenant_manager',
       'tenant_csr',
-      'tenant_dispatch',
     ]).order('created_at', ascending: false);
 
     final userIds =
@@ -1068,7 +1067,7 @@ class SupabaseTenantManagementRepository implements TenantManagementRepository {
         'tenant_id': tenantId,
         'email_from_name': name,
         'timezone': 'America/Chicago',
-        'resident_activation_codes_required': true,
+        'resident_activation_codes_required': false,
       },
       onConflict: 'tenant_id',
     );

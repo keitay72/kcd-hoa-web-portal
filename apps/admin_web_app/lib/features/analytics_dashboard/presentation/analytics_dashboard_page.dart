@@ -107,11 +107,10 @@ class _AnalyticsDashboardContent extends ConsumerWidget {
                   ),
                   if (!isTenantScoped)
                     _MetricCardData(
-                      label: 'Active Activation Codes',
+                      label: 'Legacy Activation Codes',
                       value: snapshot.platformMetrics.activeActivationCodes,
                       icon: Icons.password_outlined,
                       color: Colors.indigo,
-                      onTapPath: '/admin/activation-codes',
                     ),
                   _MetricCardData(
                     label: 'Documents',

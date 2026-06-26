@@ -73,7 +73,6 @@ Deno.serve(async (request) => {
   if (!serviceLocation) {
     return jsonResponse({ error: "Address not found in this portal" }, 404);
   }
-  const activationCodeRequired = false;
 
   const { error: profileError } = await supabase.from("profiles").upsert({
     id: userId,
@@ -145,5 +144,5 @@ Deno.serve(async (request) => {
     return jsonResponse({ error: verificationError.message }, 500);
   }
 
-  return jsonResponse({ verification, activationCodeRequired });
+  return jsonResponse({ verification });
 });

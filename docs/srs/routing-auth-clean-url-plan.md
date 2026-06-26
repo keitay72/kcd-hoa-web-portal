@@ -159,7 +159,7 @@ Suggested priority for deterministic default:
 
 1. Platform admin/support context.
 2. Tenant admin/manager context.
-3. CSR/dispatch operational context.
+3. Tenant customer-service or ticket operations context.
 4. Community admin context.
 5. Customer user context.
 
@@ -214,7 +214,7 @@ Document current routes and classify them:
 - Customer portal.
 - Auth callback.
 - Invite acceptance.
-- Legacy resident portal.
+- Legacy customer/resident portal compatibility routes.
 
 ### Phase 2: Add Tenant Hostname Resolution
 

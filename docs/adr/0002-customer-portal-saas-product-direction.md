@@ -75,7 +75,8 @@ After login:
 
 - Platform users land in platform administration.
 - Tenant admins land in tenant administration.
-- CSR and dispatch users land in operational queues.
+- Tenant customer-service users land in ticket queues.
+- Tenant managers and admins land in management dashboards.
 - Community admins land in their community workspace.
 - Customer users land in their customer portal.
 - Users with multiple contexts should see a context switcher or deterministic default context.
@@ -143,9 +144,11 @@ Roles should exist only when they create meaningfully different permissions or w
 Target role groups:
 
 - Platform roles: `platform_owner`, `platform_admin`, `platform_support`, `platform_sales`.
-- Tenant roles: `tenant_admin`, `tenant_manager`, `tenant_csr`, `tenant_dispatch`.
+- Tenant roles: `tenant_owner`, `tenant_admin`, `tenant_manager`, `tenant_csr`.
 - Community role: `community_admin`.
 - Customer role: `customer_user`.
+
+`tenant_dispatch` remains a legacy compatibility role from early dispatch/routing assumptions. Do not expose dispatch in new product flows unless routing or dispatch operations become an explicit product requirement.
 
 Existing HOA roles should be treated as compatibility roles:
 
@@ -228,7 +231,7 @@ Recommended next implementation sequence:
 1. Update product language from HOA Portal to Customer Portal where it affects future-facing docs, navigation, onboarding, and marketing.
 2. Add or formalize tenant portal hostname resolution using `tenant_settings.portal_hostname`.
 3. Consolidate toward one login flow for all user types.
-4. Replace activation-code-first registration with address match plus email verification.
+4. Continue hardening address match plus email verification as the default customer registration flow.
 5. Design customer account/service location schema before expanding commercial or roll-off workflows.
 6. Simplify community-level roles and avoid creating new workflows that depend on separate HOA Manager and HOA Board Member roles.
 7. Update subscription plan data to use customer/service-location limits instead of HOA/resident limits.
@@ -238,7 +241,7 @@ Recommended next implementation sequence:
 
 - Do not build separate login pages for each user type.
 - Do not make feature-gated subscription tiers for core portal functionality.
-- Do not add new activation-code requirements unless a tenant explicitly chooses strict verification.
+- Do not add new activation-code requirements without a fresh product decision and security review.
 - Do not expand the deferred mobile app before the web portal model is stable.
 - Do not treat roll-off and commercial as separate products. They are future account/context types inside the same portal platform.
 

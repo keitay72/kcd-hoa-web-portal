@@ -171,7 +171,7 @@ Should focus on active work:
 
 - New/untriaged requests.
 - Urgent/aging requests.
-- Dispatch queue.
+- Customer-service queue and ticket board/list views.
 - Recently updated tickets.
 - Signup/verification issues.
 - Data import/onboarding blockers.

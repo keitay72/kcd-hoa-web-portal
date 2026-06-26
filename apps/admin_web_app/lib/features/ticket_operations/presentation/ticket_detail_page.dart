@@ -258,7 +258,7 @@ class _TicketWorkflowSection extends StatelessWidget {
         _WorkflowRow(
           icon: Icons.assignment_ind_outlined,
           label: 'Assignment',
-          value: 'Route to CSR or dispatch',
+          value: 'Assign to a team member',
           accent: Theme.of(context).colorScheme.primary,
           actionLabel: 'Assign',
           enabled: canManageTicket,
@@ -351,11 +351,6 @@ _BackDestination _backDestination(WidgetRef ref, String? source) {
       return const _BackDestination(
         path: '/admin/tickets/csr',
         label: 'Back to CSR Queue',
-      );
-    case 'dispatch':
-      return const _BackDestination(
-        path: '/admin/tickets/dispatch',
-        label: 'Back to Dispatch Queue',
       );
     case 'urgent':
       return const _BackDestination(

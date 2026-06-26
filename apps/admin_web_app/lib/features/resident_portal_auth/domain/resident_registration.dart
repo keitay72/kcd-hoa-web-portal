@@ -17,7 +17,6 @@ class ResidentRegistrationResult {
     required this.verificationId,
     required this.address,
     required this.tenantCode,
-    required this.activationCodeRequired,
   });
 
   final String userId;
@@ -25,15 +24,12 @@ class ResidentRegistrationResult {
   final String verificationId;
   final VerifiedResidentAddress address;
   final String tenantCode;
-  final bool activationCodeRequired;
 }
 
 class ResidentEmailVerificationCompletion {
   const ResidentEmailVerificationCompletion({
     required this.verified,
-    required this.activationCodeRequired,
   });
 
   final bool verified;
-  final bool activationCodeRequired;
 }

@@ -69,17 +69,17 @@ Implemented or in progress:
 - Permission-aware navigation visibility
 - Protected admin routes
 - Unauthorized page
-- HOA Management
-- Address Registry Management
+- Community Management
+- Service Location Management
 - Bulk address CSV import
-- Activation Code Management
-- Resident Verification Management
+- Legacy activation-code compatibility reporting
+- Customer Verification Management
 - Document Management with Supabase Storage uploads and signed downloads
 - Announcement Management
-- Service Schedule Management with HOA-wide defaults and optional address overrides
+- Service Schedule Management with customer account/community defaults and optional service-location overrides
 - Ticket Operations Management
-- Dispatch Workflow Management
-- CSR and Dispatch queue dashboards
+- Customer-service queue dashboards
+- Ticket board and list views
 - User and Role Management
 - Invite lifecycle handling for admin users
 - Invite acceptance and password setup flow
@@ -96,12 +96,12 @@ Reserved or planned:
 - Production Stripe activation after account credentials are available
 - Tenant email provider configuration workflow
 - Tenant SMS/Twilio add-on workflow
-- Resident Portal/mobile implementation
+- Customer portal PWA hardening and mobile polish
 
 ## Repository Layout
 
 - `apps/admin_web_app`: Flutter Web admin portal currently under active development.
-- `apps/mobile_app`: Deferred resident mobile app skeleton.
+- `apps/mobile_app`: Deferred native mobile app skeleton. The current mobile strategy is to harden the customer portal as a PWA first.
 - `backend/supabase`: Supabase migrations, Edge Functions, RLS policies, storage policies, and tests.
 - `backend/supabase/functions`: Supabase Edge Functions.
 - `backend/supabase/migrations`: Versioned database migrations.
@@ -129,17 +129,16 @@ Important app folders:
 - `lib/core/supabase`: Supabase client providers.
 - `lib/core/rbac`: RBAC services, permission rules, role providers, route access utilities, and unauthorized page.
 - `lib/features/auth_admin`: Admin sign-in flow.
-- `lib/features/hoa_management`: HOA community CRUD workflows.
-- `lib/features/address_registry`: HOA address registry and CSV import workflows.
-- `lib/features/activation_codes`: Activation code list/detail/generate/reset/revoke/history workflows.
-- `lib/features/verification_admin`: Resident verification management workflows.
+- `lib/features/hoa_management`: Community/customer-account management workflows. The folder name is legacy while the product moves from HOA-first to customer-portal SaaS.
+- `lib/features/address_registry`: Service-location registry and CSV import workflows. The folder name is legacy while the UI moves toward service locations.
+- `lib/features/verification_admin`: Customer verification management workflows.
 - `lib/features/documents_cms`: Document CMS and Storage workflows.
 - `lib/features/announcements_cms`: Announcement CMS workflows.
-- `lib/features/schedules_admin`: HOA-wide service schedules and optional address overrides.
-- `lib/features/ticket_operations`: Ticket operations, dispatch, queues, assignment, notes, priority, and metrics.
-- `lib/features/user_management`: User invitation, profile, role, HOA scope, tenant scope, and invite lifecycle management.
+- `lib/features/schedules_admin`: Service schedules at customer-account, community, and service-location scopes.
+- `lib/features/ticket_operations`: Ticket operations, customer-service queues, ticket board/list views, assignment, notes, priority, SLA, attachments, and metrics.
+- `lib/features/user_management`: User invitation, profile, platform/tenant/community roles, tenant scope, invite lifecycle, deactivation/reactivation, and password workflows.
 - `lib/features/analytics_dashboard`: Platform and operational metrics dashboard.
-- `lib/features/audit_logs`: Admin audit log viewer with actor, HOA, action, entity, and JSON change details. Tenant and user-management workflows write audit events for profile changes, role assignment/removal, tenant settings, onboarding, billing contacts, subscriptions, add-ons, and Stripe action requests.
+- `lib/features/audit_logs`: Admin audit log viewer with actor, scope, action, entity, and JSON change details. Tenant and user-management workflows write audit events for profile changes, role assignment/removal, tenant settings, onboarding, billing contacts, subscriptions, add-ons, and Stripe action requests.
 - `lib/features/tenant_management`: SaaS tenant management, commercial settings, subscription assignment, and onboarding workflow.
 - `lib/features/commercial_catalog`: Subscription/add-on catalog management foundations.
 
@@ -195,10 +194,10 @@ Platform roles:
 
 Tenant roles:
 
+- `tenant_owner`: Waste-hauler tenant owner with top-level tenant authority for one tenant.
 - `tenant_admin`: Waste-management company administrator for a tenant.
 - `tenant_manager`: Waste-management company management user.
 - `tenant_csr`: Tenant customer service user.
-- `tenant_dispatch`: Tenant dispatch/operations user.
 
 Community roles:
 
@@ -217,9 +216,12 @@ Deprecated compatibility roles may still exist in historical data and compatibil
 - `mgmt`
 - `csr`
 - `dispatch`
+- `tenant_dispatch`
 - `resident`
 
 These should not be used for new role assignments. Active Admin Web App flows and Edge Function authorization should use the canonical SaaS roles above.
+
+`tenant_dispatch` is retained for historical migrations and compatibility only. New invite flows should not expose dispatch unless routing or dispatch operations are reintroduced as an explicit product requirement.
 
 ## RBAC Behavior
 
@@ -276,7 +278,7 @@ Important migration groups:
 - `0030_seed_saas_subscription_catalog.sql`: Original SaaS subscription catalog seed.
 - `0031_free_beta_subscription_mode.sql`: Free beta subscription mode.
 - `0032_tenant_beta_tracking.sql`: Tenant beta tracking fields.
-- `0033_resident_activation_code_settings.sql`: Resident activation code settings.
+- `0033_resident_activation_code_settings.sql`: Legacy resident activation code settings retained for migration compatibility.
 - `0034_submit_resident_service_issue_rpc.sql`: Resident service issue RPC.
 - `0035_customer_portal_foundation.sql`: Generalized customer account, service location, membership, verification, and usage snapshot foundation.
 - `0036_backfill_customer_portal_from_hoa.sql`: Backfill generalized customer portal tables from current HOA data.
@@ -290,7 +292,6 @@ Current Edge Functions include:
 
 - `invite-admin-user`: Invites admin users without exposing the service role key to Flutter. It records invite lifecycle state and supports pending, accepted, failed, expired, and cancelled invites.
 - `verify-address`: Address verification workflow support.
-- `verify-activation-code`: Resident activation code verification workflow support.
 - `create-tenant-checkout-session`: Stripe-ready placeholder for tenant subscription checkout.
 - `sync-tenant-stripe-status`: Stripe-ready placeholder for manual subscription sync.
 - `stripe-webhook`: Stripe-ready placeholder webhook endpoint.
@@ -449,8 +450,8 @@ Implemented ticket workflows:
 - Staff assignment and reassignment.
 - Internal notes through ticket timeline events.
 - Priority escalation.
-- CSR and dispatch dashboards.
-- Queue views.
+- Customer-service queue dashboard.
+- Ticket board and list views.
 - SLA indicators.
 - Ticket metrics.
 - Attachment signed URL viewer.
@@ -461,7 +462,7 @@ Internal notes are currently represented through tagged ticket events. Before re
 
 ## Customer Signup And Verification
 
-The preferred customer signup flow does not require mailed activation codes.
+The customer signup flow does not require mailed activation codes.
 
 Target customer signup flow:
 
@@ -481,20 +482,15 @@ Design notes:
 - Multiple users may be associated with the same service location.
 - Sensitive future features, such as billing or payment history, may require stronger verification.
 
-Activation codes remain a compatibility or stricter-verification option.
+Activation codes are legacy compatibility data only. New customer signup uses address match plus email verification, and the active portal no longer exposes an activation-code verification flow.
 
-Current activation-code model:
+Legacy activation-code model:
 
 - `activation_codes.code_hash` stores the hash.
 - Plaintext codes are not stored in the base table.
 - Admin visibility for plaintext activation codes requires a separate secure design if needed.
 
-If activation codes are retained for strict-mode tenants:
-
-- Keep `code_hash` for verification.
-- Store encrypted activation code values only when business requirements demand admin re-display.
-- Restrict plaintext viewing to approved roles, such as platform administrators and tenant CSR users.
-- Audit every plaintext view, regeneration, resend, and print action.
+Do not add new activation-code UI without a fresh product decision and security review.
 
 ## Admin Invite Acceptance
 
@@ -653,7 +649,7 @@ Recommended next steps:
 1. Create the customer-portal product architecture plan from ADR 0002 before adding more HOA-specific workflows.
 2. Add tenant portal-domain resolution so a hostname such as `portal.olathewasteinc.com` resolves tenant branding and configuration.
 3. Consolidate toward one login experience for all users, with post-login routing based on roles and memberships.
-4. Replace activation-code-first signup with address match plus email verification for customer account creation.
+4. Continue hardening address match plus email verification for customer account creation.
 5. Design the customer account/service location schema that can support residential, HOA/community, commercial, and roll-off contexts.
 6. Simplify HOA/community roles so future work uses one community admin role unless distinct permissions are required.
 7. Update subscription plans so all tiers include the full core feature set and differ by active customer/service-location limits.

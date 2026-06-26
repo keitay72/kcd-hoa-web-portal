@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/design/app_theme.dart';
 import 'admin_router.dart';
 
 class AdminApp extends ConsumerWidget {
@@ -14,12 +15,7 @@ class AdminApp extends ConsumerWidget {
       title: 'Customer Portal',
       routerConfig: router,
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xff0f5132),
-        ),
-        useMaterial3: true,
-      ),
+      theme: CustomerPortalTheme.light(),
     );
   }
 }

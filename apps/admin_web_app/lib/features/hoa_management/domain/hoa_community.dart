@@ -32,12 +32,4 @@ class HoaCommunity {
   final bool? residentActivationCodesRequiredOverride;
 
   bool get isActive => status == HoaCommunityStatus.active;
-
-  String get residentActivationCodeSettingLabel {
-    return switch (residentActivationCodesRequiredOverride) {
-      null => 'Activation codes: tenant default',
-      true => 'Activation codes: required',
-      false => 'Activation codes: bypassed',
-    };
-  }
 }

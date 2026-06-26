@@ -179,35 +179,4 @@ class ResidentPortalAuthController extends AutoDisposeAsyncNotifier<void> {
     state = const AsyncData(null);
     return result.value;
   }
-
-  Future<bool> verifyActivationCode(String code) async {
-    final registration = ref.read(residentRegistrationStateProvider);
-    state = const AsyncLoading();
-    final result = await AsyncValue.guard(() {
-      if (registration == null) {
-        return ref
-            .read(residentPortalAuthRepositoryProvider)
-            .verifyActivationCodeForCurrentUser(code);
-      }
-
-      return ref
-          .read(residentPortalAuthRepositoryProvider)
-          .verifyActivationCode(
-            verificationId: registration.verificationId,
-            addressId: registration.address.id,
-            code: code,
-          );
-    });
-
-    if (result.hasError || result.value != true) {
-      state = AsyncError<void>(
-        result.error ?? StateError('Activation code verification failed.'),
-        result.stackTrace ?? StackTrace.current,
-      );
-      return false;
-    }
-
-    state = const AsyncData(null);
-    return true;
-  }
 }

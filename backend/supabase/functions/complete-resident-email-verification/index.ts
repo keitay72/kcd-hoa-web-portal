@@ -150,28 +150,13 @@ Deno.serve(async (request) => {
   }
 
   if (verification.status === "verified") {
-    return jsonResponse({ verified: true, activationCodeRequired: false });
+    return jsonResponse({ verified: true });
   }
 
   if (!verification.customer_account_id || !verification.service_location_id) {
     return jsonResponse({
       error: "Customer verification is missing a service location",
     }, 400);
-  }
-
-  const activationCodeRequired = false;
-
-  if (activationCodeRequired) {
-    const { error: updateError } = await serviceClient
-      .from("customer_verifications")
-      .update({ email_verified: true })
-      .eq("id", verification.id);
-
-    if (updateError) {
-      return jsonResponse({ error: updateError.message }, 500);
-    }
-
-    return jsonResponse({ verified: false, activationCodeRequired: true });
   }
 
   const membershipError = await activateCustomerMembership(
@@ -189,5 +174,5 @@ Deno.serve(async (request) => {
     return jsonResponse({ error: membershipError }, 500);
   }
 
-  return jsonResponse({ verified: true, activationCodeRequired: false });
+  return jsonResponse({ verified: true });
 });

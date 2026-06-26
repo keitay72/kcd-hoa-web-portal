@@ -228,7 +228,6 @@ String _tenantContextPrefix(List<AdminRoleAssignment> roles) {
   if (roles.any((role) => role.code == 'tenant_csr')) {
     return 'Customer Service';
   }
-  if (roles.any((role) => role.code == 'tenant_dispatch')) return 'Dispatch';
   return 'Staff';
 }
 

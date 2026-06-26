@@ -72,8 +72,7 @@ class SupabaseTicketRepository implements TicketRepository {
     is_active,
     created_at,
     updated_at,
-    hoa_communities(name, code),
-    activation_codes(id, status, expires_at, consumed_at, reset_count, created_at)
+    hoa_communities(name, code)
   ''';
   static const _ticketSelect = '''
     id,
@@ -215,7 +214,6 @@ class SupabaseTicketRepository implements TicketRepository {
       if (!{
         'tenant_owner',
         'tenant_csr',
-        'tenant_dispatch',
         'tenant_admin',
         'tenant_manager',
       }.contains(roleCode)) {
@@ -287,12 +285,6 @@ class SupabaseTicketRepository implements TicketRepository {
           return ticket.status == TicketStatus.newTicket ||
               ticket.status == TicketStatus.open ||
               ticket.status == TicketStatus.waitingOnCustomer;
-        }).toList(),
-      TicketQueue.dispatch => tickets.where((ticket) {
-          return ticket.type == TicketType.missedPickup ||
-              ticket.type == TicketType.damagedCart ||
-              ticket.status == TicketStatus.assigned ||
-              ticket.status == TicketStatus.inProgress;
         }).toList(),
       TicketQueue.urgent => tickets.where((ticket) {
           return ticket.priority == TicketPriority.urgent ||

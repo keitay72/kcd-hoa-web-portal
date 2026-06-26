@@ -35,7 +35,7 @@ class ResidentVerificationDetailPage extends ConsumerWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Resident Verification Detail',
+                  'Customer Verification Detail',
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
               ),
@@ -81,7 +81,7 @@ class ResidentVerificationDetailPage extends ConsumerWidget {
               ),
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (error, _) => Center(
-                child: Text('Unable to load resident verification: $error'),
+                child: Text('Unable to load customer verification: $error'),
               ),
             ),
           ),
@@ -124,7 +124,8 @@ class ResidentVerificationDetailPage extends ConsumerWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Unable to calculate resident overage impact: $error'),
+            content:
+                Text('Unable to calculate customer overage impact: $error'),
           ),
         );
       }
@@ -136,7 +137,7 @@ class ResidentVerificationDetailPage extends ConsumerWidget {
     if (impact.shouldWarn) {
       return _confirm(
         context: context,
-        title: 'Resident overage may apply',
+        title: 'Customer overage may apply',
         message: _residentOverageMessage(impact),
         actionLabel: 'Approve Anyway',
       );
@@ -145,7 +146,8 @@ class ResidentVerificationDetailPage extends ConsumerWidget {
     return _confirm(
       context: context,
       title: 'Approve Verification',
-      message: 'Approve this resident verification and mark all factors verified?',
+      message:
+          'Approve this customer verification and mark all factors verified?',
       actionLabel: 'Approve',
     );
   }
@@ -158,7 +160,8 @@ class ResidentVerificationDetailPage extends ConsumerWidget {
     final confirmed = await _confirm(
       context: context,
       title: 'Reset Verification',
-      message: 'Reset this verification to pending and clear all verification factors?',
+      message:
+          'Reset this verification to pending and clear all verification factors?',
       actionLabel: 'Reset',
     );
 
@@ -185,7 +188,9 @@ class ResidentVerificationDetailPage extends ConsumerWidget {
       return;
     }
 
-    await ref.read(residentVerificationCommandProvider.notifier).deactivateResident(
+    await ref
+        .read(residentVerificationCommandProvider.notifier)
+        .deactivateResident(
           userId: item.userId,
           reason: reason,
           verificationId: item.id,
@@ -231,7 +236,8 @@ class ResidentVerificationDetailPage extends ConsumerWidget {
               _DetailRow(label: 'Resident', value: item.residentLabel),
               _DetailRow(label: 'Email', value: item.residentEmail ?? ''),
               _DetailRow(label: 'Phone', value: item.residentPhone ?? ''),
-              _DetailRow(label: 'Profile Status', value: item.residentStatus ?? ''),
+              _DetailRow(
+                  label: 'Profile Status', value: item.residentStatus ?? ''),
               _DetailRow(label: 'User ID', value: item.userId),
             ],
           ),
@@ -253,11 +259,11 @@ String _residentOverageMessage(ResidentApprovalImpact impact) {
   final projectedAnnual = projectedMonthly * 12;
 
   return '${impact.tenantName} is using ${_formatCount(impact.currentResidentCount)} '
-      'of ${_formatCount(limit ?? 0)} included residents for '
+      'of ${_formatCount(limit ?? 0)} included customers for '
       '${impact.planName}.\n\n'
-      'Approving this resident may add \$0.05/month to this tenant '
-      'subscription. Projected resident overage: '
-      '${_formatCount(impact.projectedOverageCount)} resident(s), estimated '
+      'Approving this customer may add \$0.05/month to this tenant '
+      'subscription. Projected customer overage: '
+      '${_formatCount(impact.projectedOverageCount)} customer(s), estimated '
       '${_formatMoneyCents(projectedMonthly)}/month '
       '(${_formatMoneyCents(projectedAnnual)}/year).\n\n'
       'Billing is not automated yet, but this keeps approvals moving while '
@@ -326,10 +332,11 @@ class _VerificationDetailsCard extends StatelessWidget {
                 OutlinedButton.icon(
                   onPressed: isBusy ? null : onViewResident,
                   icon: const Icon(Icons.person_search_outlined),
-                  label: const Text('View Resident'),
+                  label: const Text('View Customer'),
                 ),
                 FilledButton.icon(
-                  onPressed: isBusy || item.status == ResidentVerificationStatus.verified
+                  onPressed: isBusy ||
+                          item.status == ResidentVerificationStatus.verified
                       ? null
                       : onApprove,
                   icon: const Icon(Icons.verified_user_outlined),
@@ -345,7 +352,7 @@ class _VerificationDetailsCard extends StatelessWidget {
                       ? null
                       : onDeactivate,
                   icon: const Icon(Icons.person_off_outlined),
-                  label: const Text('Deactivate Resident'),
+                  label: const Text('Deactivate Customer'),
                 ),
               ],
             ),
@@ -353,16 +360,21 @@ class _VerificationDetailsCard extends StatelessWidget {
             _DetailRow(label: 'Verification ID', value: item.id),
             _DetailRow(label: 'Resident Name', value: item.residentLabel),
             _DetailRow(label: 'Email', value: item.residentEmail ?? ''),
-            _DetailRow(label: 'Profile Status', value: item.residentStatus ?? ''),
+            _DetailRow(
+                label: 'Profile Status', value: item.residentStatus ?? ''),
             _DetailRow(label: 'HOA', value: item.hoaLabel),
             _DetailRow(
               label: 'Address',
-              value: item.addressLabel.isEmpty ? item.addressId ?? '' : item.addressLabel,
+              value: item.addressLabel.isEmpty
+                  ? item.addressId ?? ''
+                  : item.addressLabel,
             ),
-            _DetailRow(label: 'Address Verified', value: _yesNo(item.addressVerified)),
-            _DetailRow(label: 'Email Verified', value: _yesNo(item.emailVerified)),
             _DetailRow(
-              label: 'Activation Code Verified',
+                label: 'Address Verified', value: _yesNo(item.addressVerified)),
+            _DetailRow(
+                label: 'Email Verified', value: _yesNo(item.emailVerified)),
+            _DetailRow(
+              label: 'Legacy Code Verified',
               value: _yesNo(item.activationCodeVerified),
             ),
             _DetailRow(label: 'Verification Status', value: item.statusLabel),
@@ -370,8 +382,10 @@ class _VerificationDetailsCard extends StatelessWidget {
               label: 'Verified At',
               value: item.verifiedAt?.toLocal().toString() ?? '',
             ),
-            _DetailRow(label: 'Created', value: item.createdAt.toLocal().toString()),
-            _DetailRow(label: 'Updated', value: item.updatedAt.toLocal().toString()),
+            _DetailRow(
+                label: 'Created', value: item.createdAt.toLocal().toString()),
+            _DetailRow(
+                label: 'Updated', value: item.updatedAt.toLocal().toString()),
           ],
         ),
       ),
@@ -465,7 +479,8 @@ class _DeactivateResidentDialog extends StatefulWidget {
   const _DeactivateResidentDialog();
 
   @override
-  State<_DeactivateResidentDialog> createState() => _DeactivateResidentDialogState();
+  State<_DeactivateResidentDialog> createState() =>
+      _DeactivateResidentDialogState();
 }
 
 class _DeactivateResidentDialogState extends State<_DeactivateResidentDialog> {

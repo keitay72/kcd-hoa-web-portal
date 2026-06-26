@@ -141,7 +141,7 @@ Recommended columns:
 
 Recommended constraints:
 
-- `verification_method in ('address_email', 'activation_code', 'manual_review', 'account_number')`
+- `verification_method in ('address_email', 'manual_review', 'account_number')`; legacy imported rows may still contain `activation_code`
 - `status in ('pending', 'email_sent', 'verified', 'failed', 'expired', 'cancelled')`
 
 ## Existing Tables To Generalize

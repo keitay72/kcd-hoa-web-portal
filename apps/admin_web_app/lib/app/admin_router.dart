@@ -20,8 +20,6 @@ import '../core/supabase/supabase_provider.dart';
 import '../features/analytics_dashboard/presentation/analytics_dashboard_page.dart';
 import '../features/address_registry/presentation/address_detail_page.dart';
 import '../features/address_registry/presentation/address_list_page.dart';
-import '../features/activation_codes/presentation/activation_code_detail_page.dart';
-import '../features/activation_codes/presentation/activation_code_list_page.dart';
 import '../features/announcements_cms/presentation/announcement_detail_page.dart';
 import '../features/announcements_cms/presentation/announcement_list_page.dart';
 import '../features/audit_logs/presentation/audit_log_list_page.dart';
@@ -44,7 +42,6 @@ import '../features/hoa_manager_experience/presentation/hoa_staff_page.dart';
 import '../features/hoa_manager_experience/presentation/hoa_tickets_page.dart';
 import '../features/schedules_admin/presentation/service_schedule_detail_page.dart';
 import '../features/schedules_admin/presentation/service_schedule_list_page.dart';
-import '../features/resident_portal_auth/presentation/activation_code_verification_page.dart';
 import '../features/resident_portal_auth/presentation/customer_document_view_page.dart';
 import '../features/resident_portal_auth/presentation/customer_portal_home_page.dart';
 import '../features/resident_portal_auth/presentation/customer_service_issue_page.dart';
@@ -199,7 +196,6 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
           _rememberResidentTenantCode(tenantCode);
 
           const protectedPortalLeaves = {
-            'activation-code',
             'documents',
             'home',
             'service-issue',
@@ -359,13 +355,6 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
         ),
       ),
       GoRoute(
-        path: '/portal/:tenantCode/activation-code',
-        name: 'residentPortalActivationCode',
-        builder: (context, state) => ActivationCodeVerificationPage(
-          tenantCode: state.pathParameters['tenantCode']!,
-        ),
-      ),
-      GoRoute(
         path: '/portal/:tenantCode/success',
         name: 'residentPortalSuccess',
         builder: (context, state) => RegistrationSuccessPage(
@@ -487,19 +476,6 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
             ).protectedBy(AdminPermissions.addressRead),
           ),
           GoRoute(
-            path: '/admin/activation-codes',
-            name: 'activationCodeList',
-            builder: (context, state) => const ActivationCodeListPage()
-                .protectedBy(AdminPermissions.activationCodes),
-          ),
-          GoRoute(
-            path: '/admin/activation-codes/:activationCodeId',
-            name: 'activationCodeDetail',
-            builder: (context, state) => ActivationCodeDetailPage(
-              activationCodeId: state.pathParameters['activationCodeId']!,
-            ).protectedBy(AdminPermissions.activationCodes),
-          ),
-          GoRoute(
             path: '/admin/resident-verification',
             name: 'residentVerificationList',
             builder: (context, state) => const ResidentVerificationListPage()
@@ -564,15 +540,6 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
               queue: TicketQueue.csr,
             )
                 .protectedByFeature(TenantFeature.advancedTicketManagement)
-                .protectedBy(AdminPermissions.ticketsRead),
-          ),
-          GoRoute(
-            path: '/admin/tickets/dispatch',
-            name: 'ticketDispatchDashboard',
-            builder: (context, state) => const TicketDashboardPage(
-              queue: TicketQueue.dispatch,
-            )
-                .protectedByFeature(TenantFeature.dispatchDashboard)
                 .protectedBy(AdminPermissions.ticketsRead),
           ),
           GoRoute(
@@ -828,14 +795,32 @@ class _AdminNavigationShellState extends ConsumerState<AdminNavigationShell> {
   @override
   Widget build(BuildContext context) {
     if (_isSigningOut) {
-      return const Scaffold(body: SizedBox.expand());
+      return const _AdminSessionTransitionPage(
+        message: 'Signing you out...',
+      );
     }
 
     final accessState = ref.watch(adminAccessProvider);
+    if (accessState.isLoading) {
+      return const _AdminSessionTransitionPage(
+        message: 'Loading your workspace...',
+      );
+    }
+
+    if (accessState.hasError) {
+      return _AdminSessionErrorPage(
+        message: 'Unable to load your workspace.',
+        details: accessState.error.toString(),
+        onSignOut: _signOut,
+      );
+    }
+
     final access = accessState.asData?.value;
     if (access != null && !_hasAdminPortalAccess(access)) {
       _redirectNonAdminSession();
-      return const Scaffold(body: SizedBox.expand());
+      return const _AdminSessionTransitionPage(
+        message: 'Sending you to the right portal...',
+      );
     }
 
     final passwordSetupRequired =
@@ -915,6 +900,89 @@ class _AdminNavigationShellState extends ConsumerState<AdminNavigationShell> {
   }
 }
 
+class _AdminSessionTransitionPage extends StatelessWidget {
+  const _AdminSessionTransitionPage({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox.square(
+              dimension: 28,
+              child: CircularProgressIndicator(strokeWidth: 3),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              message,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AdminSessionErrorPage extends StatelessWidget {
+  const _AdminSessionErrorPage({
+    required this.message,
+    required this.details,
+    required this.onSignOut,
+  });
+
+  final String message;
+  final String details;
+  final VoidCallback onSignOut;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return Scaffold(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.lock_clock_outlined,
+                    color: scheme.error,
+                    size: 40,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(message, style: theme.textTheme.headlineSmall),
+                  const SizedBox(height: 8),
+                  Text(
+                    details,
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 20),
+                  FilledButton.icon(
+                    onPressed: onSignOut,
+                    icon: const Icon(Icons.logout),
+                    label: const Text('Sign out'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _SidebarHeader extends StatelessWidget {
   const _SidebarHeader({
     required this.isCollapsed,
@@ -932,6 +1000,7 @@ class _SidebarHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final toggle = onToggleCollapsed == null
         ? null
         : IconButton(
@@ -952,10 +1021,7 @@ class _SidebarHeader extends StatelessWidget {
           children: [
             Tooltip(
               message: fullTitle,
-              child: const CircleAvatar(
-                radius: 20,
-                child: Icon(Icons.delete_outline),
-              ),
+              child: const _PortalMark(),
             ),
             if (toggle != null) ...[
               const SizedBox(height: 6),
@@ -970,10 +1036,7 @@ class _SidebarHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
       child: Row(
         children: [
-          const CircleAvatar(
-            radius: 20,
-            child: Icon(Icons.delete_outline),
-          ),
+          const _PortalMark(),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -989,12 +1052,37 @@ class _SidebarHeader extends StatelessWidget {
                   subtitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
                 ),
               ],
             ),
           ),
           if (toggle != null) toggle,
         ],
+      ),
+    );
+  }
+}
+
+class _PortalMark extends StatelessWidget {
+  const _PortalMark();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: scheme.primaryContainer,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Icon(
+        Icons.delete_outline,
+        color: scheme.onPrimaryContainer,
       ),
     );
   }
@@ -1145,13 +1233,6 @@ class _AdminSidebar extends ConsumerWidget {
       activePrefixes: ['/admin/addresses'],
     ),
     _AdminNavItem(
-      label: 'Customer Verification',
-      permissionRule: AdminPermissions.verificationRead,
-      path: '/admin/resident-verification',
-      icon: Icons.verified_user_outlined,
-      activePrefixes: ['/admin/resident-verification'],
-    ),
-    _AdminNavItem(
       label: 'Announcements',
       permissionRule: AdminPermissions.announcementsRead,
       path: '/admin/announcements',
@@ -1225,13 +1306,6 @@ class _AdminSidebar extends ConsumerWidget {
       path: '/admin/addresses',
       icon: Icons.location_on_outlined,
       activePrefixes: ['/admin/addresses'],
-    ),
-    _AdminNavItem(
-      label: 'Customer Verification',
-      permissionRule: AdminPermissions.verificationRead,
-      path: '/admin/resident-verification',
-      icon: Icons.verified_user_outlined,
-      activePrefixes: ['/admin/resident-verification'],
     ),
     _AdminNavItem(
       label: 'Announcements',
@@ -1356,6 +1430,7 @@ class _AdminSidebar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
     final user = ref.watch(currentUserProvider);
     final role = ref.watch(currentAdminRoleProvider);
     final profile = ref.watch(currentAdminProfileProvider);
@@ -1387,7 +1462,7 @@ class _AdminSidebar extends ConsumerWidget {
       duration: Duration.zero,
       curve: Curves.easeOutCubic,
       width: width,
-      color: Theme.of(context).colorScheme.surface,
+      color: scheme.surfaceContainerLow,
       child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1416,21 +1491,21 @@ class _AdminSidebar extends ConsumerWidget {
                   final isActive = item.isActive(currentPath);
 
                   return Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
+                    padding: const EdgeInsets.only(bottom: 6),
                     child: Tooltip(
                       message: isCollapsed ? item.label : '',
                       child: Material(
                         color: isActive
-                            ? Theme.of(context).colorScheme.primaryContainer
+                            ? scheme.primaryContainer
                             : Colors.transparent,
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(8),
                         child: InkWell(
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(8),
                           onTap: () => context.go(item.path),
                           child: Padding(
                             padding: EdgeInsets.symmetric(
-                              horizontal: isCollapsed ? 14 : 16,
-                              vertical: 12,
+                              horizontal: isCollapsed ? 14 : 14,
+                              vertical: 11,
                             ),
                             child: Row(
                               mainAxisAlignment: isCollapsed
@@ -1439,11 +1514,10 @@ class _AdminSidebar extends ConsumerWidget {
                               children: [
                                 Icon(
                                   item.icon,
+                                  size: 22,
                                   color: isActive
-                                      ? Theme.of(context)
-                                          .colorScheme
-                                          .onPrimaryContainer
-                                      : null,
+                                      ? scheme.onPrimaryContainer
+                                      : scheme.onSurfaceVariant,
                                 ),
                                 if (!isCollapsed) ...[
                                   const SizedBox(width: 12),
@@ -1455,10 +1529,8 @@ class _AdminSidebar extends ConsumerWidget {
                                             ? FontWeight.w800
                                             : FontWeight.w500,
                                         color: isActive
-                                            ? Theme.of(context)
-                                                .colorScheme
-                                                .onPrimaryContainer
-                                            : null,
+                                            ? scheme.onPrimaryContainer
+                                            : scheme.onSurfaceVariant,
                                       ),
                                     ),
                                   ),
@@ -1525,6 +1597,7 @@ class _AdminUserPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final tooltipMessage =
         displayName == email ? '$email\n$role' : '$displayName\n$email\n$role';
 
@@ -1533,7 +1606,11 @@ class _AdminUserPanel extends StatelessWidget {
         children: [
           Tooltip(
             message: tooltipMessage,
-            child: const CircleAvatar(child: Icon(Icons.person_outline)),
+            child: CircleAvatar(
+              backgroundColor: scheme.primaryContainer,
+              child:
+                  Icon(Icons.person_outline, color: scheme.onPrimaryContainer),
+            ),
           ),
           const SizedBox(height: 8),
           IconButton(
@@ -1548,13 +1625,19 @@ class _AdminUserPanel extends StatelessWidget {
     return Card(
       margin: EdgeInsets.zero,
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                const CircleAvatar(child: Icon(Icons.person_outline)),
+                CircleAvatar(
+                  backgroundColor: scheme.primaryContainer,
+                  child: Icon(
+                    Icons.person_outline,
+                    color: scheme.onPrimaryContainer,
+                  ),
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Tooltip(
@@ -1580,7 +1663,10 @@ class _AdminUserPanel extends StatelessWidget {
                           role,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodySmall,
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: scheme.onSurfaceVariant,
+                                  ),
                         ),
                       ],
                     ),

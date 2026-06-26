@@ -39,7 +39,6 @@ class _TenantSettingsDialogState extends ConsumerState<TenantSettingsDialog> {
   late final TextEditingController _primaryColor;
   late final TextEditingController _secondaryColor;
   late final TextEditingController _timezone;
-  late bool _residentActivationCodesRequired;
 
   @override
   void initState() {
@@ -57,8 +56,6 @@ class _TenantSettingsDialogState extends ConsumerState<TenantSettingsDialog> {
         TextEditingController(text: settings?.secondaryColor ?? '');
     _timezone =
         TextEditingController(text: settings?.timezone ?? 'America/Chicago');
-    _residentActivationCodesRequired =
-        settings?.residentActivationCodesRequired ?? true;
   }
 
   @override
@@ -133,20 +130,6 @@ class _TenantSettingsDialogState extends ConsumerState<TenantSettingsDialog> {
                   enabled: widget.canManageBranding,
                 ),
                 _field(_timezone, 'Timezone'),
-                SizedBox(
-                  width: 640,
-                  child: SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Require resident activation codes'),
-                    subtitle: const Text(
-                      'When off, residents only verify their email and service address during self-registration.',
-                    ),
-                    value: _residentActivationCodesRequired,
-                    onChanged: (value) {
-                      setState(() => _residentActivationCodesRequired = value);
-                    },
-                  ),
-                ),
                 if (state.hasError)
                   SizedBox(
                     width: 640,
@@ -252,7 +235,7 @@ class _TenantSettingsDialogState extends ConsumerState<TenantSettingsDialog> {
             primaryColor: _primaryColor.text,
             secondaryColor: _secondaryColor.text,
             timezone: _timezone.text,
-            residentActivationCodesRequired: _residentActivationCodesRequired,
+            residentActivationCodesRequired: false,
           ),
         );
     if (ok && mounted) Navigator.of(context).pop(true);

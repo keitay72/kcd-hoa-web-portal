@@ -53,7 +53,7 @@ class _ResidentVerificationListPageState
             children: [
               Expanded(
                 child: Text(
-                  'Resident Verification',
+                  'Customer Verification',
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
               ),
@@ -97,7 +97,7 @@ class _ResidentVerificationListPageState
                 child: TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
-                    labelText: 'Search resident, email, HOA, or address',
+                    labelText: 'Search customer, email, community, or address',
                     border: const OutlineInputBorder(),
                     prefixIcon: const Icon(Icons.search),
                     suffixIcon: _search.trim().isEmpty
@@ -118,7 +118,7 @@ class _ResidentVerificationListPageState
               data: (items) {
                 if (items.isEmpty) {
                   return const Center(
-                    child: Text('No resident verifications found.'),
+                    child: Text('No customer verifications found.'),
                   );
                 }
 
@@ -147,7 +147,7 @@ class _ResidentVerificationListPageState
               },
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (error, _) => Center(
-                child: Text('Unable to load resident verifications: $error'),
+                child: Text('Unable to load customer verifications: $error'),
               ),
             ),
           ),

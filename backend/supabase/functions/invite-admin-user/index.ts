@@ -65,7 +65,7 @@ const corsHeaders = {
 };
 
 const globalPlatformRoles = new Set(['platform_owner', 'platform_admin', 'platform_support', 'platform_sales']);
-const tenantRoles = new Set(['tenant_owner', 'tenant_admin', 'tenant_manager', 'tenant_csr', 'tenant_dispatch']);
+const tenantRoles = new Set(['tenant_owner', 'tenant_admin', 'tenant_manager', 'tenant_csr']);
 const communityRoles = new Set(['community_admin']);
 const namePattern = /^[A-Za-z][A-Za-z .'-]*$/;
 const emailPattern = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;

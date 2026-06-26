@@ -190,12 +190,12 @@ Preserve:
 - Ticket events.
 - Ticket attachments.
 - CSR queue.
-- Dispatch queue.
+- Customer-service queue and ticket board/list views.
 - Priority/status model.
 
 ## Phase 5: Update Signup Flow
 
-Replace activation-code-first signup with address match plus email verification.
+Continue replacing legacy activation-code signup paths with address match plus email verification.
 
 Target flow:
 
@@ -209,8 +209,8 @@ Target flow:
 
 Compatibility:
 
-- Existing activation-code functions may remain for strict-mode tenants.
-- New signup should not require mailed activation codes by default.
+- Existing activation-code tables/columns may remain only for migration compatibility and historical reporting.
+- New signup should use address match plus email verification.
 
 ## Phase 6: Update Roles
 
@@ -315,4 +315,4 @@ Avoid destructive migrations until:
 - Should documents and announcements share one scoped content model?
 - Should usage overages be billed monthly from live counts or usage snapshots?
 - How long should compatibility roles remain visible in admin UI?
-- Should strict-mode activation code support be tenant-level, account-level, or location-level?
+- When can legacy activation-code tables/columns be removed after beta data cleanup?

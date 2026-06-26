@@ -247,7 +247,7 @@ Target fields:
 - `email`
 - `email_verified`
 - `address_matched`
-- `verification_method`: `address_email`, `activation_code`, `manual_review`, `account_number`
+- `verification_method`: `address_email`, `manual_review`, `account_number`; legacy imported records may still reference `activation_code`
 - `status`: `pending`, `email_sent`, `verified`, `failed`, `expired`, `cancelled`
 - `verified_at`
 - `expires_at`
@@ -314,7 +314,7 @@ Current table alignment:
 Target direction:
 
 - Preserve the useful default-plus-override pattern.
-- Generalize HOA-wide defaults into customer account or service context defaults.
+- Generalize community-wide defaults into customer account or service context defaults.
 - Keep service location overrides.
 
 ### Service Request
@@ -341,7 +341,7 @@ Target fields to preserve:
 Target direction:
 
 - Replace required `hoa_id` with `tenant_id`, `customer_account_id`, and optional `service_location_id`.
-- Keep queue operations for CSR and dispatch.
+- Keep queue operations for customer service and tenant ticket operations.
 - Add commercial and roll-off request types later without creating separate ticket systems.
 
 ## Signup Flow
@@ -375,10 +375,10 @@ Target roles:
 - `platform_admin`
 - `platform_support`
 - `platform_sales`
+- `tenant_owner`
 - `tenant_admin`
 - `tenant_manager`
 - `tenant_csr`
-- `tenant_dispatch`
 - `community_admin`
 - `customer_user`
 
@@ -392,6 +392,7 @@ Decision:
 
 - Do not preserve separate HOA Manager and HOA Board Member permissions unless the product identifies a real difference.
 - New community-level workflows should use `community_admin`.
+- `tenant_dispatch` is a legacy compatibility role only. Do not expose it in new invite flows unless dispatch/routing becomes a product requirement again.
 
 ## Subscription Capacity Model
 
@@ -434,7 +435,7 @@ Future schema implications:
 | `user_hoa_memberships` | Customer/community membership | Replace with broader account/context membership. |
 | `user_address_memberships` | Customer service-location membership | Replace with broader service-location membership. |
 | `residency_verifications` | Customer verification | Replace resident/HOA naming. |
-| `activation_codes` | Optional strict verification | Keep only as optional/compatibility path. |
+| `activation_codes` | Legacy verification data | Keep only for migration compatibility and historical reporting unless a new product decision reintroduces it. |
 | `documents` | Scoped content | Generalize scope beyond HOA. |
 | `announcements` | Scoped content | Generalize scope beyond HOA. |
 | `service_schedules` | Scoped schedule | Generalize default-plus-override model. |

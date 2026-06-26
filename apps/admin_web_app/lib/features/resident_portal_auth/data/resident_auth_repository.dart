@@ -41,12 +41,6 @@ abstract interface class ResidentPortalAuthRepository {
     required String tenantCode,
     required ResidentRegistrationInput input,
   });
-  Future<bool> verifyActivationCode({
-    required String verificationId,
-    required String addressId,
-    required String code,
-  });
-  Future<bool> verifyActivationCodeForCurrentUser(String code);
 }
 
 class SupabaseResidentPortalAuthRepository
@@ -273,7 +267,6 @@ class SupabaseResidentPortalAuthRepository
     final data = response.data as Map<String, dynamic>;
     return ResidentEmailVerificationCompletion(
       verified: data['verified'] == true,
-      activationCodeRequired: data['activationCodeRequired'] == true,
     );
   }
 
@@ -406,8 +399,6 @@ class SupabaseResidentPortalAuthRepository
     }
     final data = response.data as Map<String, dynamic>;
     final verification = data['verification'] as Map<String, dynamic>;
-    final activationCodeRequired =
-        data['activationCodeRequired'] as bool? ?? true;
 
     return ResidentRegistrationResult(
       userId: user.id,
@@ -415,7 +406,6 @@ class SupabaseResidentPortalAuthRepository
       verificationId: verification['id'] as String,
       address: address,
       tenantCode: tenantCode,
-      activationCodeRequired: activationCodeRequired,
     );
   }
 
@@ -436,51 +426,6 @@ class SupabaseResidentPortalAuthRepository
     final values = Uint8List(32);
     html.window.crypto!.getRandomValues(values);
     return values.map((value) => chars[value % chars.length]).join();
-  }
-
-  @override
-  Future<bool> verifyActivationCodeForCurrentUser(String code) async {
-    final user = _client.auth.currentUser;
-    if (user == null) {
-      throw StateError('Please sign in before entering your activation code.');
-    }
-
-    final row = await _client
-        .from('residency_verifications')
-        .select('id, address_id')
-        .eq('user_id', user.id)
-        .eq('status', 'pending')
-        .limit(1)
-        .maybeSingle();
-
-    if (row == null) {
-      throw StateError(
-          'No pending resident verification was found for this account.');
-    }
-
-    return verifyActivationCode(
-      verificationId: row['id'] as String,
-      addressId: row['address_id'] as String,
-      code: code,
-    );
-  }
-
-  @override
-  Future<bool> verifyActivationCode({
-    required String verificationId,
-    required String addressId,
-    required String code,
-  }) async {
-    final response = await _client.functions.invoke(
-      'verify-activation-code',
-      body: {
-        'verificationId': verificationId,
-        'addressId': addressId,
-        'code': code.trim(),
-      },
-    );
-    final data = response.data as Map<String, dynamic>;
-    return data['verified'] == true;
   }
 
   Future<String> _resolveResidentEmailRedirectUrl(

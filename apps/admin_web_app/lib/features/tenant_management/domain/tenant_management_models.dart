@@ -168,7 +168,7 @@ class TenantSettings {
     this.emailFromName,
     this.emailReplyTo,
     this.timezone = 'America/Chicago',
-    this.residentActivationCodesRequired = true,
+    this.residentActivationCodesRequired = false,
   });
 
   final String tenantId;

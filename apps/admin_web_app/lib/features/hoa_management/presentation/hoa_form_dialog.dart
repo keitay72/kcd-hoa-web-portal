@@ -26,7 +26,6 @@ class _HoaFormDialogState extends ConsumerState<HoaFormDialog> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   HoaCommunityStatus _status = HoaCommunityStatus.active;
-  bool? _residentActivationCodesRequiredOverride;
 
   bool get _isEditing => widget.initialValue != null;
 
@@ -37,8 +36,6 @@ class _HoaFormDialogState extends ConsumerState<HoaFormDialog> {
     if (initialValue != null) {
       _nameController.text = initialValue.name;
       _status = initialValue.status;
-      _residentActivationCodesRequiredOverride =
-          initialValue.residentActivationCodesRequiredOverride;
     }
     _nameController.addListener(_refreshCodePreview);
   }
@@ -124,33 +121,6 @@ class _HoaFormDialogState extends ConsumerState<HoaFormDialog> {
                   }
                 },
               ),
-              const SizedBox(height: 14),
-              DropdownButtonFormField<bool?>(
-                initialValue: _residentActivationCodesRequiredOverride,
-                decoration: const InputDecoration(
-                  labelText: 'Customer activation codes',
-                  border: OutlineInputBorder(),
-                ),
-                items: const [
-                  DropdownMenuItem<bool?>(
-                    value: null,
-                    child: Text('Use tenant default'),
-                  ),
-                  DropdownMenuItem<bool?>(
-                    value: true,
-                    child: Text('Require codes'),
-                  ),
-                  DropdownMenuItem<bool?>(
-                    value: false,
-                    child: Text('Bypass codes'),
-                  ),
-                ],
-                onChanged: (value) {
-                  setState(
-                    () => _residentActivationCodesRequiredOverride = value,
-                  );
-                },
-              ),
               if (formState.hasError) ...[
                 const SizedBox(height: 14),
                 Text(
@@ -201,8 +171,7 @@ class _HoaFormDialogState extends ConsumerState<HoaFormDialog> {
     final input = HoaCommunityInput(
       name: _nameController.text.trim(),
       status: _status,
-      residentActivationCodesRequiredOverride:
-          _residentActivationCodesRequiredOverride,
+      residentActivationCodesRequiredOverride: false,
     );
 
     final controller = ref.read(hoaFormControllerProvider.notifier);

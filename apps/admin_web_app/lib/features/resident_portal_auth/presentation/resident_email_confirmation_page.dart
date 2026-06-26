@@ -147,8 +147,7 @@ class _ResidentEmailConfirmationPageState
   Future<void> _completeVerification() async {
     try {
       final repository = ref.read(residentPortalAuthRepositoryProvider);
-      final result =
-          await repository.completeEmailVerificationFromUri(Uri.base);
+      await repository.completeEmailVerificationFromUri(Uri.base);
       final tenantCode = widget.tenantCode ??
           await repository.resolveTenantCodeForCurrentResident();
       html.window.localStorage.remove('resident_pending_tenant_code');
@@ -156,11 +155,7 @@ class _ResidentEmailConfirmationPageState
       html.window.localStorage.remove('resident_email_callback_payload');
       _clearSensitiveUrl(tenantCode);
       if (!mounted) return;
-      if (result.activationCodeRequired && !result.verified) {
-        context.go('/portal/$tenantCode/activation-code');
-      } else {
-        context.go('/portal/$tenantCode/setup-account');
-      }
+      context.go('/portal/$tenantCode/setup-account');
     } catch (error) {
       html.window.localStorage.remove('resident_email_callback_payload');
       _clearSensitiveUrl(widget.tenantCode);
