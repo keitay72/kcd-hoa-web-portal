@@ -1,13 +1,13 @@
 # Customer Portal Migration Plan
 
 Status: Draft
-Last updated: 2026-06-21
+Last updated: 2026-06-30
 
 ## Purpose
 
 Plan the migration from the current HOA-centered schema to the customer portal data model before writing database migrations.
 
-This plan keeps the current app operational while adding generalized customer account and service location tables that can support residential, HOA/community, commercial, and future roll-off customers.
+This plan keeps the current app operational while adding generalized customer account and service location tables that can support residential city/community contexts, commercial customers, and future roll-off customers.
 
 ## Guiding Decision
 
@@ -20,7 +20,7 @@ Start with:
 - `customer_memberships`
 - `customer_verifications`
 
-Defer `service_contexts` until there is a clear implementation need for a separate city, route, or community grouping layer.
+Defer `service_contexts` until there is a clear implementation need for a separate city or community grouping layer.
 
 ## Why This Order
 
@@ -37,6 +37,8 @@ The current system already has useful SaaS infrastructure:
 
 The risky part is the customer layer. A phased migration lets the product move toward the new model without breaking existing HOA workflows.
 
+The current UI direction is to consolidate Customer Accounts, Community Management, and Service Locations into a Customers workspace. Legacy table and folder names can remain temporarily, but user-facing language should use customer, city, community, and service-location terms.
+
 ## Phase 0: Confirm Product Decisions
 
 Before migration work starts, confirm:
@@ -44,10 +46,12 @@ Before migration work starts, confirm:
 - Active service locations are the primary subscription capacity metric.
 - HOA/community is represented as `customer_accounts.account_type = 'community'`.
 - Direct residential service can use `account_type = 'residential'`.
+- Non-HOA residential service locations should resolve to a city context for city-wide rules, documents, schedules, and announcements.
 - Commercial service can use `account_type = 'commercial'`.
 - Roll-off can use `account_type = 'roll_off'` later.
 - Activation codes are optional strict-mode verification only.
 - One login flow will serve all user types.
+- Dispatch/routing is not in scope unless explicitly reintroduced later.
 
 ## Phase 1: Add Generalized Tables
 
@@ -132,6 +136,7 @@ Target:
 ```text
 documents.tenant_id
 documents.customer_account_id
+documents.service_context_id or city/community scope equivalent
 documents.service_location_id
 documents.scope_type
 ```
@@ -145,6 +150,8 @@ Recommended first move:
 ### Announcements
 
 Follow the same scope strategy as documents.
+
+City-wide and community-wide announcements are first-class residential customer use cases.
 
 ### Service Schedules
 
@@ -160,6 +167,7 @@ Target:
 ```text
 service_schedules.tenant_id
 service_schedules.customer_account_id
+service_schedules.service_context_id or city/community scope equivalent
 service_schedules.service_location_id
 ```
 
@@ -273,23 +281,24 @@ Suggested workflow order:
 1. Tenant portal hostname resolution.
 2. One login routing/context resolution.
 3. Customer signup/address verification.
-4. Customer account/service location admin views.
-5. Documents.
-6. Service schedules.
-7. Tickets/service requests.
-8. Announcements.
+4. Consolidated Customers workspace.
+5. City/community residential context management.
+6. Service-location detail and history views.
+7. CSR-first tickets/service requests.
+8. Documents, announcements, and service schedules.
 9. Billing usage and overages.
 
 ## Validation Checklist
 
 Before each phase is considered complete:
 
-- Existing HOA workflows still load.
+- Existing customer workflows still load.
 - Tenant isolation still holds.
 - RLS tests cover the new tables.
 - Backfilled row counts match expected source counts.
 - A known HOA maps to one customer account.
 - A known HOA address maps to one service location.
+- A known non-HOA address maps to a city residential context.
 - A known resident maps to one customer membership.
 - A tenant staff user cannot read another tenant's customer data.
 - A customer user cannot read unassigned locations.

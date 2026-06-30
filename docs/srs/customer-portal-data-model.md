@@ -1,7 +1,7 @@
 # Customer Portal Data Model SRS
 
 Status: Draft
-Last updated: 2026-06-21
+Last updated: 2026-06-30
 
 ## Purpose
 
@@ -20,7 +20,7 @@ This document should be completed before database migrations are written.
 Introduce a generalized customer/service-location model that supports:
 
 - Residential customers.
-- HOA/community customers.
+- Residential addresses grouped by city or community/HOA context.
 - Commercial customers.
 - Future roll-off customers.
 - One login experience.
@@ -39,7 +39,7 @@ platform_tenants
   customer_verifications
 ```
 
-Add `service_contexts` only if the implementation needs a separate grouping layer for city, route, or HOA/community content before the first migration ships.
+Add `service_contexts` only if the implementation needs a separate grouping layer for city or community/HOA content before the first migration ships.
 
 ## Proposed Tables
 
@@ -65,6 +65,12 @@ Recommended constraints:
 - `account_type in ('residential', 'community', 'commercial', 'roll_off')`
 - `status in ('active', 'inactive', 'suspended')`
 - Unique account number per tenant when present.
+
+UI note:
+
+- The customer-facing and tenant-staff account type filter should show `Residential`, `Commercial`, and `Roll-Off`.
+- Residential city/community tabs are context filters inside Residential, not top-level account types.
+- During the transition, city and community records may still use community-compatible schema paths.
 
 ### `service_locations`
 
@@ -92,6 +98,12 @@ Recommended constraints:
 - `status in ('active', 'inactive')`
 - `state` is two-letter uppercase state code.
 - Unique normalized address key per tenant, with a decision still needed on whether uniqueness should be tenant-wide or account-scoped.
+
+UI note:
+
+- Creating a service location should start with address fields.
+- Community/HOA selection is optional and clearable.
+- `external_location_ref` is for imports/integrations and should not be presented as the primary way to create an address.
 
 ### `customer_memberships`
 
@@ -194,6 +206,7 @@ Recommendation:
 Preserve the default-plus-override model:
 
 - Tenant/account default schedule.
+- City/community default schedule.
 - Optional service-location override.
 
 ### Tickets
@@ -211,6 +224,7 @@ Generalize to:
 
 - `tenant_id`
 - `customer_account_id`
+- optional city/community context, where present
 - optional `service_location_id`
 
 Keep ticket events and attachments.

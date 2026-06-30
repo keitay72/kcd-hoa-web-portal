@@ -69,15 +69,17 @@ Implemented or in progress:
 - Permission-aware navigation visibility
 - Protected admin routes
 - Unauthorized page
-- Community Management
-- Service Location Management
+- Consolidated Customers workspace for residential, commercial, and roll-off customer setup
+- Residential city/community context tabs
+- Service-address registry and address detail panel
 - Bulk address CSV import
-- Legacy activation-code compatibility reporting
-- Customer Verification Management
+- Customer self-registration with service-address match plus email verification
+- Legacy activation-code compatibility reporting kept only for migration/strict-mode visibility
 - Document Management with Supabase Storage uploads and signed downloads
 - Announcement Management
-- Service Schedule Management with customer account/community defaults and optional service-location overrides
-- Ticket Operations Management
+- Service Schedule Management with customer account, city, community, and service-location scopes
+- Ticket Operations Management with CSR-focused queues, board/list views, detail workflows, notes, attachments, SLA, and status history
+- Customer portal home with documents, schedules, announcements, contacts, service issues, status badges, and photo attachments
 - Customer-service queue dashboards
 - Ticket board and list views
 - User and Role Management
@@ -131,7 +133,7 @@ Important app folders:
 - `lib/features/auth_admin`: Admin sign-in flow.
 - `lib/features/hoa_management`: Community/customer-account management workflows. The folder name is legacy while the product moves from HOA-first to customer-portal SaaS.
 - `lib/features/address_registry`: Service-location registry and CSV import workflows. The folder name is legacy while the UI moves toward service locations.
-- `lib/features/verification_admin`: Customer verification management workflows.
+- `lib/features/verification_admin`: Legacy verification and strict-mode compatibility workflows. The default customer signup flow is service-address match plus email verification.
 - `lib/features/documents_cms`: Document CMS and Storage workflows.
 - `lib/features/announcements_cms`: Announcement CMS workflows.
 - `lib/features/schedules_admin`: Service schedules at customer-account, community, and service-location scopes.
@@ -152,6 +154,7 @@ Recommended hierarchy:
 - Tenant represents a waste-management company subscriber.
 - Customer accounts, service contexts, and service locations belong to exactly one tenant.
 - HOA/community records are one supported customer/service context type, not the center of the product.
+- Residential service locations can resolve to a city context or a community/HOA context so non-HOA customers still receive city-specific documents, rules, schedules, and announcements.
 - Customers verify against tenant-owned service locations.
 - Tenant staff can operate only within their assigned tenant scope.
 - Community/customer users can operate only within their assigned customer account, service context, or service location scope.
@@ -254,7 +257,7 @@ Used Supabase services:
 
 - Auth for user identity and sessions.
 - PostgreSQL for relational data.
-- Row Level Security for tenant/HOA/resident isolation.
+- Row Level Security for platform, tenant, customer account, community, city/service context, and service-location isolation.
 - Storage for documents and ticket attachments.
 - Realtime-ready schema patterns for future live updates.
 - Edge Functions for privileged workflows that must not expose service role keys.
@@ -299,14 +302,14 @@ Current Edge Functions include:
 Deploy functions from the `backend` directory:
 
 ```bash
-cd /Users/keithtaylor/Projects/KCD-HOA-Web-Portal/backend
+cd /Users/keithtaylor/Projects/kcd-hoa-web-portal/backend
 npx supabase functions deploy invite-admin-user
 ```
 
 Deploy all relevant functions as needed:
 
 ```bash
-cd /Users/keithtaylor/Projects/KCD-HOA-Web-Portal/backend
+cd /Users/keithtaylor/Projects/kcd-hoa-web-portal/backend
 npx supabase functions deploy create-tenant-checkout-session
 npx supabase functions deploy sync-tenant-stripe-status
 npx supabase functions deploy stripe-webhook
@@ -410,26 +413,16 @@ Launch-readiness behavior:
 
 ## Service Schedule Model
 
-Service schedules are HOA-wide by default.
+Service schedules are tenant-scoped and can be narrowed to a customer account, city/service context, community/HOA context, or specific service location.
 
-Primary schedule fields:
+Target schedule behavior:
 
-- `hoa_id`
-- `address_id`, optional for address-specific overrides
-- `service_type`
-- `schedule_rule`
-- `route_name`
-- `effective_date`
-- `end_date`
-- `status`
+- City-scoped residential schedules apply to non-HOA residential addresses in that city.
+- Community-scoped residential schedules apply to addresses in that HOA/community.
+- Service-location schedules are overrides for a specific address.
+- Commercial and roll-off schedules should use the same customer/account and service-location pattern when those account types are built out.
 
-Examples:
-
-- Trash = Tuesday
-- Recycling = Thursday
-- Bulk Pickup = First Saturday
-
-Address-specific schedules should be used only as overrides.
+Current implementation still contains legacy `hoa_id` and `address_id` fields. New UI and documentation should describe these as community context and service-location scope rather than treating HOA as the top-level product model.
 
 ## Ticket Operations Notes
 
@@ -443,6 +436,8 @@ Ticket Operations uses these tables:
 - `hoa_addresses`
 - `user_platform_roles`
 
+Some current table names remain HOA-centered for compatibility. New ticket workflows should use customer, community, city, and service-location language in the UI.
+
 Implemented ticket workflows:
 
 - Ticket list and detail views.
@@ -455,6 +450,8 @@ Implemented ticket workflows:
 - SLA indicators.
 - Ticket metrics.
 - Attachment signed URL viewer.
+
+CSR ticket handling is the primary near-term operations workflow. Ticket screens should be optimized for fast triage, glanceable status, customer/address context, inline workflow actions, photo/document attachments, and clear customer-facing updates.
 
 Security note:
 
@@ -499,7 +496,7 @@ Admin invitations use Supabase Auth invite links plus the custom Admin Web App a
 Local invite acceptance URL:
 
 ```text
-http://192.168.0.141:8080/accept-invite?token_hash={{ .TokenHash }}&type=invite
+http://127.0.0.1:8080/accept-invite?token_hash={{ .TokenHash }}&type=invite
 ```
 
 Important behavior:
@@ -514,11 +511,11 @@ Important behavior:
 Supabase Auth URL configuration should include the local admin URL during development:
 
 ```text
-http://192.168.0.141:8080/
-http://192.168.0.141:8080/accept-invite
+http://127.0.0.1:8080/
+http://127.0.0.1:8080/accept-invite
 ```
 
-For production, replace these with the deployed admin domain.
+For LAN device testing, add the machine IP variant as well. For production, replace these with the deployed admin domain.
 
 ## Environment Setup
 
@@ -548,16 +545,16 @@ Do not commit real secrets.
 Run from the Admin Web App directory:
 
 ```bash
-cd /Users/keithtaylor/Projects/KCD-HOA-Web-Portal/apps/admin_web_app
+cd /Users/keithtaylor/Projects/kcd-hoa-web-portal/apps/admin_web_app
 flutter pub get
-flutter run -d chrome --web-hostname 0.0.0.0 --web-port 8080 --dart-define=SUPABASE_URL=$SUPABASE_URL --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
+flutter run -d web-server --web-hostname 127.0.0.1 --web-port 8080 --dart-define=SUPABASE_URL=$SUPABASE_URL --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
 ```
 
 If loading values manually from `apps/admin_web_app/.env`, export them first or pass them directly:
 
 ```bash
-cd /Users/keithtaylor/Projects/KCD-HOA-Web-Portal/apps/admin_web_app
-flutter run -d chrome --web-hostname 0.0.0.0 --web-port 8080 \
+cd /Users/keithtaylor/Projects/kcd-hoa-web-portal/apps/admin_web_app
+flutter run -d web-server --web-hostname 127.0.0.1 --web-port 8080 \
   --dart-define=SUPABASE_URL="https://your-project-ref.supabase.co" \
   --dart-define=SUPABASE_ANON_KEY="your-anon-key"
 ```
@@ -573,14 +570,14 @@ http://192.168.0.141:8080/
 Run migrations from `backend`:
 
 ```bash
-cd /Users/keithtaylor/Projects/KCD-HOA-Web-Portal/backend
+cd /Users/keithtaylor/Projects/kcd-hoa-web-portal/backend
 npx supabase db push
 ```
 
 If the project is not linked yet:
 
 ```bash
-cd /Users/keithtaylor/Projects/KCD-HOA-Web-Portal/backend
+cd /Users/keithtaylor/Projects/kcd-hoa-web-portal/backend
 npx supabase link --project-ref your-project-ref
 npx supabase db push
 ```
@@ -590,8 +587,8 @@ npx supabase db push
 Set secrets from `backend`:
 
 ```bash
-cd /Users/keithtaylor/Projects/KCD-HOA-Web-Portal/backend
-npx supabase secrets set ADMIN_INVITE_REDIRECT_URL="http://192.168.0.141:8080/accept-invite"
+cd /Users/keithtaylor/Projects/kcd-hoa-web-portal/backend
+npx supabase secrets set ADMIN_INVITE_REDIRECT_URL="http://127.0.0.1:8080/accept-invite"
 ```
 
 Future Stripe secrets:
@@ -619,7 +616,7 @@ If `flutter analyze` or `dart format` cannot run locally because of OS constrain
 Use this corrected project root:
 
 ```bash
-/Users/keithtaylor/Projects/KCD-HOA-Web-Portal
+/Users/keithtaylor/Projects/kcd-hoa-web-portal
 ```
 
 Do not use the old misspelled directory:
@@ -646,13 +643,12 @@ Current focus:
 
 Recommended next steps:
 
-1. Create the customer-portal product architecture plan from ADR 0002 before adding more HOA-specific workflows.
-2. Add tenant portal-domain resolution so a hostname such as `portal.olathewasteinc.com` resolves tenant branding and configuration.
-3. Consolidate toward one login experience for all users, with post-login routing based on roles and memberships.
-4. Continue hardening address match plus email verification for customer account creation.
-5. Design the customer account/service location schema that can support residential, HOA/community, commercial, and roll-off contexts.
-6. Simplify HOA/community roles so future work uses one community admin role unless distinct permissions are required.
-7. Update subscription plans so all tiers include the full core feature set and differ by active customer/service-location limits.
-8. Add usage/overage tracking for active customer accounts or service locations.
-9. Continue tenant management polish for settings, email, SMS, billing contacts, onboarding, and audit visibility.
-10. Configure Stripe once the owner creates the Stripe account, then deploy and verify Stripe webhooks in test mode.
+1. Harden CSR ticket workflows: triage queue, ticket detail, status changes, internal notes, customer updates, attachments, and customer-visible status history.
+2. Keep customer setup consolidated in the Customers workspace, with Residential, Commercial, and Roll-Off account-type views.
+3. Finish residential city/community scoping so non-HOA customers receive city-specific documents, schedules, announcements, and rules.
+4. Continue polishing service-address creation and detail views, including ticket history and optional community assignment.
+5. Keep activation-code and dispatch features hidden or clearly marked as legacy unless they return through a fresh product decision.
+6. Continue PWA routing/install hardening after core customer and CSR flows are stable.
+7. Add usage/overage tracking for active customer accounts or service locations.
+8. Configure Stripe once the owner creates the Stripe account, then deploy and verify Stripe webhooks in test mode.
+9. Prepare the beta data cleanup/import plan before launch.

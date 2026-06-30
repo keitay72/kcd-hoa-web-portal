@@ -1,7 +1,7 @@
 # ADR 0002: Customer Portal SaaS Product Direction
 
-Date: 2026-06-21
-Status: Proposed
+Date: 2026-06-30
+Status: Accepted
 Owner: Waste Hauler Customer Portal SaaS Project
 
 ## Decision
@@ -27,7 +27,8 @@ Customer Portal SaaS Platform
     portal.olathewasteinc.com
   Customer accounts and service locations
     Residential
-    HOA/community
+      City-scoped addresses
+      Community/HOA-scoped addresses
     Commercial
     Roll-off
   Customer users
@@ -96,6 +97,8 @@ Target flow:
 7. Customer sets up password, name, phone, and profile details.
 8. Customer account becomes active and linked to the service location.
 
+Residential service locations may be city-scoped or community/HOA-scoped. A non-HOA resident should still see city-level documents, announcements, schedules, and service rules that apply to their address.
+
 Activation codes should become optional compatibility or strict-mode verification. They should not be the default onboarding method.
 
 Security posture:
@@ -120,7 +123,7 @@ These tables remain valid current implementation details, but new design work sh
 
 - `platform_tenants`: waste-hauler subscribers.
 - Customer account: a tenant-owned customer relationship or billing/service account.
-- Service context: a tenant-owned grouping such as city, HOA/community, route, commercial account, or roll-off account.
+- Service context: a tenant-owned grouping such as city, community/HOA, commercial account, or roll-off account.
 - Service location: a physical address or serviced location.
 - Customer user: a profile that can access one or more customer accounts, service contexts, or service locations.
 
@@ -135,7 +138,7 @@ platform_tenants
 
 HOA/community should be one supported customer account or service context type, not the top-level product model.
 
-Documents, announcements, schedules, and tickets should eventually attach to tenant, customer account, service context, or service location scopes instead of requiring `hoa_id`.
+Documents, announcements, schedules, and tickets should eventually attach to tenant, customer account, city context, community context, or service location scopes instead of requiring `hoa_id`.
 
 ## Roles
 
@@ -232,10 +235,12 @@ Recommended next implementation sequence:
 2. Add or formalize tenant portal hostname resolution using `tenant_settings.portal_hostname`.
 3. Consolidate toward one login flow for all user types.
 4. Continue hardening address match plus email verification as the default customer registration flow.
-5. Design customer account/service location schema before expanding commercial or roll-off workflows.
-6. Simplify community-level roles and avoid creating new workflows that depend on separate HOA Manager and HOA Board Member roles.
-7. Update subscription plan data to use customer/service-location limits instead of HOA/resident limits.
-8. Add overage tracking based on active customers/service locations.
+5. Continue consolidating Customer Accounts, Community Management, and Service Locations into the Customers workspace.
+6. Support city and community/HOA residential contexts so non-HOA residents receive city-scoped content.
+7. Make CSR ticketing the primary operations workflow, including ticket status, notes, customer updates, and attachments.
+8. Simplify community-level roles and avoid creating new workflows that depend on separate HOA Manager and HOA Board Member roles.
+9. Update subscription plan data to use customer/service-location limits instead of HOA/resident limits.
+10. Add overage tracking based on active customers/service locations.
 
 ## Non-Goals For The Next Pass
 
@@ -244,6 +249,7 @@ Recommended next implementation sequence:
 - Do not add new activation-code requirements without a fresh product decision and security review.
 - Do not expand the deferred mobile app before the web portal model is stable.
 - Do not treat roll-off and commercial as separate products. They are future account/context types inside the same portal platform.
+- Do not build dispatch or route optimization workflows unless that becomes an explicit product requirement.
 
 ## Rationale
 

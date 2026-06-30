@@ -2,29 +2,30 @@
 
 Date: 2026-06-10
 Status: Proposed
-Owner: KC Disposal HOA Portal Project
+Owner: Customer Portal SaaS Project
 
 > Superseded in part by ADR 0002: Customer Portal SaaS Product Direction.
-> This ADR remains useful for SaaS tenant isolation, RBAC, billing, and operational foundation work. Where this ADR frames the product as an HOA Portal SaaS, ADR 0002 is the current product direction.
+> This ADR remains useful for SaaS tenant isolation, RBAC, billing, and operational foundation work. Where this ADR frames the product as an HOA Portal SaaS, read that as historical wording; ADR 0002 is the current customer-portal product direction.
 
 ## Decision
 
 Pause net-new feature development and correct the platform foundation before onboarding additional waste-management companies.
 
-The product direction is now a multi-tenant HOA Portal SaaS platform. KC Disposal is tenant 1, not the platform itself.
+The product direction is now a multi-tenant Customer Portal SaaS platform for waste haulers. KC Disposal is tenant 1, not the platform itself.
 
 Target model:
 
 ```text
-HOA Portal SaaS Platform
+Customer Portal SaaS Platform
   SaaS Operator
     Platform roles
   Waste-management tenants
     KC Disposal
     Mountain High Disposal
     Future subscribed companies
-  HOA communities
-  Residents
+  Residential city/community contexts
+  Commercial and roll-off account contexts
+  Customer users
 ```
 
 This plan keeps the existing application and data model where possible, but corrects naming, role hierarchy, tenant isolation, RLS semantics, and Admin Web App navigation before continuing feature work.
@@ -136,7 +137,7 @@ user_tenant_roles
 
 ## Current Role Catalog
 
-Current roles:
+Original roles at the time of this ADR:
 
 ```text
 resident
@@ -153,7 +154,7 @@ Current concerns:
 - `mgmt` is abbreviated and tenant-specific.
 - `tenant_csr` is valid, but should be tenant-scoped.
 - `tenant_dispatch` exists in legacy role data, but dispatch-specific routing is no longer part of the near-term product direction.
-- `hoa_manager`, `hoa_board`, and `resident` are valid and should remain HOA-scoped.
+- `hoa_manager`, `hoa_board`, and `resident` are historical HOA-scoped roles. The current direction is `community_admin` for city/community context contacts and `customer_user` for customer portal users.
 - There are no true SaaS operator roles yet.
 
 ## Current RLS Helper Concerns
@@ -278,43 +279,42 @@ Interim storage:
 user_platform_roles
 ```
 
-### Layer 3: HOA Roles
+### Layer 3: Community Context Roles
 
-These belong to an HOA community.
+These belong to a residential city/community context. Existing table names still use `hoa` in places, but the product model is broader than HOAs.
 
 Roles:
 
 ```text
-hoa_manager
-hoa_board
+community_admin
 ```
 
 Scope:
 
 ```text
-One or more HOA communities
+One or more city/community service contexts
 ```
 
-Stored in existing table:
+Stored in existing/legacy table:
 
 ```text
 user_hoa_memberships
 ```
 
-### Layer 4: Resident Roles
+### Layer 4: Customer Roles
 
-Residents belong to verified HOA/address memberships.
+Customers belong to verified service-location memberships.
 
 Role:
 
 ```text
-resident
+customer_user
 ```
 
 Scope:
 
 ```text
-Verified HOA/address membership
+Verified service-location membership
 ```
 
 Stored across:
@@ -338,22 +338,20 @@ platform_owner
 platform_admin
 platform_support
 platform_sales
+tenant_owner
 tenant_admin
 tenant_manager
+tenant_csr
+community_admin
+customer_user
 ```
 
-Keep:
+Keep for legacy compatibility only:
 
 ```text
-tenant_csr
 hoa_manager
 hoa_board
 resident
-```
-
-Legacy compatibility only:
-
-```text
 tenant_dispatch
 ```
 
@@ -364,6 +362,21 @@ sys_admin
 mgmt
 ```
 
+Current target role stack:
+
+```text
+platform_owner
+platform_admin
+platform_support
+platform_sales
+tenant_owner
+tenant_admin
+tenant_manager
+tenant_csr
+community_admin
+customer_user
+```
+
 ## Current-to-Target Mapping
 
 | Current Role | Target Role | Scope | Action |
@@ -372,9 +385,9 @@ mgmt
 | `mgmt` | `tenant_manager` | tenant | Add new role, migrate assignments, keep deprecated alias temporarily |
 | `csr` | `tenant_csr` | tenant | Rename for SaaS clarity |
 | `dispatch` | `tenant_dispatch` | tenant | Keep only for historical compatibility unless dispatch workflows return |
-| `hoa_manager` | `hoa_manager` | HOA | Keep |
-| `hoa_board` | `hoa_board` | HOA | Keep |
-| `resident` | `hoa_resident` | resident/address | Rename for SaaS clarity |
+| `hoa_manager` | `community_admin` | community | Map to community context access where needed |
+| `hoa_board` | `community_admin` or contact-only | community | Keep only if a distinct contact-only role is needed |
+| `resident` | `customer_user` | service location | Map to verified service-location access |
 | none | `platform_owner` | global | Add |
 | none | `platform_admin` | global | Add |
 | none | `platform_support` | global | Add |
@@ -1144,7 +1157,7 @@ The current product is strong enough to evolve. The correction is mainly about m
 
 ## Why This Belongs In The Foundation
 
-The HOA Portal is expected to be sold as a subscription product to multiple waste-management companies. Subscription payments, add-on features, and tenant-owned communication settings must be included in the SaaS foundation so they are not bolted on later in a risky way.
+The Customer Portal is expected to be sold as a subscription product to multiple waste-management companies. Subscription payments, add-on features, and tenant-owned communication settings must be included in the SaaS foundation so they are not bolted on later in a risky way.
 
 This does not mean billing must be implemented before tenant isolation. It means the architecture must reserve the correct concepts now.
 
@@ -1200,16 +1213,17 @@ The SaaS platform should eventually support subscription plans plus add-ons.
 Example plan structure:
 
 ```text
-Base HOA Portal Subscription
+Customer Portal Subscription
   includes:
-    HOA management
-    resident verification
+    Customers workspace
+    residential city/community contexts
+    customer self-registration
     documents
     announcements
     schedules
     tickets
-    admin users up to plan limit
-    HOA communities up to plan limit
+    tenant staff users
+    active service locations up to plan limit
 
 Add-ons:
   SMS notifications

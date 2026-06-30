@@ -1,6 +1,6 @@
 # invite-admin-user
 
-Secure Supabase Edge Function used by the Admin Web App to invite, resend, and cancel tenant staff and HOA user invitations without exposing the service role key to Flutter.
+Secure Supabase Edge Function used by the Admin Web App to invite, resend, and cancel platform staff, tenant staff, and community contact invitations without exposing the service role key to Flutter.
 
 ## Required environment variables
 
@@ -12,11 +12,11 @@ Supabase provides these automatically when deployed from the linked project:
 
 Configure this project-specific value:
 
-- `ADMIN_INVITE_REDIRECT_URL`: Admin web invite acceptance URL users should land on after accepting the invite. For local network testing, use `http://192.168.0.141:8080/accept-invite`.
+- `ADMIN_INVITE_REDIRECT_URL`: App invite acceptance URL users should land on after accepting the invite. For local development, use `http://127.0.0.1:8080/accept-invite`. For LAN testing, use the Mac's LAN IP.
 
 ## Database dependency
 
-Deploy migration `0015_admin_user_invite_lifecycle.sql` before using this function. It creates:
+Apply the current Supabase migrations before using this function. The invite lifecycle and role catalog migrations create:
 
 - `public.admin_user_invites`
 - invite lifecycle RLS policies
@@ -38,6 +38,8 @@ Deploy migration `0015_admin_user_invite_lifecycle.sql` before using this functi
   "hoa_id": null
 }
 ```
+
+`hoa_id` is a legacy field name used during the transition for community contact assignments.
 
 ## Resend request body
 
@@ -77,13 +79,13 @@ Recommended Supabase Auth settings:
 
 ```text
 Site URL:
-http://192.168.0.141:8080
+http://127.0.0.1:8080
 
 Redirect URLs:
-http://192.168.0.141:8080
-http://192.168.0.141:8080/
-http://192.168.0.141:8080/accept-invite
-http://192.168.0.141:8080/#/accept-invite
+http://127.0.0.1:8080
+http://127.0.0.1:8080/
+http://127.0.0.1:8080/accept-invite
+http://127.0.0.1:8080/#/accept-invite
 ```
 
 Recommended Supabase Invite User email template:
@@ -105,7 +107,7 @@ Why this template matters:
 - It sends users directly to the app-owned `/accept-invite` route first.
 - It uses `token_hash` instead of exposing a full Supabase verification URL.
 - It lets the Flutter app show friendly expired/invalid messages.
-- It avoids putting email, role, tenant, or HOA details in the URL.
+- It avoids putting email, role, tenant, or community details in the URL.
 
 Old invites generated before this template change should be cancelled or resent.
 
@@ -115,7 +117,7 @@ From the `backend` directory:
 
 ```bash
 npx supabase db push
-npx supabase secrets set ADMIN_INVITE_REDIRECT_URL="http://192.168.0.141:8080/accept-invite"
+npx supabase secrets set ADMIN_INVITE_REDIRECT_URL="http://127.0.0.1:8080/accept-invite"
 npx supabase functions deploy invite-admin-user
 ```
 

@@ -1,7 +1,7 @@
 # UI/UX Redesign Plan
 
 Status: Draft
-Last updated: 2026-06-21
+Last updated: 2026-06-30
 
 ## Purpose
 
@@ -32,7 +32,7 @@ The UI needs distinct but related experiences:
 
 2. Tenant admin/operations
    - Used by trash company staff.
-   - Manages customer accounts, service locations, tickets, schedules, documents, and customer support.
+   - Manages customers, city/community residential contexts, service locations, tickets, schedules, documents, and customer support.
 
 3. Community/customer admin
    - Used by HOA board members or community managers.
@@ -108,13 +108,13 @@ Target sections:
 
 - Dashboard
 - Customers
-- Service Locations
-- Requests
-- Schedules
-- Documents
 - Announcements
-- Staff
-- Settings
+- Documents
+- Service Schedules
+- Tickets
+- Users & Roles
+
+Customer accounts, residential areas, and service locations should be consolidated in the Customers workspace instead of appearing as separate side-navigation concepts.
 
 ### Customer Portal Navigation
 
@@ -175,6 +175,14 @@ Should focus on active work:
 - Recently updated tickets.
 - Signup/verification issues.
 - Data import/onboarding blockers.
+- Team Members, not "Team Coverage".
+
+Dashboard labels should be simple:
+
+- Sidebar tenant header: tenant company name only.
+- Page title: `Dashboard`.
+- Greeting: `Welcome back, {first_name}`.
+- Avoid showing billing/onboarding readiness to tenant managers.
 
 ### Customer Account Detail
 
@@ -197,6 +205,32 @@ Should show:
 - Assigned customer users.
 - Open/history requests.
 - Related documents/announcements.
+
+### Customers Workspace
+
+Should combine the old Customer Accounts, Community Management, and Service Locations workflows.
+
+Expected behavior:
+
+- Top-level account type filter: Residential, Commercial, Roll-Off.
+- Residential context tabs: All, City, Community.
+- City records appear alphabetically before community records in All.
+- City and community records use distinct icons.
+- Service addresses are clickable and open a detail panel with status, normalized key, optional external reference, related context, customer users, and service ticket history.
+- Adding a service address starts with the physical address. Community/HOA selection is optional and clearable.
+
+### CSR Ticketing
+
+CSR workflows are the primary daily-use operations surface.
+
+Expected behavior:
+
+- Tickets should be glanceable by status, priority, SLA, customer, address, and type.
+- The All Tickets view should stay list-oriented.
+- CSR Queue and any future specialized queues may use board/column views.
+- Opening a ticket from a queue should return to that queue; opening from All Tickets should return to All Tickets.
+- Ticket detail should keep status, priority, assignment, internal note, customer update, attachments, and customer info visible without forcing every interaction through top-row buttons.
+- Remove or hide unclear automation controls until real workflow automation exists.
 
 ## PWA/Mobile Requirements
 

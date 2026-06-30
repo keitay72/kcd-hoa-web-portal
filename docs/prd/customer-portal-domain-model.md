@@ -1,7 +1,7 @@
 # Customer Portal Domain Model
 
 Status: Draft
-Last updated: 2026-06-21
+Last updated: 2026-06-30
 
 ## Purpose
 
@@ -29,6 +29,8 @@ Examples:
 - Subscription tiers control capacity, not core feature access.
 - Activation codes are optional strict-mode verification, not the default signup path.
 - New schema work should use customer-account and service-location language rather than expanding HOA-specific concepts.
+- Residential service locations can be city-scoped or community/HOA-scoped.
+- The admin UI should consolidate customer account, residential context, and service-location management into a Customers workspace.
 
 ## Core Domain Terms
 
@@ -105,6 +107,7 @@ Customer accounts are the commercial/customer-level object that can represent:
 
 - A direct-billed residential customer.
 - An HOA/community service relationship.
+- A city service-area context for non-HOA residential addresses.
 - A commercial customer.
 - A roll-off customer.
 
@@ -124,6 +127,8 @@ Target fields:
 Notes:
 
 - HOA/community should be represented as `account_type = community`, not as the universal parent object.
+- City-scoped residential areas may be represented with the current community-compatible schema during the transition, but UI language should call them cities, not communities.
+- The product-facing account type filter should use `Residential`, `Commercial`, and `Roll-Off`; city/community are residential context tabs, not top-level subscription categories.
 - A residential direct-service account may have a customer name if imported, but many HOA/service-area addresses may start with only an address.
 - Commercial accounts may have multiple service locations.
 - Roll-off accounts may later have active containers/orders, but those do not need to exist in the first schema pass.
@@ -136,7 +141,6 @@ Examples:
 
 - City or municipality.
 - HOA/community.
-- Route group.
 - Commercial portfolio.
 - Roll-off service grouping.
 
@@ -275,7 +279,8 @@ Target content scopes:
 
 - Tenant-wide.
 - Customer account.
-- Service context.
+- City service context.
+- Community/HOA service context.
 - Service location.
 
 Examples:

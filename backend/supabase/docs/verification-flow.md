@@ -9,4 +9,6 @@ Target customer signup uses address match plus email verification:
 5. Customer completes password, name, phone, and profile setup.
 6. The account becomes active and linked to the verified service location.
 
+If the address belongs to a community/HOA, the customer sees that community's documents, schedules, announcements, contacts, and service issue history. If the address is not in a community/HOA, the customer sees the city-scoped residential information that applies to that address.
+
 Activation codes are optional compatibility or strict-mode verification, not the default customer onboarding path.
