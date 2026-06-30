@@ -177,7 +177,7 @@ class _Header extends StatelessWidget {
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         Text(
-          'Service Locations',
+          'Service Addresses',
           style: Theme.of(context).textTheme.headlineMedium,
         ),
         IconButton(
@@ -193,7 +193,7 @@ class _Header extends StatelessWidget {
         OutlinedButton.icon(
           onPressed: onCreateLocation,
           icon: const Icon(Icons.edit_location_alt_outlined),
-          label: const Text('Add Location to Existing Account'),
+          label: const Text('Add Address to Existing Account'),
         ),
         ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 340),
@@ -208,7 +208,7 @@ class _Header extends StatelessWidget {
               items: [
                 const DropdownMenuItem<String?>(
                   value: null,
-                  child: Text('All service locations'),
+                  child: Text('All service addresses'),
                 ),
                 ...items.map(
                   (account) => DropdownMenuItem<String?>(

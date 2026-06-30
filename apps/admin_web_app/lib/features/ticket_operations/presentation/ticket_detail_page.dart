@@ -9,8 +9,6 @@ import '../../../core/rbac/admin_context.dart';
 import '../domain/ticket.dart';
 import '../domain/ticket_inputs.dart';
 import 'ticket_assignment_dialog.dart';
-import 'ticket_customer_update_dialog.dart';
-import 'ticket_internal_note_dialog.dart';
 import 'ticket_priority_dialog.dart';
 import 'ticket_providers.dart';
 
@@ -322,22 +320,6 @@ Future<void> _openPriorityDialog(BuildContext context, ServiceTicket ticket) {
   );
 }
 
-Future<void> _openInternalNoteDialog(
-    BuildContext context, ServiceTicket ticket) {
-  return showDialog<void>(
-    context: context,
-    builder: (_) => TicketInternalNoteDialog(ticket: ticket),
-  );
-}
-
-Future<void> _openCustomerUpdateDialog(
-    BuildContext context, ServiceTicket ticket) {
-  return showDialog<void>(
-    context: context,
-    builder: (_) => TicketCustomerUpdateDialog(ticket: ticket),
-  );
-}
-
 class _BackDestination {
   const _BackDestination({required this.path, required this.label});
 
@@ -636,35 +618,15 @@ class _TicketTimeline extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              alignment: WrapAlignment.spaceBetween,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                Text('Timeline', style: Theme.of(context).textTheme.titleLarge),
-                if (canManageTicket)
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: () =>
-                            _openInternalNoteDialog(context, ticket),
-                        icon: const Icon(Icons.sticky_note_2_outlined),
-                        label: const Text('Internal note'),
-                      ),
-                      FilledButton.tonalIcon(
-                        onPressed: () =>
-                            _openCustomerUpdateDialog(context, ticket),
-                        icon: const Icon(Icons.forum_outlined),
-                        label: const Text('Customer update'),
-                      ),
-                    ],
-                  ),
-              ],
-            ),
+            Text('Activity & Notes',
+                style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 16),
+            if (canManageTicket) ...[
+              _TicketActivityComposer(ticket: ticket),
+              const SizedBox(height: 18),
+              const Divider(height: 1),
+              const SizedBox(height: 18),
+            ],
             events.when(
               data: (items) {
                 final visibleItems = showInternalNotes
@@ -689,6 +651,166 @@ class _TicketTimeline extends ConsumerWidget {
   }
 }
 
+enum _TicketNoteMode { internal, customer }
+
+class _TicketActivityComposer extends ConsumerStatefulWidget {
+  const _TicketActivityComposer({required this.ticket});
+
+  final ServiceTicket ticket;
+
+  @override
+  ConsumerState<_TicketActivityComposer> createState() =>
+      _TicketActivityComposerState();
+}
+
+class _TicketActivityComposerState
+    extends ConsumerState<_TicketActivityComposer> {
+  final _controller = TextEditingController();
+  _TicketNoteMode _mode = _TicketNoteMode.internal;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(_handleTextChanged);
+  }
+
+  @override
+  void dispose() {
+    _controller.removeListener(_handleTextChanged);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _handleTextChanged() {
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final commandState = ref.watch(ticketCommandProvider);
+    final scheme = Theme.of(context).colorScheme;
+    final modeLabel =
+        _mode == _TicketNoteMode.internal ? 'Internal note' : 'Customer update';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withOpacity(0.45),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              ChoiceChip(
+                label: const Text('Internal note'),
+                selected: _mode == _TicketNoteMode.internal,
+                avatar: const Icon(Icons.sticky_note_2_outlined, size: 18),
+                onSelected: commandState.isLoading
+                    ? null
+                    : (_) => setState(() => _mode = _TicketNoteMode.internal),
+              ),
+              ChoiceChip(
+                label: const Text('Customer update'),
+                selected: _mode == _TicketNoteMode.customer,
+                avatar: const Icon(Icons.forum_outlined, size: 18),
+                onSelected: commandState.isLoading
+                    ? null
+                    : (_) => setState(() => _mode = _TicketNoteMode.customer),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controller,
+            minLines: 3,
+            maxLines: 6,
+            enabled: !commandState.isLoading,
+            decoration: InputDecoration(
+              labelText: modeLabel,
+              hintText: _mode == _TicketNoteMode.internal
+                  ? 'Add call notes, research, next steps, or handoff details.'
+                  : 'Write the update the customer should see in their portal.',
+              border: const OutlineInputBorder(),
+            ),
+          ),
+          if (commandState.hasError) ...[
+            const SizedBox(height: 10),
+            Text(
+              commandState.error.toString(),
+              style: TextStyle(color: scheme.error),
+            ),
+          ],
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: commandState.isLoading || _controller.text.isEmpty
+                    ? null
+                    : _controller.clear,
+                child: const Text('Clear'),
+              ),
+              const SizedBox(width: 8),
+              FilledButton.icon(
+                onPressed: commandState.isLoading ? null : _submit,
+                icon: commandState.isLoading
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(_mode == _TicketNoteMode.internal
+                        ? Icons.lock_outline
+                        : Icons.send_outlined),
+                label: Text(_mode == _TicketNoteMode.internal
+                    ? 'Save note'
+                    : 'Post update'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _submit() async {
+    final note = _controller.text.trim();
+    if (note.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a note before saving.')),
+      );
+      return;
+    }
+
+    final controller = ref.read(ticketCommandProvider.notifier);
+    final didSave = _mode == _TicketNoteMode.internal
+        ? await controller.addInternalNote(
+            TicketInternalNoteInput(ticket: widget.ticket, note: note),
+          )
+        : await controller.addCustomerUpdate(
+            TicketCustomerUpdateInput(ticket: widget.ticket, note: note),
+          );
+
+    if (!mounted) return;
+    if (didSave) {
+      _controller.clear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_mode == _TicketNoteMode.internal
+              ? 'Internal note saved.'
+              : 'Customer update posted.'),
+        ),
+      );
+    }
+  }
+}
+
 class _TimelineItem extends StatelessWidget {
   const _TimelineItem({required this.event});
 
@@ -697,15 +819,31 @@ class _TimelineItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final transition = _transitionLabel(event);
+    final scheme = Theme.of(context).colorScheme;
+    final tone = event.isInternalNote
+        ? Colors.indigo
+        : event.isAssignment
+            ? Colors.teal
+            : event.isAutomation
+                ? Colors.deepPurple
+                : scheme.primary;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.only(top: 4),
-            child: Icon(Icons.circle, size: 12),
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: tone.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(_eventIcon(event), size: 16, color: tone),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -727,7 +865,7 @@ class _TimelineItem extends StatelessWidget {
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       if (event.isInternalNote)
-                        const Chip(label: Text('Internal')),
+                        const Chip(label: Text('Internal note')),
                       if (event.isAssignment)
                         const Chip(label: Text('Assignment')),
                       if (event.isAutomation)
@@ -756,6 +894,14 @@ class _TimelineItem extends StatelessWidget {
     }
     if (newStatus != null) return 'Status set to $newStatus';
     return 'Ticket event';
+  }
+
+  IconData _eventIcon(TicketEvent event) {
+    if (event.isInternalNote) return Icons.sticky_note_2_outlined;
+    if (event.isAssignment) return Icons.assignment_ind_outlined;
+    if (event.isAutomation) return Icons.auto_awesome_outlined;
+    if (event.newStatus != null) return Icons.rule_outlined;
+    return Icons.forum_outlined;
   }
 }
 

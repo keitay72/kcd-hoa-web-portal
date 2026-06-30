@@ -25,6 +25,7 @@ class CustomerPortalAccount {
     required this.id,
     required this.accountType,
     required this.isCommunityAccount,
+    this.communityType = 'hoa',
     this.accountNumber,
     this.name,
   });
@@ -32,12 +33,27 @@ class CustomerPortalAccount {
   final String id;
   final String accountType;
   final bool isCommunityAccount;
+  final String communityType;
   final String? accountNumber;
   final String? name;
 
   String get displayName => name?.trim().isNotEmpty == true
       ? name!.trim()
       : accountNumber ?? 'Customer account';
+
+  bool get isCityCommunity => isCommunityAccount && communityType == 'city';
+
+  String get scopeLabel {
+    if (isCityCommunity) return 'City service area';
+    return isCommunityAccount ? 'Community' : 'Account';
+  }
+
+  String get scopeDescription {
+    if (isCityCommunity) {
+      return 'City-wide documents, announcements, schedules, and service contacts are shown here because this service address belongs to a city service area.';
+    }
+    return 'Community-wide documents, announcements, schedules, and contacts are shown here because this service address belongs to a community account.';
+  }
 }
 
 class CustomerPortalServiceLocation {

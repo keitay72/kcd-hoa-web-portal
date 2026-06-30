@@ -284,15 +284,17 @@ class _CommunityOverview extends StatelessWidget {
             Row(
               children: [
                 _IconBubble(
-                  icon: home.hasCommunityInfo
-                      ? Icons.apartment_outlined
-                      : Icons.account_circle_outlined,
+                  icon: home.account.isCityCommunity
+                      ? Icons.location_city_outlined
+                      : home.hasCommunityInfo
+                          ? Icons.apartment_outlined
+                          : Icons.account_circle_outlined,
                   color: const Color(0xFF00897B),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    home.hasCommunityInfo ? 'Community' : 'Account',
+                    home.account.scopeLabel,
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),
@@ -309,9 +311,7 @@ class _CommunityOverview extends StatelessWidget {
             ],
             if (home.hasCommunityInfo) ...[
               const SizedBox(height: 12),
-              const Text(
-                'Community-wide documents, announcements, schedules, and contacts are shown here because this service address belongs to a community account.',
-              ),
+              Text(home.account.scopeDescription),
             ],
           ],
         ),
@@ -331,7 +331,7 @@ class _ScheduleSection extends StatelessWidget {
       title: 'Service schedule',
       icon: Icons.event_repeat_outlined,
       accentColor: const Color(0xFF2F6F9F),
-      emptyText: 'No community service schedules are published yet.',
+      emptyText: 'No service schedules are published yet.',
       children: schedules
           .map(
             (schedule) => _PortalListTile(
@@ -396,7 +396,7 @@ class _DocumentSection extends StatelessWidget {
       title: 'Documents',
       icon: Icons.description_outlined,
       accentColor: const Color(0xFF6F4AA8),
-      emptyText: 'No community documents are available yet.',
+      emptyText: 'No service documents are available yet.',
       children: documents
           .map(
             (document) => _PortalListTile(
@@ -423,10 +423,10 @@ class _BoardSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _SectionCard(
-      title: 'Community contacts',
+      title: 'Service contacts',
       icon: Icons.groups_outlined,
       accentColor: const Color(0xFF4E6E2E),
-      emptyText: 'No board or community contacts have been published yet.',
+      emptyText: 'No service contacts have been published yet.',
       children: boardMembers
           .map(
             (member) => _PortalListTile(

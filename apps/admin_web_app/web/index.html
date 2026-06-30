@@ -18,7 +18,7 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="description" content="Customer portal for residential, commercial, and roll-off service customers.">
 
   <!-- iOS meta tags & icons -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -33,6 +33,24 @@
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
+  <script>
+    // Local development only: stale PWA caches can keep serving old Flutter bundles.
+    if (['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations()
+          .then((registrations) => Promise.all(
+            registrations.map((registration) => registration.unregister()),
+          ))
+          .catch(() => {});
+      }
+
+      if ('caches' in window) {
+        caches.keys()
+          .then((keys) => Promise.all(keys.map((key) => caches.delete(key))))
+          .catch(() => {});
+      }
+    }
+  </script>
   <script src="assets/assets/vendor/passkeys_bundle.js"></script>
   <script src="flutter_bootstrap.js" async></script>
 </body>

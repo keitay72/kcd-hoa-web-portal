@@ -77,6 +77,9 @@ Deno.serve(async (request) => {
   if (locationError) return jsonResponse({ error: locationError.message }, 500);
 
   const metadata = account.metadata ?? {};
+  const rawCommunityType =
+    typeof metadata.community_type === "string" ? metadata.community_type : "hoa";
+  const communityType = rawCommunityType === "city" ? "city" : "hoa";
   const legacyHoaId =
     typeof metadata.legacy_hoa_id === "string"
       ? metadata.legacy_hoa_id
@@ -180,6 +183,7 @@ Deno.serve(async (request) => {
       accountType: account.account_type,
       name: account.name,
       isCommunityAccount: account.account_type === "community",
+      communityType,
     },
     serviceLocation,
     announcements,

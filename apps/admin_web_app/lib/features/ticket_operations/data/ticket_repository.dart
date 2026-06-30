@@ -31,12 +31,14 @@ abstract interface class TicketRepository {
 class TicketListFilter {
   const TicketListFilter({
     this.hoaId,
+    this.addressId,
     this.status,
     this.priority,
     this.search,
   });
 
   final String? hoaId;
+  final String? addressId;
   final String? status;
   final String? priority;
   final String? search;
@@ -45,13 +47,14 @@ class TicketListFilter {
   bool operator ==(Object other) {
     return other is TicketListFilter &&
         other.hoaId == hoaId &&
+        other.addressId == addressId &&
         other.status == status &&
         other.priority == priority &&
         other.search == search;
   }
 
   @override
-  int get hashCode => Object.hash(hoaId, status, priority, search);
+  int get hashCode => Object.hash(hoaId, addressId, status, priority, search);
 }
 
 class SupabaseTicketRepository implements TicketRepository {
@@ -116,6 +119,9 @@ class SupabaseTicketRepository implements TicketRepository {
 
     if (filter.hoaId != null && filter.hoaId!.isNotEmpty) {
       query = query.eq('hoa_id', filter.hoaId!);
+    }
+    if (filter.addressId != null && filter.addressId!.isNotEmpty) {
+      query = query.eq('address_id', filter.addressId!);
     }
     if (filter.status != null && filter.status!.isNotEmpty) {
       query = query.eq('status', filter.status!);

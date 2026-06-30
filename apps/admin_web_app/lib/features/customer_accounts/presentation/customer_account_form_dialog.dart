@@ -63,8 +63,7 @@ class _CustomerAccountFormDialogState
     final formState = ref.watch(customerAccountFormControllerProvider);
 
     return AlertDialog(
-      title: Text(
-          _isEditing ? 'Edit Customer Account' : 'Create Customer Account'),
+      title: Text(_isEditing ? 'Edit Account' : 'Create Account'),
       content: SizedBox(
         width: 620,
         child: Form(
@@ -76,7 +75,7 @@ class _CustomerAccountFormDialogState
                 TextFormField(
                   controller: _nameController,
                   decoration: const InputDecoration(
-                    labelText: 'Account Name',
+                    labelText: 'Name',
                     border: OutlineInputBorder(),
                   ),
                 ),

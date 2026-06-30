@@ -25,7 +25,10 @@ class HoaFormDialog extends ConsumerStatefulWidget {
 class _HoaFormDialogState extends ConsumerState<HoaFormDialog> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _stateController = TextEditingController();
   HoaCommunityStatus _status = HoaCommunityStatus.active;
+  CommunityType _communityType = CommunityType.hoa;
 
   bool get _isEditing => widget.initialValue != null;
 
@@ -35,15 +38,24 @@ class _HoaFormDialogState extends ConsumerState<HoaFormDialog> {
     final initialValue = widget.initialValue;
     if (initialValue != null) {
       _nameController.text = initialValue.name;
+      _cityController.text = initialValue.city ?? '';
+      _stateController.text = initialValue.state ?? '';
       _status = initialValue.status;
+      _communityType = initialValue.communityType;
     }
     _nameController.addListener(_refreshCodePreview);
+    _cityController.addListener(_syncCityDisplayName);
+    _stateController.addListener(_syncCityDisplayName);
   }
 
   @override
   void dispose() {
     _nameController.removeListener(_refreshCodePreview);
+    _cityController.removeListener(_syncCityDisplayName);
+    _stateController.removeListener(_syncCityDisplayName);
     _nameController.dispose();
+    _cityController.dispose();
+    _stateController.dispose();
     super.dispose();
   }
 
@@ -54,13 +66,17 @@ class _HoaFormDialogState extends ConsumerState<HoaFormDialog> {
       hoaCodePreviewProvider(
         HoaCodePreviewRequest(
           name: _nameController.text,
+          communityType: _communityType,
           excludingHoaId: widget.initialValue?.id,
         ),
       ),
     );
     final fallbackCode = _nameController.text.trim().isEmpty
         ? ''
-        : HoaCodeGenerator.baseCodeFromName(_nameController.text);
+        : HoaCodeGenerator.baseCodeFromName(
+            _nameController.text,
+            communityType: _communityType,
+          );
     final displayedCode = codePreview.maybeWhen(
       data: (value) => value,
       orElse: () => fallbackCode,
@@ -77,14 +93,70 @@ class _HoaFormDialogState extends ConsumerState<HoaFormDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              SegmentedButton<CommunityType>(
+                segments: const [
+                  ButtonSegment(
+                    value: CommunityType.hoa,
+                    icon: Icon(Icons.apartment_outlined),
+                    label: Text('HOA'),
+                  ),
+                  ButtonSegment(
+                    value: CommunityType.city,
+                    icon: Icon(Icons.location_city_outlined),
+                    label: Text('City'),
+                  ),
+                ],
+                selected: {_communityType},
+                onSelectionChanged: formState.isLoading
+                    ? null
+                    : (selection) {
+                        setState(() {
+                          _communityType = selection.first;
+                          _syncCityDisplayName();
+                        });
+                      },
+              ),
+              const SizedBox(height: 14),
               TextFormField(
                 controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Community Name',
+                decoration: InputDecoration(
+                  labelText: _communityType == CommunityType.city
+                      ? 'Display Name'
+                      : 'Community Name',
                   border: OutlineInputBorder(),
                 ),
                 validator: _required,
               ),
+              if (_communityType == CommunityType.city) ...[
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: TextFormField(
+                        controller: _cityController,
+                        decoration: const InputDecoration(
+                          labelText: 'City',
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: _required,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _stateController,
+                        decoration: const InputDecoration(
+                          labelText: 'State',
+                          border: OutlineInputBorder(),
+                        ),
+                        textCapitalization: TextCapitalization.characters,
+                        validator: _validateState,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 14),
               TextFormField(
                 key: ValueKey('hoa-code-$displayedCode'),
@@ -156,9 +228,35 @@ class _HoaFormDialogState extends ConsumerState<HoaFormDialog> {
     setState(() {});
   }
 
+  void _syncCityDisplayName() {
+    if (_communityType != CommunityType.city) return;
+    final city = _cityController.text.trim();
+    final state = _stateController.text.trim().toUpperCase();
+    if (city.isEmpty && state.isEmpty) return;
+    final displayName =
+        [city, state].where((part) => part.isNotEmpty).join(', ');
+    if (_nameController.text != displayName) {
+      _nameController.text = displayName;
+      _nameController.selection = TextSelection.collapsed(
+        offset: _nameController.text.length,
+      );
+    } else {
+      _refreshCodePreview();
+    }
+  }
+
   String? _required(String? value) {
     if (value == null || value.trim().isEmpty) {
       return 'Required';
+    }
+    return null;
+  }
+
+  String? _validateState(String? value) {
+    final requiredError = _required(value);
+    if (requiredError != null) return requiredError;
+    if (!RegExp(r'^[A-Za-z]{2}$').hasMatch(value!.trim())) {
+      return 'Use 2 letters';
     }
     return null;
   }
@@ -171,6 +269,13 @@ class _HoaFormDialogState extends ConsumerState<HoaFormDialog> {
     final input = HoaCommunityInput(
       name: _nameController.text.trim(),
       status: _status,
+      communityType: _communityType,
+      city: _communityType == CommunityType.city
+          ? _titleCase(_cityController.text.trim())
+          : null,
+      state: _communityType == CommunityType.city
+          ? _stateController.text.trim().toUpperCase()
+          : null,
       residentActivationCodesRequiredOverride: false,
     );
 
@@ -182,5 +287,16 @@ class _HoaFormDialogState extends ConsumerState<HoaFormDialog> {
     if (result != null && mounted) {
       Navigator.of(context).pop(result);
     }
+  }
+
+  String _titleCase(String value) {
+    return value
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .map((part) {
+      if (part.length == 1) return part.toUpperCase();
+      return part[0].toUpperCase() + part.substring(1).toLowerCase();
+    }).join(' ');
   }
 }

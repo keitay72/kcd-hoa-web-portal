@@ -7,6 +7,8 @@ import '../../address_registry/domain/hoa_address.dart';
 import '../../address_registry/domain/hoa_address_input.dart';
 import '../../address_registry/presentation/address_providers.dart';
 import '../../hoa_management/domain/hoa_community.dart';
+import '../../hoa_management/domain/hoa_community_input.dart';
+import '../../hoa_management/presentation/hoa_providers.dart';
 import '../domain/customer_account.dart';
 import '../domain/customer_account_input.dart';
 import '../domain/service_location.dart';
@@ -44,6 +46,8 @@ class _ServiceAddressFormDialogState
   String? _communityId;
   bool _isSubmitting = false;
   Object? _error;
+
+  bool get _usesCityScope => !_belongsToCommunity;
 
   @override
   void initState() {
@@ -96,13 +100,13 @@ class _ServiceAddressFormDialogState
                   segments: const [
                     ButtonSegment(
                       value: false,
-                      icon: Icon(Icons.home_outlined),
-                      label: Text('Standalone'),
+                      icon: Icon(Icons.location_city_outlined),
+                      label: Text('City service'),
                     ),
                     ButtonSegment(
                       value: true,
                       icon: Icon(Icons.apartment_outlined),
-                      label: Text('Community'),
+                      label: Text('HOA / Community'),
                     ),
                   ],
                   selected: {_belongsToCommunity},
@@ -121,10 +125,11 @@ class _ServiceAddressFormDialogState
                     initialValue: _communityId,
                     isExpanded: true,
                     decoration: const InputDecoration(
-                      labelText: 'Community',
+                      labelText: 'HOA / Community',
                       border: OutlineInputBorder(),
                     ),
                     items: widget.communities
+                        .where((community) => community.isHoa)
                         .map(
                           (community) => DropdownMenuItem(
                             value: community.id,
@@ -137,7 +142,7 @@ class _ServiceAddressFormDialogState
                         )
                         .toList(),
                     validator: (value) => _belongsToCommunity && value == null
-                        ? 'Select a community'
+                        ? 'Select an HOA or community'
                         : null,
                     onChanged: _isSubmitting
                         ? null
@@ -211,7 +216,9 @@ class _ServiceAddressFormDialogState
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Normalized key: ${_normalizedPreview()}',
+                  _usesCityScope
+                      ? 'This address will receive city-wide service information for ${_cityScopeName()}.'
+                      : 'Normalized key: ${_normalizedPreview()}',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 if (_error != null) ...[
@@ -282,8 +289,9 @@ class _ServiceAddressFormDialogState
     });
 
     try {
-      final account = await _resolveAccount();
-      final legacyAddress = await _resolveLegacyAddress();
+      final community = await _resolveServiceCommunity();
+      final account = await _resolveAccount(community);
+      final legacyAddress = await _resolveLegacyAddress(community);
       final input = ServiceLocationInput(
         customerAccountId: account.id,
         line1: _line1Controller.text,
@@ -293,7 +301,7 @@ class _ServiceAddressFormDialogState
         postalCode: _postalCodeController.text,
         status: ServiceLocationStatus.active,
         externalLocationRef: _externalLocationRef(legacyAddress),
-        metadata: _serviceLocationMetadata(legacyAddress),
+        metadata: _serviceLocationMetadata(community, legacyAddress),
       );
 
       final location = await ref
@@ -302,6 +310,7 @@ class _ServiceAddressFormDialogState
 
       ref.invalidate(customerAccountListProvider);
       ref.invalidate(serviceLocationListProvider);
+      ref.invalidate(hoaListProvider);
 
       if (mounted) Navigator.of(context).pop(location);
     } catch (error) {
@@ -314,11 +323,9 @@ class _ServiceAddressFormDialogState
     }
   }
 
-  Future<HoaAddress?> _resolveLegacyAddress() async {
-    if (!_belongsToCommunity || _communityId == null) return null;
-
+  Future<HoaAddress?> _resolveLegacyAddress(HoaCommunity community) async {
     final input = HoaAddressInput(
-      hoaId: _communityId!,
+      hoaId: community.id,
       line1: _line1Controller.text,
       line2: _line2Controller.text,
       city: _cityController.text,
@@ -347,24 +354,40 @@ class _ServiceAddressFormDialogState
     return legacyAddress?.id ?? '';
   }
 
-  Future<CustomerAccount> _resolveAccount() async {
-    if (!_belongsToCommunity) {
-      return ref.read(customerAccountRepositoryProvider).createAccount(
-            CustomerAccountInput(
-              accountType: CustomerAccountType.residential,
-              status: CustomerAccountStatus.active,
-              name: _singleLineAddress(),
-            ),
-            tenantId: widget.tenantId,
-          );
+  Future<HoaCommunity> _resolveServiceCommunity() async {
+    if (_belongsToCommunity) {
+      final communityId = _communityId;
+      return widget.communities.firstWhere(
+        (item) => item.id == communityId,
+        orElse: () => throw StateError('Select an HOA or community.'),
+      );
     }
 
-    final communityId = _communityId;
-    final community = widget.communities.firstWhere(
-      (item) => item.id == communityId,
-      orElse: () => throw StateError('Select a community.'),
-    );
+    final city = _titleCase(_cityController.text.trim());
+    final state = _stateController.text.trim().toUpperCase();
+    for (final community in widget.communities) {
+      final sameCity =
+          (community.city ?? '').toLowerCase() == city.toLowerCase();
+      final sameState = (community.state ?? '').toUpperCase() == state;
+      if (community.isCity && sameCity && sameState) {
+        return community;
+      }
+    }
 
+    return ref.read(hoaRepositoryProvider).create(
+          HoaCommunityInput(
+            name: '$city, $state',
+            status: HoaCommunityStatus.active,
+            communityType: CommunityType.city,
+            city: city,
+            state: state,
+            residentActivationCodesRequiredOverride: false,
+          ),
+          tenantId: widget.tenantId,
+        );
+  }
+
+  Future<CustomerAccount> _resolveAccount(HoaCommunity community) async {
     for (final account in widget.accounts) {
       final legacyHoaId = account.metadata['legacy_hoa_id']?.toString();
       if (account.accountType == CustomerAccountType.community &&
@@ -380,27 +403,45 @@ class _ServiceAddressFormDialogState
             status: CustomerAccountStatus.active,
             name: community.name,
             externalAccountRef: community.id,
-            metadata: {'legacy_hoa_id': community.id},
+            metadata: {
+              'legacy_hoa_id': community.id,
+              'community_type': community.communityType.name,
+              if (community.city != null) 'city': community.city,
+              if (community.state != null) 'state': community.state,
+            },
           ),
           tenantId: widget.tenantId,
         );
   }
 
-  Map<String, dynamic> _serviceLocationMetadata(HoaAddress? legacyAddress) {
-    if (!_belongsToCommunity || _communityId == null) return const {};
+  Map<String, dynamic> _serviceLocationMetadata(
+    HoaCommunity community,
+    HoaAddress? legacyAddress,
+  ) {
     return {
-      'legacy_hoa_id': _communityId,
+      'legacy_hoa_id': community.id,
+      'community_type': community.communityType.name,
+      if (community.city != null) 'city': community.city,
+      if (community.state != null) 'state': community.state,
       if (legacyAddress != null) 'legacy_address_id': legacyAddress.id,
     };
   }
 
-  String _singleLineAddress() {
-    return <String?>[
-      _line1Controller.text.trim(),
-      _line2Controller.text.trim(),
-      _cityController.text.trim(),
-      _stateController.text.trim(),
-      _postalCodeController.text.trim(),
-    ].where((part) => part != null && part.isNotEmpty).join(', ');
+  String _cityScopeName() {
+    final city = _cityController.text.trim();
+    final state = _stateController.text.trim().toUpperCase();
+    if (city.isEmpty && state.isEmpty) return 'this city';
+    return [city, state].where((part) => part.isNotEmpty).join(', ');
+  }
+
+  String _titleCase(String value) {
+    return value
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .map((part) {
+      if (part.length == 1) return part.toUpperCase();
+      return part[0].toUpperCase() + part.substring(1).toLowerCase();
+    }).join(' ');
   }
 }

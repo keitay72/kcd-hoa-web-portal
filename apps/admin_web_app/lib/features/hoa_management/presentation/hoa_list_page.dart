@@ -27,7 +27,7 @@ class HoaListPage extends ConsumerWidget {
             children: [
               Expanded(
                 child: Text(
-                  'Community Management',
+                  'Residential Areas',
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
               ),
@@ -69,13 +69,15 @@ class HoaListPage extends ConsumerWidget {
 
                       return ListTile(
                         leading: Icon(
-                          hoa.isActive
-                              ? Icons.domain_outlined
-                              : Icons.domain_disabled_outlined,
+                          hoa.isCity
+                              ? Icons.location_city_outlined
+                              : hoa.isActive
+                                  ? Icons.apartment_outlined
+                                  : Icons.domain_disabled_outlined,
                         ),
                         title: Text(hoa.name),
                         subtitle: Text(
-                          '${hoa.code} · ${hoa.status.name}',
+                          '${hoa.communityType.label} · ${hoa.code} · ${hoa.status.name}',
                         ),
                         trailing: const Icon(Icons.chevron_right),
                         onTap: () => context.go('/admin/hoas/${hoa.id}'),

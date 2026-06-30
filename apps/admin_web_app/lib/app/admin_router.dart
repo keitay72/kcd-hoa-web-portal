@@ -736,7 +736,7 @@ class _PortalChromeText {
   final String title;
   final String subtitle;
 
-  String get fullTitle => '$title $subtitle';
+  String get fullTitle => subtitle.trim().isEmpty ? title : '$title $subtitle';
 }
 
 _PortalChromeText _portalChromeText(AdminContext? context) {
@@ -753,7 +753,7 @@ _PortalChromeText _portalChromeText(AdminContext? context) {
       title: scopeName == null || scopeName.isEmpty
           ? 'Customer Portal'
           : scopeName,
-      subtitle: 'Management Portal',
+      subtitle: '',
     );
   }
 
@@ -1048,14 +1048,15 @@ class _SidebarHeader extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
-                Text(
-                  subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                ),
+                if (subtitle.trim().isNotEmpty)
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                  ),
               ],
             ),
           ),
@@ -1212,25 +1213,11 @@ class _AdminSidebar extends ConsumerWidget {
       activePrefixes: ['/admin/tenants'],
     ),
     _AdminNavItem(
-      label: 'Customer Accounts',
+      label: 'Customers',
       permissionRule: AdminPermissions.customerAccountsRead,
       path: '/admin/customer-accounts',
       icon: Icons.account_tree_outlined,
       activePrefixes: ['/admin/customer-accounts'],
-    ),
-    _AdminNavItem(
-      label: 'Community Management',
-      permissionRule: AdminPermissions.hoaRead,
-      path: '/admin/hoas',
-      icon: Icons.domain_outlined,
-      activePrefixes: ['/admin/hoas'],
-    ),
-    _AdminNavItem(
-      label: 'Service Locations',
-      permissionRule: AdminPermissions.addressRead,
-      path: '/admin/addresses',
-      icon: Icons.location_on_outlined,
-      activePrefixes: ['/admin/addresses'],
     ),
     _AdminNavItem(
       label: 'Announcements',
@@ -1287,25 +1274,11 @@ class _AdminSidebar extends ConsumerWidget {
       feature: TenantFeature.analyticsDashboard,
     ),
     _AdminNavItem(
-      label: 'Customer Accounts',
+      label: 'Customers',
       permissionRule: AdminPermissions.customerAccountsRead,
       path: '/admin/customer-accounts',
       icon: Icons.account_tree_outlined,
       activePrefixes: ['/admin/customer-accounts'],
-    ),
-    _AdminNavItem(
-      label: 'Community Management',
-      permissionRule: AdminPermissions.hoaRead,
-      path: '/admin/hoas',
-      icon: Icons.domain_outlined,
-      activePrefixes: ['/admin/hoas'],
-    ),
-    _AdminNavItem(
-      label: 'Service Locations',
-      permissionRule: AdminPermissions.addressRead,
-      path: '/admin/addresses',
-      icon: Icons.location_on_outlined,
-      activePrefixes: ['/admin/addresses'],
     ),
     _AdminNavItem(
       label: 'Announcements',

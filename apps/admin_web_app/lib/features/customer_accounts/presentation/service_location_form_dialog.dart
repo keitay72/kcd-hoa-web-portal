@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../address_registry/domain/address_normalizer.dart';
 import '../domain/customer_account.dart';
+import '../domain/customer_account_input.dart';
 import '../domain/service_location.dart';
 import '../domain/service_location_input.dart';
 import 'customer_account_providers.dart';
@@ -34,12 +35,18 @@ class _ServiceLocationFormDialogState
   final _cityController = TextEditingController();
   final _stateController = TextEditingController();
   final _postalCodeController = TextEditingController();
-  final _externalRefController = TextEditingController();
 
   String? _customerAccountId;
   ServiceLocationStatus _status = ServiceLocationStatus.active;
+  Object? _localError;
 
   bool get _isEditing => widget.initialValue != null;
+
+  List<CustomerAccount> get _communityAccounts {
+    final accounts = widget.accounts.where(_isHoaCommunityAccount).toList()
+      ..sort((a, b) => a.displayName.compareTo(b.displayName));
+    return accounts;
+  }
 
   @override
   void initState() {
@@ -54,8 +61,14 @@ class _ServiceLocationFormDialogState
       _cityController.text = initialValue.city;
       _stateController.text = initialValue.state;
       _postalCodeController.text = initialValue.postalCode;
-      _externalRefController.text = initialValue.externalLocationRef ?? '';
       _status = initialValue.status;
+    }
+
+    if (_customerAccountId != null) {
+      final selectedAccount = _accountById(_customerAccountId!);
+      if (selectedAccount == null || !_isHoaCommunityAccount(selectedAccount)) {
+        _customerAccountId = null;
+      }
     }
 
     for (final controller in [
@@ -86,17 +99,18 @@ class _ServiceLocationFormDialogState
     _cityController.dispose();
     _stateController.dispose();
     _postalCodeController.dispose();
-    _externalRefController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final formState = ref.watch(serviceLocationFormControllerProvider);
+    final visibleError = formState.error ?? _localError;
 
     return AlertDialog(
       title: Text(
-          _isEditing ? 'Edit Service Location' : 'Create Service Location'),
+        _isEditing ? 'Edit Service Address' : 'Add Service Address',
+      ),
       content: SizedBox(
         width: 680,
         child: Form(
@@ -105,30 +119,6 @@ class _ServiceLocationFormDialogState
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                DropdownButtonFormField<String>(
-                  initialValue: _customerAccountId,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Customer Account',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: widget.accounts
-                      .map(
-                        (account) => DropdownMenuItem(
-                          value: account.id,
-                          child: Text(
-                            account.displayName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  validator: (value) => value == null ? 'Required' : null,
-                  onChanged: (value) =>
-                      setState(() => _customerAccountId = value),
-                ),
-                const SizedBox(height: 14),
                 TextFormField(
                   controller: _line1Controller,
                   decoration: const InputDecoration(
@@ -205,12 +195,39 @@ class _ServiceLocationFormDialogState
                   },
                 ),
                 const SizedBox(height: 14),
-                TextFormField(
-                  controller: _externalRefController,
-                  decoration: const InputDecoration(
-                    labelText: 'External Location Reference',
-                    border: OutlineInputBorder(),
+                DropdownButtonFormField<String?>(
+                  key: ValueKey(_customerAccountId ?? 'no-community'),
+                  initialValue: _customerAccountId,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: 'Community / HOA (optional)',
+                    helperText:
+                        'Leave blank for city-wide residential service.',
+                    border: const OutlineInputBorder(),
+                    suffixIcon: _customerAccountId == null
+                        ? null
+                        : IconButton(
+                            tooltip: 'Clear community',
+                            icon: const Icon(Icons.close),
+                            onPressed: () {
+                              setState(() => _customerAccountId = null);
+                            },
+                          ),
                   ),
+                  items: _communityAccounts
+                      .map(
+                        (account) => DropdownMenuItem<String?>(
+                          value: account.id,
+                          child: Text(
+                            account.displayName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) =>
+                      setState(() => _customerAccountId = value),
                 ),
                 const SizedBox(height: 8),
                 Align(
@@ -220,10 +237,10 @@ class _ServiceLocationFormDialogState
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
-                if (formState.hasError) ...[
+                if (visibleError != null) ...[
                   const SizedBox(height: 14),
                   Text(
-                    formState.error.toString(),
+                    visibleError.toString(),
                     style:
                         TextStyle(color: Theme.of(context).colorScheme.error),
                   ),
@@ -292,15 +309,31 @@ class _ServiceLocationFormDialogState
       return;
     }
 
+    setState(() => _localError = null);
+
+    final String? accountId;
+    try {
+      accountId = await _resolveLocationAccountId();
+    } catch (error) {
+      if (mounted) {
+        setState(() => _localError = error);
+      }
+      return;
+    }
+
+    if (accountId == null) {
+      return;
+    }
+
     final input = ServiceLocationInput(
-      customerAccountId: _customerAccountId!,
+      customerAccountId: accountId,
       line1: _line1Controller.text.trim(),
       line2: _line2Controller.text.trim(),
       city: _cityController.text.trim(),
       state: _stateController.text.trim(),
       postalCode: _postalCodeController.text.trim(),
       status: _status,
-      externalLocationRef: _externalRefController.text,
+      externalLocationRef: widget.initialValue?.externalLocationRef,
     );
 
     final controller = ref.read(serviceLocationFormControllerProvider.notifier);
@@ -314,5 +347,95 @@ class _ServiceLocationFormDialogState
     if (result != null && mounted) {
       Navigator.of(context).pop(result);
     }
+  }
+
+  Future<String?> _resolveLocationAccountId() async {
+    final selectedCommunityId = _customerAccountId;
+    if (selectedCommunityId != null) return selectedCommunityId;
+
+    final existingCityAccount = _findCityAccount();
+    if (existingCityAccount != null) return existingCityAccount.id;
+
+    final tenantId = widget.tenantId;
+    if (tenantId == null || tenantId.isEmpty) {
+      setState(() {
+        _localError = StateError(
+            'Unable to create a city service area for this address.');
+      });
+      return null;
+    }
+
+    final city = _titleCase(_cityController.text);
+    final state = _stateController.text.trim().toUpperCase();
+    final repository = ref.read(customerAccountRepositoryProvider);
+    final cityAccount = await repository.createAccount(
+      CustomerAccountInput(
+        accountType: CustomerAccountType.community,
+        status: CustomerAccountStatus.active,
+        name: _cityScopeName(city: city, state: state),
+        metadata: {
+          'community_type': 'city',
+          'city': city,
+          'state': state,
+        },
+      ),
+      tenantId: tenantId,
+    );
+
+    ref.invalidate(customerAccountListProvider);
+    return cityAccount.id;
+  }
+
+  CustomerAccount? _findCityAccount() {
+    final city = _cityController.text.trim().toLowerCase();
+    final state = _stateController.text.trim().toUpperCase();
+    for (final account in widget.accounts) {
+      if (!_isCityAccount(account)) continue;
+      final accountCity =
+          (account.metadata['city'] ?? '').toString().trim().toLowerCase();
+      final accountState =
+          (account.metadata['state'] ?? '').toString().trim().toUpperCase();
+      if (accountCity == city && accountState == state) return account;
+
+      final displayName = account.displayName.trim().toLowerCase();
+      if (displayName ==
+          _cityScopeName(city: city, state: state).toLowerCase()) {
+        return account;
+      }
+    }
+
+    return null;
+  }
+
+  CustomerAccount? _accountById(String id) {
+    for (final account in widget.accounts) {
+      if (account.id == id) return account;
+    }
+    return null;
+  }
+
+  bool _isHoaCommunityAccount(CustomerAccount account) {
+    return account.accountType == CustomerAccountType.community &&
+        !_isCityAccount(account);
+  }
+
+  bool _isCityAccount(CustomerAccount account) {
+    return account.accountType == CustomerAccountType.community &&
+        account.metadata['community_type'] == 'city';
+  }
+
+  String _cityScopeName({required String city, required String state}) {
+    return [city, state].where((part) => part.trim().isNotEmpty).join(', ');
+  }
+
+  String _titleCase(String value) {
+    return value
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .map((part) {
+      if (part.length == 1) return part.toUpperCase();
+      return part[0].toUpperCase() + part.substring(1).toLowerCase();
+    }).join(' ');
   }
 }

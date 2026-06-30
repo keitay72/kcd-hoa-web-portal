@@ -39,6 +39,7 @@ final hoaCodePreviewProvider =
 
     return ref.watch(hoaRepositoryProvider).availableCodeForName(
           name: request.name,
+          communityType: request.communityType,
           excludingHoaId: request.excludingHoaId,
         );
   },
@@ -52,21 +53,24 @@ final hoaFormControllerProvider =
 class HoaCodePreviewRequest {
   const HoaCodePreviewRequest({
     required this.name,
+    this.communityType = CommunityType.hoa,
     this.excludingHoaId,
   });
 
   final String name;
+  final CommunityType communityType;
   final String? excludingHoaId;
 
   @override
   bool operator ==(Object other) {
     return other is HoaCodePreviewRequest &&
         other.name == name &&
+        other.communityType == communityType &&
         other.excludingHoaId == excludingHoaId;
   }
 
   @override
-  int get hashCode => Object.hash(name, excludingHoaId);
+  int get hashCode => Object.hash(name, communityType, excludingHoaId);
 }
 
 class HoaFormController extends AutoDisposeAsyncNotifier<void> {

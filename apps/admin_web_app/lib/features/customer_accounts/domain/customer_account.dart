@@ -26,7 +26,7 @@ enum CustomerAccountType {
       CustomerAccountType.residential => 'Residential',
       CustomerAccountType.community => 'Community',
       CustomerAccountType.commercial => 'Commercial',
-      CustomerAccountType.rollOff => 'Roll off',
+      CustomerAccountType.rollOff => 'Roll-Off',
     };
   }
 }

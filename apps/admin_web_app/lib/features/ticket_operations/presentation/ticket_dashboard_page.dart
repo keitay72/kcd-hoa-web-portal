@@ -47,10 +47,13 @@ class TicketDashboardPage extends ConsumerWidget {
                   icon: const Icon(Icons.list_alt),
                   label: const Text('All Tickets'),
                 ),
-                OutlinedButton.icon(
-                  onPressed: () => ref.invalidate(ticketQueueProvider(queue)),
+                IconButton.filledTonal(
+                  tooltip: 'Refresh queue',
+                  onPressed: () {
+                    ref.invalidate(ticketQueueProvider(queue));
+                    ref.invalidate(ticketMetricsProvider);
+                  },
                   icon: const Icon(Icons.refresh),
-                  label: const Text('Refresh'),
                 ),
               ],
             ),
@@ -58,13 +61,19 @@ class TicketDashboardPage extends ConsumerWidget {
         ),
         const SizedBox(height: 20),
         metrics.when(
-          data: (value) => _MetricGrid(metrics: value),
+          data: (value) => _QueueSummaryStrip(
+            queue: queue,
+            metrics: value,
+          ),
           loading: () => const LinearProgressIndicator(),
           error: (error, _) => Text('Unable to load ticket metrics: $error'),
         ),
         const SizedBox(height: 20),
         tickets.when(
-          data: (items) => _QueueTicketList(tickets: items),
+          data: (items) => _QueueTicketList(
+            queue: queue,
+            tickets: items,
+          ),
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (error, _) => Text('Unable to load queue: $error'),
         ),
@@ -75,7 +84,7 @@ class TicketDashboardPage extends ConsumerWidget {
   String _subtitleForQueue(TicketQueue queue) {
     return switch (queue) {
       TicketQueue.csr =>
-        'New, open, and customer-facing tickets for CSR triage.',
+        'Triage customer issues, capture updates, and keep SLA risk visible.',
       TicketQueue.urgent =>
         'Urgent and SLA-breached tickets needing immediate attention.',
       TicketQueue.aging => 'Open tickets older than 48 hours.',
@@ -84,112 +93,212 @@ class TicketDashboardPage extends ConsumerWidget {
   }
 }
 
-class _MetricGrid extends StatelessWidget {
-  const _MetricGrid({required this.metrics});
+class _QueueSummaryStrip extends StatelessWidget {
+  const _QueueSummaryStrip({
+    required this.queue,
+    required this.metrics,
+  });
 
+  final TicketQueue queue;
   final TicketMetrics metrics;
 
   @override
   Widget build(BuildContext context) {
-    final cards = [
-      _MetricCard(
-        label: 'Open',
-        value: metrics.totalOpen.toString(),
-        icon: Icons.pending_actions,
-      ),
-      _MetricCard(
-        label: 'New',
-        value: metrics.newTickets.toString(),
-        icon: Icons.fiber_new,
-      ),
-      _MetricCard(
-        label: 'Assigned',
-        value: metrics.assigned.toString(),
-        icon: Icons.assignment_ind,
-      ),
-      _MetricCard(
-        label: 'In Progress',
-        value: metrics.inProgress.toString(),
-        icon: Icons.sync,
-      ),
-      _MetricCard(
-        label: 'Urgent',
-        value: metrics.urgent.toString(),
-        icon: Icons.priority_high,
-      ),
-      _MetricCard(
-        label: 'SLA Breached',
-        value: metrics.slaBreached.toString(),
-        icon: Icons.warning_amber,
-      ),
-      _MetricCard(
-        label: 'Due Soon',
-        value: metrics.slaDueSoon.toString(),
-        icon: Icons.timer,
-      ),
-      _MetricCard(
-        label: 'Resolved Today',
-        value: metrics.resolvedToday.toString(),
-        icon: Icons.check_circle_outline,
-      ),
-    ];
+    final cards = _cardsForQueue();
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final width = constraints.maxWidth >= 1100
-            ? (constraints.maxWidth - 48) / 4
-            : constraints.maxWidth >= 720
-                ? (constraints.maxWidth - 24) / 2
-                : constraints.maxWidth;
-        return Wrap(
-          spacing: 16,
-          runSpacing: 16,
-          children:
-              cards.map((card) => SizedBox(width: width, child: card)).toList(),
-        );
-      },
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: cards
+          .map(
+            (card) => _QueueSummaryChip(
+              label: card.label,
+              value: card.value,
+              icon: card.icon,
+              tone: card.tone(context),
+            ),
+          )
+          .toList(),
     );
+  }
+
+  List<_QueueSummaryData> _cardsForQueue() {
+    return switch (queue) {
+      TicketQueue.csr => [
+          _QueueSummaryData(
+            label: 'New',
+            value: metrics.newTickets,
+            icon: Icons.fiber_new,
+            tone: (context) => Colors.blue.shade700,
+          ),
+          _QueueSummaryData(
+            label: 'Open',
+            value: metrics.totalOpen,
+            icon: Icons.pending_actions,
+            tone: (context) => Theme.of(context).colorScheme.primary,
+          ),
+          _QueueSummaryData(
+            label: 'Assigned',
+            value: metrics.assigned,
+            icon: Icons.assignment_ind,
+            tone: (context) => Colors.indigo.shade700,
+          ),
+          _QueueSummaryData(
+            label: 'Due Soon',
+            value: metrics.slaDueSoon,
+            icon: Icons.timer_outlined,
+            tone: (context) => Colors.orange.shade800,
+          ),
+        ],
+      TicketQueue.urgent => [
+          _QueueSummaryData(
+            label: 'Urgent',
+            value: metrics.urgent,
+            icon: Icons.priority_high,
+            tone: (context) => Theme.of(context).colorScheme.error,
+          ),
+          _QueueSummaryData(
+            label: 'SLA Breached',
+            value: metrics.slaBreached,
+            icon: Icons.warning_amber,
+            tone: (context) => Theme.of(context).colorScheme.error,
+          ),
+          _QueueSummaryData(
+            label: 'Due Soon',
+            value: metrics.slaDueSoon,
+            icon: Icons.timer_outlined,
+            tone: (context) => Colors.orange.shade800,
+          ),
+          _QueueSummaryData(
+            label: 'Open',
+            value: metrics.totalOpen,
+            icon: Icons.pending_actions,
+            tone: (context) => Theme.of(context).colorScheme.primary,
+          ),
+        ],
+      TicketQueue.aging => [
+          _QueueSummaryData(
+            label: 'Open',
+            value: metrics.totalOpen,
+            icon: Icons.pending_actions,
+            tone: (context) => Theme.of(context).colorScheme.primary,
+          ),
+          _QueueSummaryData(
+            label: 'In Progress',
+            value: metrics.inProgress,
+            icon: Icons.sync,
+            tone: (context) => Colors.orange.shade800,
+          ),
+          _QueueSummaryData(
+            label: 'Due Soon',
+            value: metrics.slaDueSoon,
+            icon: Icons.timer_outlined,
+            tone: (context) => Colors.orange.shade800,
+          ),
+          _QueueSummaryData(
+            label: 'SLA Breached',
+            value: metrics.slaBreached,
+            icon: Icons.warning_amber,
+            tone: (context) => Theme.of(context).colorScheme.error,
+          ),
+        ],
+      TicketQueue.all => [
+          _QueueSummaryData(
+            label: 'Open',
+            value: metrics.totalOpen,
+            icon: Icons.pending_actions,
+            tone: (context) => Theme.of(context).colorScheme.primary,
+          ),
+          _QueueSummaryData(
+            label: 'New',
+            value: metrics.newTickets,
+            icon: Icons.fiber_new,
+            tone: (context) => Colors.blue.shade700,
+          ),
+          _QueueSummaryData(
+            label: 'Assigned',
+            value: metrics.assigned,
+            icon: Icons.assignment_ind,
+            tone: (context) => Colors.indigo.shade700,
+          ),
+          _QueueSummaryData(
+            label: 'Resolved Today',
+            value: metrics.resolvedToday,
+            icon: Icons.check_circle_outline,
+            tone: (context) => Colors.green.shade800,
+          ),
+        ],
+    };
   }
 }
 
-class _MetricCard extends StatelessWidget {
-  const _MetricCard({
+class _QueueSummaryData {
+  const _QueueSummaryData({
     required this.label,
     required this.value,
     required this.icon,
+    required this.tone,
   });
 
   final String label;
-  final String value;
+  final int value;
   final IconData icon;
+  final Color Function(BuildContext context) tone;
+}
+
+class _QueueSummaryChip extends StatelessWidget {
+  const _QueueSummaryChip({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.tone,
+  });
+
+  final String label;
+  final int value;
+  final IconData icon;
+  final Color tone;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Row(
-          children: [
-            Icon(icon, size: 32),
-            const SizedBox(width: 14),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(value, style: Theme.of(context).textTheme.headlineSmall),
-                Text(label),
-              ],
-            ),
-          ],
-        ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: tone.withOpacity(0.09),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: tone.withOpacity(0.22)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: tone),
+          const SizedBox(width: 8),
+          _CountPill(
+            value: value,
+            foreground: tone,
+            background: Theme.of(context).colorScheme.surface,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: tone,
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+        ],
       ),
     );
   }
 }
 
 class _QueueTicketList extends StatelessWidget {
-  const _QueueTicketList({required this.tickets});
+  const _QueueTicketList({
+    required this.queue,
+    required this.tickets,
+  });
 
+  final TicketQueue queue;
   final List<ServiceTicket> tickets;
 
   @override
@@ -207,6 +316,7 @@ class _QueueTicketList extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         return _TicketBoard(
+          queue: queue,
           tickets: tickets,
           compact: constraints.maxWidth < 860,
         );
@@ -217,20 +327,22 @@ class _QueueTicketList extends StatelessWidget {
 
 class _TicketBoard extends StatelessWidget {
   const _TicketBoard({
+    required this.queue,
     required this.tickets,
     required this.compact,
   });
 
+  final TicketQueue queue;
   final List<ServiceTicket> tickets;
   final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final grouped = {
-      for (final status in TicketStatus.values)
+      for (final status in _statusOrderForQueue(queue))
         status: tickets.where((ticket) => ticket.status == status).toList(),
     };
-    final visibleStatuses = TicketStatus.values
+    final visibleStatuses = _statusOrderForQueue(queue)
         .where((status) => grouped[status]!.isNotEmpty || !compact)
         .toList();
 
@@ -250,7 +362,7 @@ class _TicketBoard extends StatelessWidget {
     }
 
     final viewportHeight = MediaQuery.sizeOf(context).height;
-    final boardHeight = (viewportHeight * 0.72).clamp(540.0, 880.0);
+    final boardHeight = (viewportHeight * 0.66).clamp(480.0, 760.0);
 
     return Container(
       height: boardHeight,
@@ -275,7 +387,7 @@ class _TicketBoard extends StatelessWidget {
                     right: index == visibleStatuses.length - 1 ? 0 : 16,
                   ),
                   child: SizedBox(
-                    width: 312,
+                    width: 292,
                     height: boardHeight - 32,
                     child: _TicketBoardColumn(
                       status: visibleStatuses[index],
@@ -395,6 +507,7 @@ class _BoardTicketCard extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
@@ -449,6 +562,11 @@ class _BoardTicketCard extends StatelessWidget {
               _MiniInfoLine(
                 icon: Icons.person_outline,
                 text: ticket.requesterLabel,
+              ),
+              const SizedBox(height: 5),
+              _MiniInfoLine(
+                icon: Icons.location_on_outlined,
+                text: ticket.addressLabel,
               ),
               const SizedBox(height: 5),
               _MiniInfoLine(
@@ -544,6 +662,27 @@ String _ticketDetailPath(BuildContext context, String ticketId) {
     path: '/admin/tickets/$ticketId',
     queryParameters: {'from': source},
   ).toString();
+}
+
+List<TicketStatus> _statusOrderForQueue(TicketQueue queue) {
+  return switch (queue) {
+    TicketQueue.csr => const [
+        TicketStatus.newTicket,
+        TicketStatus.open,
+        TicketStatus.assigned,
+        TicketStatus.inProgress,
+        TicketStatus.waitingOnCustomer,
+      ],
+    TicketQueue.urgent || TicketQueue.aging || TicketQueue.all => const [
+        TicketStatus.newTicket,
+        TicketStatus.open,
+        TicketStatus.assigned,
+        TicketStatus.inProgress,
+        TicketStatus.waitingOnCustomer,
+        TicketStatus.resolved,
+        TicketStatus.closed,
+      ],
+  };
 }
 
 class _SoftBadge extends StatelessWidget {

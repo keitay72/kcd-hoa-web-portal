@@ -19,6 +19,7 @@ abstract interface class HoaRepository {
 
   Future<String> availableCodeForName({
     required String name,
+    CommunityType communityType = CommunityType.hoa,
     String? excludingHoaId,
   });
 }
@@ -35,26 +36,25 @@ class SupabaseHoaRepository implements HoaRepository {
         .select()
         .order('name', ascending: true);
 
-    return rows
-        .map((row) => HoaCommunityDto.fromJson(row).toDomain())
-        .toList();
+    return rows.map((row) => HoaCommunityDto.fromJson(row).toDomain()).toList();
   }
 
   @override
   Future<HoaCommunity> getById(String id) async {
-    final row = await _client
-        .from('hoa_communities')
-        .select()
-        .eq('id', id)
-        .single();
+    final row =
+        await _client.from('hoa_communities').select().eq('id', id).single();
 
     return HoaCommunityDto.fromJson(row).toDomain();
   }
 
   @override
-  Future<HoaCommunity> create(HoaCommunityInput input, {String? tenantId}) async {
+  Future<HoaCommunity> create(HoaCommunityInput input,
+      {String? tenantId}) async {
     final targetTenantId = tenantId ?? await _primaryTenantId();
-    final code = await availableCodeForName(name: input.name);
+    final code = await availableCodeForName(
+      name: input.name,
+      communityType: input.communityType,
+    );
     final row = await _client
         .from('hoa_communities')
         .insert(input.toInsertJson(tenantId: targetTenantId, code: code))
@@ -71,6 +71,7 @@ class SupabaseHoaRepository implements HoaRepository {
   }) async {
     final code = await availableCodeForName(
       name: input.name,
+      communityType: input.communityType,
       excludingHoaId: id,
     );
     final row = await _client
@@ -86,6 +87,7 @@ class SupabaseHoaRepository implements HoaRepository {
   @override
   Future<String> availableCodeForName({
     required String name,
+    CommunityType communityType = CommunityType.hoa,
     String? excludingHoaId,
   }) async {
     final rows = await _client.from('hoa_communities').select('id, code');
@@ -96,6 +98,7 @@ class SupabaseHoaRepository implements HoaRepository {
     return HoaCodeGenerator.uniqueCodeForName(
       name: name,
       existingCodes: existingCodes,
+      communityType: communityType,
     );
   }
 

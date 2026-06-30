@@ -47,6 +47,7 @@ class SupabaseCustomerPortalHomeRepository
       id: json['id'] as String,
       accountType: json['accountType'] as String? ?? 'residential',
       isCommunityAccount: json['isCommunityAccount'] == true,
+      communityType: json['communityType'] as String? ?? 'hoa',
       accountNumber: json['accountNumber'] as String?,
       name: json['name'] as String?,
     );

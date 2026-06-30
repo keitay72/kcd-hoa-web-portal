@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/rbac/admin_context.dart';
+import '../../../core/supabase/supabase_provider.dart';
 import '../domain/analytics_dashboard.dart';
 import 'analytics_dashboard_providers.dart';
 
@@ -54,6 +55,12 @@ class _AnalyticsDashboardContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final profile = ref.watch(currentAdminProfileProvider);
+    final firstName = profile.maybeWhen(
+      data: (value) => _firstNameFromDisplayName(value?.displayName),
+      orElse: () => null,
+    );
+
     return RefreshIndicator(
       onRefresh: () async {
         ref.invalidate(analyticsDashboardProvider);
@@ -69,12 +76,14 @@ class _AnalyticsDashboardContent extends ConsumerWidget {
               _DashboardHeader(
                 loadedAt: snapshot.loadedAt,
                 isTenantScoped: isTenantScoped,
+                firstName: firstName,
               ),
               const SizedBox(height: 20),
               _SectionHeader(
-                title: isTenantScoped ? 'Portal Metrics' : 'Platform Metrics',
+                title:
+                    isTenantScoped ? 'Activity Overview' : 'Platform Metrics',
                 subtitle: isTenantScoped
-                    ? 'Current customer portal activity for your organization.'
+                    ? 'Current customer activity for your organization.'
                     : 'Current customer portal health across tenant operations.',
               ),
               const SizedBox(height: 12),
@@ -183,7 +192,7 @@ class _AnalyticsDashboardContent extends ConsumerWidget {
               _SectionHeader(
                 title: 'Recent Activity',
                 subtitle: isTenantScoped
-                    ? 'Latest activity for this management portal.'
+                    ? 'Latest activity across your organization.'
                     : 'Latest operational events from the live Supabase data set.',
               ),
               const SizedBox(height: 12),
@@ -200,10 +209,12 @@ class _DashboardHeader extends StatelessWidget {
   const _DashboardHeader({
     required this.loadedAt,
     required this.isTenantScoped,
+    required this.firstName,
   });
 
   final DateTime loadedAt;
   final bool isTenantScoped;
+  final String? firstName;
 
   @override
   Widget build(BuildContext context) {
@@ -217,15 +228,20 @@ class _DashboardHeader extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              isTenantScoped
-                  ? 'Management Dashboard'
-                  : 'Analytics & Operations Dashboard',
+              isTenantScoped ? 'Dashboard' : 'Analytics & Operations Dashboard',
               style: Theme.of(context).textTheme.headlineMedium,
             ),
+            if (firstName != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Welcome back, $firstName.',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ],
             const SizedBox(height: 6),
             Text(
               isTenantScoped
-                  ? 'Customer accounts, tickets, content, and readiness for your organization.'
+                  ? 'Customer accounts, tickets, content, and team activity for your organization.'
                   : 'Platform, ticket, staffing, and activity metrics across tenant portal operations.',
               style: Theme.of(context).textTheme.bodyLarge,
             ),
@@ -238,6 +254,14 @@ class _DashboardHeader extends StatelessWidget {
       ],
     );
   }
+}
+
+String? _firstNameFromDisplayName(String? value) {
+  final trimmed = value?.trim();
+  if (trimmed == null || trimmed.isEmpty || trimmed.contains('@')) {
+    return null;
+  }
+  return trimmed.split(RegExp(r'\s+')).first;
 }
 
 class _SectionHeader extends StatelessWidget {
